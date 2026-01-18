@@ -18,8 +18,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private destroy$ = new Subject<void>();
 
-  username = 'demo';
-  password = 'password';
+  username = '';
+  password = '';
   isLoading = false;
   isAuthenticated = false;
   error = '';
@@ -65,8 +65,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   handleLogout(): void {
     this.authService.logout();
     this.isAuthenticated = false;
-    this.username = 'demo';
-    this.password = 'password';
+    this.username = '';
+    this.password = '';
   }
 
   goToDashboard(): void {

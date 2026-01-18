@@ -16,7 +16,8 @@ export interface RegisterCredentials extends LoginCredentials {
 }
 
 export interface AuthResponse {
-  token: string;
+  access_token: string;
+  refresh_token: string;
   user: {
     id: string;
     email: string;
@@ -34,10 +35,11 @@ export interface VerificationResponse {
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly TOKEN_KEY = 'auth_token';
+  private readonly ACCESS_TOKEN_KEY = 'auth_token';
+  private readonly REFRESH_TOKEN_KEY = 'refresh_token';
   private readonly USER_KEY = 'auth_user';
 
-  private isLoggedIn = new BehaviorSubject<boolean>(this.hasToken());
+  private isLoggedIn = new BehaviorSubject<boolean>(this.hasValidTokens());
   public isLoggedIn$: Observable<boolean> = this.isLoggedIn.asObservable();
 
   private currentUser = signal<any>(this.getStoredUser());
@@ -55,7 +57,7 @@ export class AuthService {
   login(credentials: LoginCredentials): Observable<AuthResponse> {
     return this.apiService.post<AuthResponse>('auth/login', credentials).pipe(
       tap(response => {
-        this.setToken(response.token);
+        this.setTokens(response.access_token, response.refresh_token);
         // Set admin flag if username matches admin username (configurable)
         const adminUsername = 'kevin'; // Change this to your admin username
         const user = {
@@ -75,7 +77,7 @@ export class AuthService {
   register(credentials: RegisterCredentials): Observable<AuthResponse> {
     return this.apiService.post<AuthResponse>('auth/register', credentials).pipe(
       tap(response => {
-        this.setToken(response.token);
+        this.setTokens(response.access_token, response.refresh_token);
         const user = {
           ...response.user,
           is_admin: false
@@ -91,30 +93,38 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.ACCESS_TOKEN_KEY);
+    localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
     this.currentUser.set(null);
     this.isLoggedIn.next(false);
   }
 
   isAuthenticated(): boolean {
-    return this.hasToken() && this.isLoggedIn.value;
+    return this.hasValidTokens() && this.isLoggedIn.value;
   }
 
-  getToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
+  getAccessToken(): string | null {
+    return localStorage.getItem(this.ACCESS_TOKEN_KEY);
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
   }
 
   getCurrentUser() {
     return this.currentUser;
   }
 
-  private setToken(token: string): void {
-    localStorage.setItem(this.TOKEN_KEY, token);
+  private setTokens(accessToken: string, refreshToken: string): void {
+    localStorage.setItem(this.ACCESS_TOKEN_KEY, accessToken);
+    localStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
   }
 
-  private hasToken(): boolean {
-    return !!localStorage.getItem(this.TOKEN_KEY);
+  private hasValidTokens(): boolean {
+    const accessToken = localStorage.getItem(this.ACCESS_TOKEN_KEY);
+    const refreshToken = localStorage.getItem(this.REFRESH_TOKEN_KEY);
+    return !!(accessToken && refreshToken);
   }
 
   private getStoredUser(): any {
