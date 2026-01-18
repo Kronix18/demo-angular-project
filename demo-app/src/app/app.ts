@@ -1,7 +1,7 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, Router } from '@angular/router';
-import { AuthService } from './core/services/auth.service';
+import { AuthService } from './core/auth/auth.service';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -13,17 +13,15 @@ import { takeUntil } from 'rxjs/operators';
   styleUrl: './app.scss'
 })
 export class App implements OnInit, OnDestroy {
-  isAuthenticated = false;
-  title = 'Angular Demo App';
+  private authService = inject(AuthService);
+  private router = inject(Router);
   private destroy$ = new Subject<void>();
 
-  constructor(
-    private authService: AuthService,
-    private router: Router
-  ) {}
+  isAuthenticated = false;
+  title = 'Stock Screener';
 
   ngOnInit(): void {
-    this.authService.isAuthenticated$
+    this.authService.isLoggedIn$
       .pipe(takeUntil(this.destroy$))
       .subscribe(isAuth => {
         this.isAuthenticated = isAuth;

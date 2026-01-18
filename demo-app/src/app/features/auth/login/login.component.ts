@@ -1,8 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
+import { AuthService } from '../../../core/auth/auth.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-login',
@@ -11,20 +13,26 @@ import { AuthService } from '../../../core/services/auth.service';
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit, OnDestroy {
+  private authService = inject(AuthService);
+  private router = inject(Router);
+  private destroy$ = new Subject<void>();
+
   username = 'demo';
   password = 'password';
   isLoading = false;
   isAuthenticated = false;
   error = '';
 
-  constructor(
-    private authService: AuthService,
-    private router: Router
-  ) {
+  ngOnInit(): void {
     if (this.authService.isAuthenticated()) {
       this.isAuthenticated = true;
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   handleLogin(): void {
@@ -36,18 +44,22 @@ export class LoginComponent {
     this.isLoading = true;
     this.error = '';
 
-    this.authService.login(this.username, this.password).subscribe({
-      next: (response) => {
-        this.authService.setToken(response.token);
-        this.isAuthenticated = true;
-        this.isLoading = false;
-        console.log('Login successful, token stored:', response.token.substring(0, 20) + '...');
-      },
-      error: (err) => {
-        this.error = 'Login failed. Please try again.';
-        this.isLoading = false;
-      }
-    });
+    this.authService.login({
+      username: this.username,
+      password: this.password
+    })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.isAuthenticated = true;
+          this.isLoading = false;
+          this.goToDashboard();
+        },
+        error: (err) => {
+          this.error = err?.message || 'Login failed. Please try again.';
+          this.isLoading = false;
+        }
+      });
   }
 
   handleLogout(): void {

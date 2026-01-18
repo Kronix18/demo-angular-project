@@ -1,0 +1,161 @@
+<div class="demo-container">
+  <h2>Template-Driven Forms Demo</h2>
+
+  <div class="section">
+    <h3>User Registration Form</h3>
+    
+    <form #userForm="ngForm" (ngSubmit)="handleSubmit(userForm)">
+      <div class="form-group">
+        <label for="fullName">Full Name</label>
+        <input 
+          type="text"
+          id="fullName"
+          name="fullName"
+          [(ngModel)]="formData.fullName"
+          #fullNameField="ngModel"
+          required
+          minlength="3"
+          placeholder="Enter your full name" />
+        <span class="error" *ngIf="fullNameField.invalid && fullNameField.touched">
+          <span *ngIf="fullNameField.errors?.['required']">Name is required</span>
+          <span *ngIf="fullNameField.errors?.['minlength']">Name must be at least 3 characters</span>
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input 
+          type="email"
+          id="email"
+          name="email"
+          [(ngModel)]="formData.email"
+          #emailField="ngModel"
+          required
+          email
+          placeholder="Enter your email" />
+        <span class="error" *ngIf="emailField.invalid && emailField.touched">
+          <span *ngIf="emailField.errors?.['required']">Email is required</span>
+          <span *ngIf="emailField.errors?.['email']">Invalid email format</span>
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input 
+          type="password"
+          id="password"
+          name="password"
+          [(ngModel)]="formData.password"
+          #passwordField="ngModel"
+          required
+          minlength="6"
+          placeholder="Enter password (min 6 chars)" />
+        <span class="error" *ngIf="passwordField.invalid && passwordField.touched">
+          <span *ngIf="passwordField.errors?.['required']">Password is required</span>
+          <span *ngIf="passwordField.errors?.['minlength']">Password must be at least 6 characters</span>
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <input 
+          type="password"
+          id="confirmPassword"
+          name="confirmPassword"
+          [(ngModel)]="formData.confirmPassword"
+          #confirmPasswordField="ngModel"
+          required
+          placeholder="Confirm password" />
+        <span class="error" *ngIf="passwordMismatch && confirmPasswordField.touched">
+          Passwords do not match
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label for="country">Country</label>
+        <select 
+          id="country"
+          name="country"
+          [(ngModel)]="formData.country"
+          #countryField="ngModel"
+          required>
+          <option value="">Select a country</option>
+          <option value="usa">United States</option>
+          <option value="canada">Canada</option>
+          <option value="uk">United Kingdom</option>
+          <option value="australia">Australia</option>
+        </select>
+        <span class="error" *ngIf="countryField.invalid && countryField.touched">
+          Please select a country
+        </span>
+      </div>
+
+      <div class="form-group checkbox">
+        <label for="agree">
+          <input 
+            type="checkbox"
+            id="agree"
+            name="agree"
+            [(ngModel)]="formData.agree"
+            #agreeField="ngModel"
+            required />
+          I agree to the terms and conditions
+        </label>
+        <span class="error" *ngIf="agreeField.invalid && agreeField.touched">
+          You must agree to continue
+        </span>
+      </div>
+
+      <div class="button-group">
+        <button type="submit" [disabled]="userForm.invalid || passwordMismatch">
+          Submit
+        </button>
+        <button type="reset" (click)="handleReset(userForm)">
+          Reset
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section" *ngIf="submitted">
+    <h3>Form Data Summary</h3>
+    <div class="success-message">
+      Form submitted successfully!
+    </div>
+    <table class="data-table">
+      <tr>
+        <td><strong>Full Name:</strong></td>
+        <td>{{ formData.fullName }}</td>
+      </tr>
+      <tr>
+        <td><strong>Email:</strong></td>
+        <td>{{ formData.email }}</td>
+      </tr>
+      <tr>
+        <td><strong>Password:</strong></td>
+        <td>{{ '•'.repeat(formData.password.length) }}</td>
+      </tr>
+      <tr>
+        <td><strong>Country:</strong></td>
+        <td>{{ formData.country }}</td>
+      </tr>
+      <tr>
+        <td><strong>Agreed:</strong></td>
+        <td>{{ formData.agree ? 'Yes' : 'No' }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h3>Form State Information</h3>
+    <div class="info-box">
+      <p><strong>Form Valid:</strong> <span [ngClass]="{'success': userForm.valid, 'error': !userForm.valid}">
+        {{ userForm.valid ? 'Yes' : 'No' }}
+      </span></p>
+      <p><strong>Form Dirty:</strong> {{ userForm.dirty ? 'Yes' : 'No' }}</p>
+      <p><strong>Form Touched:</strong> {{ userForm.touched ? 'Yes' : 'No' }}</p>
+      <p><strong>Form Value:</strong></p>
+      <pre>{{ userForm.value | json }}</pre>
+    </div>
+  </div>
+</div>

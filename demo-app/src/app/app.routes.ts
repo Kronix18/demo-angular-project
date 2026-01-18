@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { AuthGuard } from './core/guards/auth.guard';
+import { authGuard } from './core/guards/auth.guard';
 import { ScreenerComponent } from './features/screener/screener.component';
 import { StockComponent } from './features/stock/stock.component';
 
@@ -13,13 +13,13 @@ export const routes: Routes = [
     path: 'screener',
     component: ScreenerComponent,
     data: { title: 'Stock Screener' },
-    canActivate: [AuthGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'stock/:symbol',
     component: StockComponent,
     data: { title: 'Stock Details' },
-    canActivate: [AuthGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'auth',

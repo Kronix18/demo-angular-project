@@ -1,0 +1,142 @@
+<div class="demo-container">
+  <h2>Directives Demo</h2>
+
+  <div class="section">
+    <h3>1. *ngIf - Conditional Rendering</h3>
+    <button (click)="showContent = !showContent">
+      {{ showContent ? 'Hide' : 'Show' }} Content
+    </button>
+    
+    <div *ngIf="showContent" class="content-box">
+      <p>This content is conditionally displayed!</p>
+    </div>
+
+    <div *ngIf="isLoggedIn; then loggedInTemplate else loggedOutTemplate"></div>
+    <ng-template #loggedInTemplate>
+      <p class="success">User is logged in</p>
+    </ng-template>
+    <ng-template #loggedOutTemplate>
+      <p class="warning">User is logged out</p>
+    </ng-template>
+  </div>
+
+  <div class="section">
+    <h3>2. *ngFor - List Rendering</h3>
+    <div *ngIf="items.length > 0; else noItems">
+      <ul>
+        <li *ngFor="let item of items; let idx = index; let isLast = last">
+          {{ idx + 1 }}. {{ item.name }} - {{ item.price | currency }}
+          <span *ngIf="isLast" class="badge">Last</span>
+        </li>
+      </ul>
+    </div>
+    <ng-template #noItems>
+      <p>No items to display</p>
+    </ng-template>
+  </div>
+
+  <div class="section">
+    <h3>3. *ngSwitch - Switch Statements</h3>
+    <label>
+      Status:
+      <select [(ngModel)]="selectedStatus">
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+        <option value="pending">Pending</option>
+      </select>
+    </label>
+
+    <div [ngSwitch]="selectedStatus">
+      <div *ngSwitchCase="'active'" class="status-active">
+        Status is Active
+      </div>
+      <div *ngSwitchCase="'inactive'" class="status-inactive">
+        Status is Inactive
+      </div>
+      <div *ngSwitchCase="'pending'" class="status-pending">
+        Status is Pending
+      </div>
+      <div *ngSwitchDefault>
+        Unknown Status
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>4. [ngClass] - Dynamic Classes</h3>
+    <button (click)="highlightedItem = (highlightedItem + 1) % 3">
+      Highlight Next
+    </button>
+    
+    <div *ngFor="let item of items.slice(0, 3); let idx = index"
+         [ngClass]="{
+           'highlight': idx === highlightedItem,
+           'fade': idx !== highlightedItem
+         }"
+         class="item-card">
+      {{ item.name }}
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>5. [ngStyle] - Dynamic Styles</h3>
+    <div *ngFor="let item of items.slice(0, 3)"
+         [ngStyle]="{
+           'backgroundColor': item.status === 'active' ? '#d4edda' : '#f8d7da',
+           'color': item.status === 'active' ? '#155724' : '#721c24',
+           'padding': '12px',
+           'margin': '8px 0',
+           'borderRadius': '4px'
+         }">
+      {{ item.name }} - {{ item.status }}
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>6. [ngModel] - Attribute Binding</h3>
+    <input [ngModel]="inputValue" 
+           (ngModelChange)="inputValue = $event"
+           placeholder="Type here..." />
+    <p>Input value: {{ inputValue }}</p>
+  </div>
+
+  <div class="section">
+    <h3>7. Filtered List with Multiple Directives</h3>
+    <label>
+      Filter by status:
+      <select [(ngModel)]="filterStatus">
+        <option value="">All</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+        <option value="pending">Pending</option>
+      </select>
+    </label>
+
+    <div *ngIf="filteredItems.length > 0; else noFiltered">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of filteredItems" 
+              [ngClass]="'status-' + item.status">
+            <td>{{ item.name }}</td>
+            <td>
+              <span [ngClass]="'badge badge-' + item.status">
+                {{ item.status }}
+              </span>
+            </td>
+            <td>{{ item.price | currency }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ng-template #noFiltered>
+      <p class="warning">No items match the selected filter</p>
+    </ng-template>
+  </div>
+</div>
