@@ -1,0 +1,100 @@
+<div class="screener-container">
+  <h1>Stock Screener</h1>
+  
+  <div class="filters-section">
+    <h2>Filter Stocks</h2>
+    <div class="filters-grid">
+      <div class="filter-group">
+        <label>Min Price ($)</label>
+        <input type="number" [(ngModel)]="filters.minPrice" (change)="applyFilters()" placeholder="0">
+      </div>
+      <div class="filter-group">
+        <label>Max Price ($)</label>
+        <input type="number" [(ngModel)]="filters.maxPrice" (change)="applyFilters()" placeholder="999999">
+      </div>
+      <div class="filter-group">
+        <label>Min P/E Ratio</label>
+        <input type="number" [(ngModel)]="filters.minPE" (change)="applyFilters()" placeholder="0">
+      </div>
+      <div class="filter-group">
+        <label>Max P/E Ratio</label>
+        <input type="number" [(ngModel)]="filters.maxPE" (change)="applyFilters()" placeholder="999">
+      </div>
+      <div class="filter-group">
+        <label>Min Dividend (%)</label>
+        <input type="number" [(ngModel)]="filters.minDividend" (change)="applyFilters()" placeholder="0" step="0.1">
+      </div>
+      <div class="filter-group">
+        <label>Sector</label>
+        <select [(ngModel)]="filters.sector" (change)="applyFilters()">
+          <option value="">All Sectors</option>
+          <option *ngFor="let sector of sectors$ | async" [value]="sector">
+            {{ sector }}
+          </option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Min Volume (M)</label>
+        <input type="number" [(ngModel)]="filters.minVolume" (change)="applyFilters()" placeholder="0" step="1">
+      </div>
+      <div class="filter-group">
+        <button class="reset-btn" (click)="resetFilters()">Reset Filters</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="search-section">
+    <input type="text" 
+           [(ngModel)]="searchQuery" 
+           (ngModelChange)="onSearch($event)" 
+           placeholder="Search by symbol or name..."
+           class="search-input">
+  </div>
+
+  <div class="results-section">
+    <h2>Results ({{ filteredStocks.length }})</h2>
+    
+    <div class="stocks-table-container">
+      <table class="stocks-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Change</th>
+            <th>%</th>
+            <th>P/E</th>
+            <th>Dividend</th>
+            <th>Volume</th>
+            <th>Market Cap</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let stock of filteredStocks" [class.negative]="stock.change < 0">
+            <td class="symbol">{{ stock.symbol }}</td>
+            <td class="name">{{ stock.name }}</td>
+            <td class="price">${{ stock.price | number: '1.2-2' }}</td>
+            <td class="change" [class.positive]="stock.change >= 0" [class.negative]="stock.change < 0">
+              {{ stock.change >= 0 ? '+' : '' }}{{ stock.change | number: '1.2-2' }}
+            </td>
+            <td class="percent" [class.positive]="stock.changePercent >= 0" [class.negative]="stock.changePercent < 0">
+              {{ stock.changePercent >= 0 ? '+' : '' }}{{ stock.changePercent | number: '1.2-2' }}%
+            </td>
+            <td class="metric">{{ stock.peRatio | number: '1.1-1' }}</td>
+            <td class="metric">{{ stock.dividend | number: '1.2-2' }}%</td>
+            <td class="metric">{{ (stock.volume / 1000000) | number: '1.1-1' }}M</td>
+            <td class="metric">${{ (stock.marketCap / 1000000000) | number: '1.0-0' }}B</td>
+            <td class="action">
+              <a [routerLink]="['/stock', stock.symbol]" class="view-btn">View</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state" *ngIf="filteredStocks.length === 0">
+      <p>No stocks match your criteria. Try adjusting your filters.</p>
+    </div>
+  </div>
+</div>

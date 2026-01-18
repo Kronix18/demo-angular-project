@@ -14,6 +14,7 @@ import { takeUntil } from 'rxjs/operators';
 })
 export class App implements OnInit, OnDestroy {
   isAuthenticated = false;
+  title = 'Angular Demo App';
   private destroy$ = new Subject<void>();
 
   constructor(

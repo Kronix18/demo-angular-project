@@ -69,7 +69,8 @@
 }
 
 .logout-btn,
-.login-link {
+.login-link,
+.register-link {
   padding: 8px 16px;
   border-radius: 6px;
   font-weight: 500;
@@ -97,6 +98,17 @@
 
   &:hover {
     background: rgba(255, 255, 255, 0.9);
+  }
+}
+
+.register-link {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: white;
   }
 }
 

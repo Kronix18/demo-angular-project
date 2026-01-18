@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DataService } from '../../core/services/data.service';
 import { UserService, User } from '../../core/services/user.service';
-import { Subject, takeUntil, filter, map } from 'rxjs';
+import { Subject, takeUntil, filter, map, Observable } from 'rxjs';
 
 @Component({
   selector: 'app-observables',
@@ -45,7 +45,7 @@ import { Subject, takeUntil, filter, map } from 'rxjs';
         <h3>3. Real-time Data Stream</h3>
         <p>Updates every 2 seconds:</p>
         <div class="realtime-value">
-          Value: {{ realtimeValue | async }}
+          Value: {{ realtimeValue$ | async }}
         </div>
       </div>
 
@@ -214,11 +214,9 @@ export class ObservablesComponent implements OnInit, OnDestroy {
   subscriptionActive = false;
   subscriptionCount = 0;
 
-  users$ = this.userService.getUsers();
-  realtimeValue$ = this.dataService.realtimeData$;
-  filteredUsers$ = this.userService.getUsers().pipe(
-    map(users => users.filter(u => u.role === 'user'))
-  );
+  users$: Observable<any[]>;
+  realtimeValue$: Observable<number>;
+  filteredUsers$: Observable<any[]>;
 
   private destroy$ = new Subject<void>();
   private subscriptionTimer: any;
@@ -226,7 +224,13 @@ export class ObservablesComponent implements OnInit, OnDestroy {
   constructor(
     private dataService: DataService,
     private userService: UserService
-  ) {}
+  ) {
+    this.users$ = this.userService.getUsers();
+    this.realtimeValue$ = this.dataService.realtimeData$;
+    this.filteredUsers$ = this.userService.getUsers().pipe(
+      map(users => users.filter(u => u.role === 'user'))
+    );
+  }
 
   ngOnInit(): void {
     // Subscribe to users

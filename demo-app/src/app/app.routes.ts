@@ -1,40 +1,24 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
-import { DataBindingComponent } from './features/data-binding/data-binding.component';
-import { DirectivesComponent } from './features/directives/directives.component';
-import { FormsComponent } from './features/forms/forms.component';
-import { ObservablesComponent } from './features/observables/observables.component';
+import { ScreenerComponent } from './features/screener/screener.component';
+import { StockComponent } from './features/stock/stock.component';
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: '/home',
+    redirectTo: '/screener',
     pathMatch: 'full'
   },
   {
-    path: 'home',
-    component: DataBindingComponent,
-    data: { title: 'Data Binding' }
+    path: 'screener',
+    component: ScreenerComponent,
+    data: { title: 'Stock Screener' },
+    canActivate: [AuthGuard]
   },
   {
-    path: 'data-binding',
-    component: DataBindingComponent,
-    data: { title: 'Data Binding' }
-  },
-  {
-    path: 'directives',
-    component: DirectivesComponent,
-    data: { title: 'Directives' }
-  },
-  {
-    path: 'forms',
-    component: FormsComponent,
-    data: { title: 'Template-Driven Forms' }
-  },
-  {
-    path: 'observables',
-    component: ObservablesComponent,
-    data: { title: 'Observables' },
+    path: 'stock/:symbol',
+    component: StockComponent,
+    data: { title: 'Stock Details' },
     canActivate: [AuthGuard]
   },
   {

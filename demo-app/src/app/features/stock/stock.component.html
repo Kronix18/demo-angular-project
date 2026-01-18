@@ -1,0 +1,78 @@
+<div class="stock-container">
+  <div class="back-link">
+    <a routerLink="/screener">← Back to Screener</a>
+  </div>
+
+  <div *ngIf="stock" class="stock-detail">
+    <div class="header">
+      <div class="header-left">
+        <h1>{{ stock.symbol }}</h1>
+        <p class="company-name">{{ stock.name }}</p>
+        <p class="sector-badge">{{ stock.sector }} • {{ stock.industry }}</p>
+      </div>
+      <div class="header-right">
+        <div class="price-display">
+          <div class="current-price">${{ stock.price | number: '1.2-2' }}</div>
+          <div class="change" [class.positive]="stock.change >= 0" [class.negative]="stock.change < 0">
+            <span class="change-value">{{ stock.change >= 0 ? '+' : '' }}{{ stock.change | number: '1.2-2' }}</span>
+            <span class="change-percent">({{ stock.changePercent >= 0 ? '+' : '' }}{{ stock.changePercent | number: '1.2-2' }}%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <h3>Market Capitalization</h3>
+        <p class="metric-value">${{ (stock.marketCap / 1000000000) | number: '1.1-0' }}B</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>P/E Ratio</h3>
+        <p class="metric-value">{{ stock.peRatio | number: '1.1-1' }}</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>Dividend Yield</h3>
+        <p class="metric-value">{{ stock.dividend | number: '1.2-2' }}%</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>Volume</h3>
+        <p class="metric-value">{{ (stock.volume / 1000000) | number: '1.1-1' }}M</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>Avg Volume (3M)</h3>
+        <p class="metric-value">{{ (stock.avgVolume / 1000000) | number: '1.1-1' }}M</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>52-Week High</h3>
+        <p class="metric-value">${{ stock.fiftyTwoWeekHigh | number: '1.2-2' }}</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>52-Week Low</h3>
+        <p class="metric-value">${{ stock.fiftyTwoWeekLow | number: '1.2-2' }}</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>52-Week Range</h3>
+        <div class="range-bar">
+          <div class="range-fill" [style.width.%]="getRangePercent()"></div>
+        </div>
+        <p class="range-text">${{ stock.fiftyTwoWeekLow | number: '1.2-2' }} — ${{ stock.fiftyTwoWeekHigh | number: '1.2-2' }}</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="buy-btn">Buy {{ stock.symbol }}</button>
+      <button class="watchlist-btn">+ Add to Watchlist</button>
+    </div>
+  </div>
+
+  <div *ngIf="!stock" class="loading">
+    <p>Loading stock data...</p>
+  </div>
+</div>

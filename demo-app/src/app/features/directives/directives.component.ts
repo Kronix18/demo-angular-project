@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 interface Item {
   id: number;
@@ -11,7 +12,7 @@ interface Item {
 @Component({
   selector: 'app-directives',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="demo-container">
       <h2>Directives Demo</h2>
@@ -40,7 +41,7 @@ interface Item {
         <div *ngIf="items.length > 0; else noItems">
           <ul>
             <li *ngFor="let item of items; let idx = index; let isLast = last">
-              {{ idx + 1 }}. {{ item.name }} - ${{ item.price }}
+              {{ idx + 1 }}. {{ item.name }} - {{ item.price | currency }}
               <span *ngIf="isLast" class="badge">Last</span>
             </li>
           </ul>
@@ -145,7 +146,7 @@ interface Item {
                     {{ item.status }}
                   </span>
                 </td>
-                <td>${{ item.price }}</td>
+                <td>{{ item.price | currency }}</td>
               </tr>
             </tbody>
           </table>
