@@ -330,13 +330,40 @@
   </div>
 </main>
 
-<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
-<!-- * * * * * * * * * * * The content above * * * * * * * * * * * * -->
-<!-- * * * * * * * * * * is only a placeholder * * * * * * * * * * * -->
-<!-- * * * * * * * * * * and can be replaced.  * * * * * * * * * * * -->
-<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
-<!-- * * * * * * * * * * End of Placeholder  * * * * * * * * * * * * -->
-<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+<div class="app-container">
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <h1 class="logo">Angular Demo App</h1>
+      
+      <div class="nav-links">
+        <a routerLink="/data-binding" class="nav-link">Data Binding</a>
+        <a routerLink="/directives" class="nav-link">Directives</a>
+        <a routerLink="/forms" class="nav-link">Forms</a>
+        <a routerLink="/observables" class="nav-link" [class.disabled]="!isAuthenticated" [attr.title]="!isAuthenticated ? 'Login required' : ''">Observables</a>
+      </div>
 
+      <div class="nav-actions">
+        <span class="auth-status" *ngIf="isAuthenticated">
+          ✓ Authenticated
+        </span>
+        <button class="logout-btn" *ngIf="isAuthenticated" (click)="handleLogout()">
+          Logout
+        </button>
+        <a *ngIf="!isAuthenticated" routerLink="/auth/login" class="login-link">
+          Login
+        </a>
+      </div>
+    </div>
+  </nav>
 
-<router-outlet />
+  <!-- Main Content -->
+  <main class="main-content">
+    <router-outlet></router-outlet>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>&copy; 2024 Angular Demo Application. Showcasing core concepts: Data Binding, Directives, Forms, Observables, Services, Routing, and JWT Interceptors.</p>
+  </footer>
+</div>
