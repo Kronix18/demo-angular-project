@@ -1,0 +1,36 @@
+<div class="success-container">
+  <div class="success-card">
+    <div class="success-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+    </div>
+
+    <h1>Registration Successful!</h1>
+    
+    <div class="message-box">
+      <p class="main-message">Please check your email to verify your account</p>
+      <p class="email-info">We've sent a verification link to:</p>
+      <p class="masked-email">{{ maskedEmail }}</p>
+    </div>
+
+    <div class="instructions">
+      <h3>Next Steps:</h3>
+      <ol>
+        <li>Check your inbox (and spam folder)</li>
+        <li>Click the verification link in the email</li>
+        <li>Return here to log in</li>
+      </ol>
+    </div>
+
+    <div class="actions">
+      <button routerLink="/auth/login" class="login-button">
+        Go to Login
+      </button>
+      <p class="resend-text">
+        Didn't receive the email? <a href="#" class="resend-link">Resend verification</a>
+      </p>
+    </div>
+  </div>
+</div>

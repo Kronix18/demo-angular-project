@@ -35,28 +35,44 @@ export class ApiService {
   }
 
   post<T>(endpoint: string, data: any): Observable<T> {
-    return this.http.post<T>(`${this.apiUrl}/${endpoint}`, data).pipe(
+    const url = `${this.apiUrl}/${endpoint}`;
+    console.log('ApiService POST request to:', url);
+    if (Object.keys(data).length > 0) {
+      console.log('Request body:', data);
+    }
+    
+    return this.http.post<T>(url, data).pipe(
       timeout(this.timeoutMs),
-      catchError(error => this.handleError(error))
+      catchError(error => this.handleError(error, url))
     );
   }
 
   put<T>(endpoint: string, data: any): Observable<T> {
-    return this.http.put<T>(`${this.apiUrl}/${endpoint}`, data).pipe(
+    const url = `${this.apiUrl}/${endpoint}`;
+    return this.http.put<T>(url, data).pipe(
       timeout(this.timeoutMs),
-      catchError(error => this.handleError(error))
+      catchError(error => this.handleError(error, url))
     );
   }
 
   delete<T>(endpoint: string): Observable<T> {
-    return this.http.delete<T>(`${this.apiUrl}/${endpoint}`).pipe(
+    const url = `${this.apiUrl}/${endpoint}`;
+    return this.http.delete<T>(url).pipe(
       timeout(this.timeoutMs),
-      catchError(error => this.handleError(error))
+      catchError(error => this.handleError(error, url))
     );
   }
 
-  private handleError(error: any) {
+  private handleError(error: any, url?: string) {
     let errorMessage = 'An unexpected error occurred';
+
+    console.error('API Error Details:', {
+      url,
+      error,
+      status: error?.status,
+      statusText: error?.statusText,
+      errorBody: error?.error
+    });
 
     if (error instanceof HttpErrorResponse) {
       if (error.error instanceof ErrorEvent) {
@@ -74,7 +90,7 @@ export class ApiService {
     }
 
     console.error('API Error:', errorMessage);
-    return throwError(() => ({ message: errorMessage, originalError: error }));
+    return throwError(() => ({ message: errorMessage, originalError: error, status: error?.status }));
   }
 }
 

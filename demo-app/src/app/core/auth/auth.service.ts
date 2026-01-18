@@ -25,6 +25,11 @@ export interface AuthResponse {
   };
 }
 
+export interface VerificationResponse {
+  message: string;
+  user_id: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -115,5 +120,22 @@ export class AuthService {
   private getStoredUser(): any {
     const user = localStorage.getItem(this.USER_KEY);
     return user ? JSON.parse(user) : null;
+  }
+
+  verifyEmail(token: string): Observable<VerificationResponse> {
+    console.log('AuthService.verifyEmail called');
+    console.log('Sending verification request with token:', token);
+    
+    // Send token in the request body (backend expects it there, not as query parameter)
+    return this.apiService.post<VerificationResponse>('auth/verify-email', { token }).pipe(
+      tap(response => {
+        console.log('Email verification successful:', response);
+        // Email is now verified, user needs to login manually
+      }),
+      catchError(error => {
+        console.error('Email verification API error:', error);
+        throw error;
+      })
+    );
   }
 }
