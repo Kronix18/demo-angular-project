@@ -2,32 +2,69 @@
   <div class="chart-header">
     <h3>{{ title }}</h3>
     <div class="chart-controls">
-      <div class="time-range-buttons">
-        <button 
-          [class.active]="timeRange === '1m'" 
-          (click)="changeTimeRange('1m')">1M</button>
-        <button 
-          [class.active]="timeRange === '3m'" 
-          (click)="changeTimeRange('3m')">3M</button>
-        <button 
-          [class.active]="timeRange === '6m'" 
-          (click)="changeTimeRange('6m')">6M</button>
-        <button 
-          [class.active]="timeRange === '1y'" 
-          (click)="changeTimeRange('1y')">1Y</button>
-        <button 
-          [class.active]="timeRange === 'all'" 
-          (click)="changeTimeRange('all')">All</button>
+      <div class="control-group">
+        <label>Time Range</label>
+        <div class="time-range-buttons">
+          <button 
+            [class.active]="timeRange === '1m'" 
+            (click)="changeTimeRange('1m')">1M</button>
+          <button 
+            [class.active]="timeRange === '3m'" 
+            (click)="changeTimeRange('3m')">3M</button>
+          <button 
+            [class.active]="timeRange === '6m'" 
+            (click)="changeTimeRange('6m')">6M</button>
+          <button 
+            [class.active]="timeRange === '1y'" 
+            (click)="changeTimeRange('1y')">1Y</button>
+          <button 
+            [class.active]="timeRange === 'all'" 
+            (click)="changeTimeRange('all')">All</button>
+        </div>
       </div>
-      <div class="chart-type-buttons">
+      
+      <div class="control-group">
+        <label>Chart Type</label>
+        <div class="chart-type-buttons">
+          <button 
+            [class.active]="chartType === 'candlestick'" 
+            (click)="changeChartType('candlestick')"
+            title="Candlestick">🕯️</button>
+          <button 
+            [class.active]="chartType === 'ohlc'" 
+            (click)="changeChartType('ohlc')"
+            title="OHLC">📊</button>
+          <button 
+            [class.active]="chartType === 'bar'" 
+            (click)="changeChartType('bar')"
+            title="Bar Chart">📊</button>
+          <button 
+            [class.active]="chartType === 'line'" 
+            (click)="changeChartType('line')"
+            title="Line Chart">📈</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Scale</label>
+        <div class="scale-buttons">
+          <button 
+            [class.active]="scaleType === 'linear'" 
+            (click)="changeScaleType('linear')"
+            title="Linear Scale">Linear</button>
+          <button 
+            [class.active]="scaleType === 'logarithmic'" 
+            (click)="changeScaleType('logarithmic')"
+            title="Logarithmic Scale">Log</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Zoom</label>
         <button 
-          [class.active]="chartType === 'candlestick'" 
-          (click)="changeChartType('candlestick')"
-          title="Candlestick Chart">📊</button>
-        <button 
-          [class.active]="chartType === 'line'" 
-          (click)="changeChartType('line')"
-          title="Line Chart">📈</button>
+          class="reset-zoom-btn"
+          (click)="resetZoom()"
+          title="Reset Zoom">🔍 Reset</button>
       </div>
     </div>
   </div>
