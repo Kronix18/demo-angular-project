@@ -11,8 +11,7 @@
           id="username"
           [(ngModel)]="username"
           name="username"
-          placeholder="Enter username"
-          disabled />
+          placeholder="Enter username" />
         <small>Enter your credentials</small>
       </div>
 
@@ -23,8 +22,7 @@
           id="password"
           [(ngModel)]="password"
           name="password"
-          placeholder="Enter password"
-          disabled />
+          placeholder="Enter password" />
         <small>Check your email for password reset</small>
       </div>
 
@@ -36,7 +34,6 @@
     <div class="info-box" *ngIf="!isAuthenticated">
       <h4>Getting Started</h4>
       <p>Sign in with your registered account</p>
-      <p class="note">Secure login with email verification</p>
     </div>
 
     <div class="success-box" *ngIf="isAuthenticated">

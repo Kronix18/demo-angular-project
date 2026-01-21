@@ -1,0 +1,40 @@
+<div class="profile-container">
+  <section class="profile-card" *ngIf="user(); else noUser">
+    <header class="profile-header">
+      <div class="avatar">{{ initials() }}</div>
+      <div class="identity">
+        <h2>{{ user()?.name || 'Unnamed User' }}</h2>
+        <p class="email">{{ user()?.email }}</p>
+        <span class="badge" *ngIf="user()?.is_admin">Admin</span>
+        <span class="badge secondary" *ngIf="!user()?.is_admin">Member</span>
+      </div>
+    </header>
+
+    <div class="profile-grid">
+      <div class="card">
+        <h3>Account</h3>
+        <div class="item"><span>User ID</span><strong>{{ user()?.id || '—' }}</strong></div>
+        <div class="item"><span>Role</span><strong>{{ user()?.is_admin ? 'Admin' : 'Member' }}</strong></div>
+        <div class="item"><span>Status</span><strong>Active</strong></div>
+      </div>
+
+      <div class="card">
+        <h3>Security</h3>
+        <div class="item"><span>Access token</span><strong>{{ authService.getAccessToken() ? 'Present' : 'Missing' }}</strong></div>
+        <div class="item"><span>Refresh token</span><strong>{{ authService.getRefreshToken() ? 'Present' : 'Missing' }}</strong></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a routerLink="/screener" class="ghost">Back to Screener</a>
+      <button type="button" (click)="logout()">Logout</button>
+    </div>
+  </section>
+
+  <ng-template #noUser>
+    <div class="empty-state">
+      <p>We could not load your profile. Please log in again.</p>
+      <a routerLink="/auth/login">Return to login</a>
+    </div>
+  </ng-template>
+</div>

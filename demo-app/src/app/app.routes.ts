@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { ScreenerComponent } from './features/screener/screener.component';
 import { StockComponent } from './features/stock/stock.component';
+import { ProfileComponent } from './features/profile/profile.component';
 
 export const routes: Routes = [
   {
@@ -13,6 +14,12 @@ export const routes: Routes = [
     path: 'screener',
     component: ScreenerComponent,
     data: { title: 'Stock Screener' },
+    canActivate: [authGuard]
+  },
+  {
+    path: 'profile',
+    component: ProfileComponent,
+    data: { title: 'Your Profile' },
     canActivate: [authGuard]
   },
   {
