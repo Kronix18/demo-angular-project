@@ -6,15 +6,15 @@
     <div class="filters-grid">
       <div class="filter-group">
         <label>Min Price ($)</label>
-        <input type="number" [(ngModel)]="filters.minPrice" (change)="applyFilters()" placeholder="0">
+        <input type="number" [(ngModel)]="filters.minPrice" (change)="onFilterChange()" placeholder="0">
       </div>
       <div class="filter-group">
         <label>Max Price ($)</label>
-        <input type="number" [(ngModel)]="filters.maxPrice" (change)="applyFilters()" placeholder="999999">
+        <input type="number" [(ngModel)]="filters.maxPrice" (change)="onFilterChange()" placeholder="999999">
       </div>
       <div class="filter-group">
         <label>Sector</label>
-        <select [(ngModel)]="filters.sector" (change)="applyFilters()">
+        <select [(ngModel)]="filters.sector" (change)="onFilterChange()">
           <option value="">All Sectors</option>
           <option *ngFor="let sector of sectors$ | async" [value]="sector">
             {{ sector }}
@@ -23,7 +23,7 @@
       </div>
       <div class="filter-group">
         <label>Min Volume (M)</label>
-        <input type="number" [(ngModel)]="filters.minVolume" (change)="applyFilters()" placeholder="0" step="1">
+        <input type="number" [(ngModel)]="filters.minVolume" (change)="onFilterChange()" placeholder="0" step="1">
       </div>
     </div>
     <button class="reset-btn" (click)="resetFilters()">Reset Filters</button>
@@ -48,7 +48,7 @@
       <p>Running screener...</p>
     </div>
     
-    <div class="stocks-table-container" *ngIf="!isLoading">
+    <div class="stocks-table-container" *ngIf="!isLoading && filteredStocks.length > 0">
       <table class="stocks-table">
         <thead>
           <tr>
@@ -85,7 +85,7 @@
       </table>
     </div>
 
-    <div class="empty-state" *ngIf="filteredStocks.length === 0">
+    <div class="empty-state" *ngIf="!isLoading && filteredStocks.length === 0">
       <p>No stocks match your criteria. Try adjusting your filters.</p>
     </div>
   </div>

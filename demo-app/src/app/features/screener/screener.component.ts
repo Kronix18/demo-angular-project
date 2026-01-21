@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -12,11 +12,15 @@ import { ScreenerService } from '../../core/services/screener.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './screener.component.html',
-  styleUrl: './screener.component.scss'
+  styleUrl: './screener.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ScreenerComponent implements OnInit, OnDestroy {
   private stockService = inject(StockService);
   private screenerService = inject(ScreenerService);
+  private cdr = inject(ChangeDetectorRef);
+  
+  allStocks: Stock[] = []; // All data from backend
   filteredStocks: Stock[] = [];
   searchQuery = '';
   sectors$ = this.stockService.getSectors();
@@ -33,7 +37,7 @@ export class ScreenerComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   ngOnInit(): void {
-    this.applyFilters();
+    this.loadAllStocks();
   }
 
   ngOnDestroy(): void {
@@ -41,66 +45,80 @@ export class ScreenerComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  applyFilters(): void {
-    const criteria: Record<string, any> = {
-      minPrice: this.filters.minPrice,
-      maxPrice: this.filters.maxPrice,
-      sector: this.filters.sector || undefined,
-      minVolume: this.filters.minVolume ? this.filters.minVolume * 1000000 : undefined
-    };
-
+  loadAllStocks(): void {
+    console.log('Loading all stocks from screener...');
     this.isLoading = true;
     this.error = '';
 
-    this.screenerService.runScreener(criteria)
+    this.screenerService.runScreener({})
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: res => {
-          console.log('Screener response:', res);
-          this.filteredStocks = res.results || [];
-          console.log('Filtered stocks updated:', this.filteredStocks);
+          console.log('All stocks loaded:', res.results?.length);
+          this.allStocks = res.results || [];
+          this.applyFiltersLocal();
           this.isLoading = false;
+          this.cdr.markForCheck();
         },
         error: err => {
           this.isLoading = false;
-          this.error = err?.error?.error || err?.message || 'Failed to run screener.';
+          this.error = err?.error?.error || err?.message || 'Failed to load stocks.';
           console.error('Screener error', err);
+          this.cdr.markForCheck();
         }
       });
   }
 
-  onSearch(query: string): void {
-    if (!query.trim()) {
-      this.applyFilters();
-      return;
-    }
+  applyFiltersLocal(): void {
+    console.log('Applying local filters. Total stocks:', this.allStocks.length);
+    
+    this.filteredStocks = this.allStocks.filter(stock => {
+      // Price filter
+      if (this.filters.minPrice !== undefined && stock.price < this.filters.minPrice) {
+        return false;
+      }
+      if (this.filters.maxPrice !== undefined && stock.price > this.filters.maxPrice) {
+        return false;
+      }
 
-    // For now, run screener with current filters and a text query if backend supports it
-    const criteria: Record<string, any> = {
-      ...this.filters,
-      query
-    };
-    if (criteria['minVolume']) {
-      criteria['minVolume'] = criteria['minVolume'] * 1000000;
-    }
+      // Sector filter
+      if (this.filters.sector && stock.sector !== this.filters.sector) {
+        return false;
+      }
 
-    this.isLoading = true;
-    this.error = '';
-
-    this.screenerService.runScreener(criteria)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: res => {
-          console.log('Search response:', res);
-          this.filteredStocks = res.results || [];
-          console.log('Filtered stocks updated from search:', this.filteredStocks);
-          this.isLoading = false;
-        },
-        error: err => {
-          this.isLoading = false;
-          this.error = err?.error?.error || err?.message || 'Failed to run screener.';
+      // Volume filter (convert from millions to actual volume)
+      if (this.filters.minVolume !== undefined) {
+        const minVolumeActual = this.filters.minVolume * 1000000;
+        if (stock.volume < minVolumeActual) {
+          return false;
         }
-      });
+      }
+
+      // Search query filter
+      if (this.searchQuery.trim()) {
+        const query = this.searchQuery.toLowerCase();
+        const matchesTicker = stock.ticker?.toLowerCase().includes(query);
+        const matchesName = stock.name?.toLowerCase().includes(query);
+        if (!matchesTicker && !matchesName) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    console.log('Filtered stocks:', this.filteredStocks.length);
+  }
+
+  onFilterChange(): void {
+    console.log('Filter changed');
+    this.applyFiltersLocal();
+  }
+
+  onSearch(query: string): void {
+    console.log('Search query:', query);
+    this.searchQuery = query;
+    this.applyFiltersLocal();
   }
 
   resetFilters(): void {
@@ -111,6 +129,6 @@ export class ScreenerComponent implements OnInit, OnDestroy {
       minVolume: undefined
     };
     this.searchQuery = '';
-    this.applyFilters();
+    this.applyFiltersLocal();
   }
 }

@@ -8,7 +8,7 @@ import { timer } from 'rxjs';
   providedIn: 'root'
 })
 export class ApiService {
-  private apiUrl = 'http://localhost:3000';
+  private apiUrl = 'http://192.168.1.111:3000';
   private readonly maxRetries = 3;
   private readonly timeoutMs = 10000;
 
@@ -37,11 +37,10 @@ export class ApiService {
   post<T>(endpoint: string, data: any, customTimeoutMs?: number): Observable<T> {
     const url = `${this.apiUrl}/${endpoint}`;
     console.log('ApiService POST request to:', url);
-    if (Object.keys(data).length > 0) {
-      console.log('Request body:', data);
-    }
+    console.log('Request body:', JSON.stringify(data, null, 2));
 
     const toMs = customTimeoutMs ?? this.timeoutMs;
+    console.log(`Request timeout: ${toMs}ms`);
 
     return this.http.post<T>(url, data).pipe(
       timeout(toMs),

@@ -2,6 +2,35 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { ApiService } from './api.service';
 
+export interface StockPrice {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  adjusted_close: number | null;
+}
+
+export interface Company {
+  ticker: string;
+  name: string;
+  sector: string;
+  industry: string;
+  market_cap: number | null;
+  pe_ratio: number | null;
+  eps: number | null;
+  dividend_yield: number | null;
+  description: string | null;
+  website: string | null;
+}
+
+export interface StockDetail {
+  company: Company;
+  prices: StockPrice[];
+}
+
+// Legacy interface for screener results
 export interface Stock {
   ticker: string;
   name: string;
@@ -174,8 +203,9 @@ export class StockService {
     return this.apiService.get<Stock[]>('stocks');
   }
 
-  getStock(symbol: string): Observable<Stock> {
-    return this.apiService.get<Stock>(`api/stocks/${symbol}`);
+  getStock(symbol: string): Observable<StockDetail> {
+    console.log('StockService.getStock called with symbol:', symbol);
+    return this.apiService.get<StockDetail>(`api/stocks/${symbol}`);
   }
 
   searchStocks(query: string): Observable<Stock[]> {

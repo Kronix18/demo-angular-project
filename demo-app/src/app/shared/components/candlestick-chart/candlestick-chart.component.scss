@@ -1,0 +1,99 @@
+.chart-container {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+
+  h3 {
+    margin: 0;
+    color: #333;
+    font-size: 18px;
+  }
+}
+
+.chart-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.time-range-buttons,
+.chart-type-buttons {
+  display: flex;
+  gap: 5px;
+  background: #f5f5f5;
+  padding: 4px;
+  border-radius: 6px;
+
+  button {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: #666;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    &.active {
+      background: #667eea;
+      color: white;
+    }
+  }
+}
+
+.chart-type-buttons button {
+  font-size: 18px;
+  padding: 4px 10px;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 400px;
+  width: 100%;
+
+  canvas {
+    max-width: 100%;
+    max-height: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chart-controls {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .time-range-buttons,
+  .chart-type-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .chart-wrapper {
+    height: 300px;
+  }
+}

@@ -1,0 +1,47 @@
+<div class="chart-container">
+  <div class="chart-header">
+    <h3>{{ title }}</h3>
+    <div class="chart-controls">
+      <div class="time-range-buttons">
+        <button 
+          [class.active]="timeRange === '1m'" 
+          (click)="changeTimeRange('1m')">1M</button>
+        <button 
+          [class.active]="timeRange === '3m'" 
+          (click)="changeTimeRange('3m')">3M</button>
+        <button 
+          [class.active]="timeRange === '6m'" 
+          (click)="changeTimeRange('6m')">6M</button>
+        <button 
+          [class.active]="timeRange === '1y'" 
+          (click)="changeTimeRange('1y')">1Y</button>
+        <button 
+          [class.active]="timeRange === 'all'" 
+          (click)="changeTimeRange('all')">All</button>
+      </div>
+      <div class="chart-type-buttons">
+        <button 
+          [class.active]="chartType === 'Candlestick'" 
+          (click)="changeChartType('Candlestick')"
+          title="Candlestick Chart">📊</button>
+        <button 
+          [class.active]="chartType === 'Line'" 
+          (click)="changeChartType('Line')"
+          title="Line Chart">📈</button>
+      </div>
+    </div>
+  </div>
+  <div class="chart-wrapper">
+    <igx-financial-chart
+      [dataSource]="chartData"
+      height="100%"
+      width="100%"
+      [chartType]="chartType"
+      thickness="2"
+      negativeBrush="rgba(220, 53, 69, 0.8)"
+      negativeBrushOutline="rgba(220, 53, 69, 1)"
+      brush="rgba(40, 167, 69, 0.8)"
+      outlinebrush="rgba(40, 167, 69, 1)">
+    </igx-financial-chart>
+  </div>
+</div>

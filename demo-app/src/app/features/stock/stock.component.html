@@ -3,7 +3,7 @@
     <a routerLink="/screener">← Back to Screener</a>
   </div>
 
-  <div *ngIf="isLoading" class="loading">
+  <div *ngIf="isLoading && !company" class="loading">
     <p>Loading stock data...</p>
   </div>
 
@@ -11,19 +11,23 @@
     <p>{{ error }}</p>
   </div>
 
-  <div *ngIf="stock && !isLoading" class="stock-detail">
+  <div *ngIf="company && !error" class="stock-detail">
     <div class="header">
       <div class="header-left">
-        <h1>{{ stock.symbol }}</h1>
-        <p class="company-name">{{ stock.name }}</p>
-        <p class="sector-badge">{{ stock.sector }} • {{ stock.industry }}</p>
+        <h1>{{ company.ticker }}</h1>
+        <p class="company-name">{{ company.name }}</p>
+        <p class="sector-badge" *ngIf="company.sector || company.industry">
+          <span *ngIf="company.sector">{{ company.sector }}</span>
+          <span *ngIf="company.sector && company.industry"> • </span>
+          <span *ngIf="company.industry">{{ company.industry }}</span>
+        </p>
       </div>
       <div class="header-right">
         <div class="price-display">
-          <div class="current-price">${{ stock.price | number: '1.2-2' }}</div>
-          <div class="change" [class.positive]="(stock.change || 0) >= 0" [class.negative]="(stock.change || 0) < 0">
-            <span class="change-value">{{ (stock.change || 0) >= 0 ? '+' : '' }}{{ (stock.change || 0) | number: '1.2-2' }}</span>
-            <span class="change-percent">({{ (stock.change_percent || 0) >= 0 ? '+' : '' }}{{ (stock.change_percent || 0) | number: '1.2-2' }}%)</span>
+          <div class="current-price">${{ currentPrice | number: '1.2-2' }}</div>
+          <div class="change" [class.positive]="priceChange >= 0" [class.negative]="priceChange < 0">
+            <span class="change-value">{{ priceChange >= 0 ? '+' : '' }}{{ priceChange | number: '1.2-2' }}</span>
+            <span class="change-percent">({{ priceChangePercent >= 0 ? '+' : '' }}{{ priceChangePercent | number: '1.2-2' }}%)</span>
           </div>
         </div>
       </div>
@@ -32,50 +36,46 @@
     <div class="metrics-grid">
       <div class="metric-card">
         <h3>Market Capitalization</h3>
-        <p class="metric-value">{{ stock.market_cap ? ('$' + (stock.market_cap / 1000000000 | number: '1.1-0') + 'B') : 'N/A' }}</p>
+        <p class="metric-value">{{ company.market_cap ? ('$' + (company.market_cap / 1000000000 | number: '1.1-0') + 'B') : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>P/E Ratio</h3>
-        <p class="metric-value">{{ stock.peRatio ? (stock.peRatio | number: '1.1-1') : 'N/A' }}</p>
+        <p class="metric-value">{{ company.pe_ratio ? (company.pe_ratio | number: '1.1-1') : 'N/A' }}</p>
+      </div>
+
+      <div class="metric-card">
+        <h3>EPS</h3>
+        <p class="metric-value">{{ company.eps ? ('$' + (company.eps | number: '1.2-2')) : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>Dividend Yield</h3>
-        <p class="metric-value">{{ stock.dividend ? (stock.dividend | number: '1.2-2') + '%' : 'N/A' }}</p>
+        <p class="metric-value">{{ company.dividend_yield ? (company.dividend_yield | number: '1.2-2') + '%' : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
-        <h3>Volume</h3>
-        <p class="metric-value">{{ stock.volume ? ((stock.volume / 1000000) | number: '1.1-1') + 'M' : 'N/A' }}</p>
+        <h3>Latest Volume</h3>
+        <p class="metric-value">{{ prices.length > 0 ? ((prices[prices.length - 1].volume / 1000000) | number: '1.1-1') + 'M' : 'N/A' }}</p>
       </div>
 
-      <div class="metric-card">
-        <h3>Avg Volume (3M)</h3>
-        <p class="metric-value">{{ stock.avgVolume ? ((stock.avgVolume / 1000000) | number: '1.1-1') + 'M' : 'N/A' }}</p>
-      </div>
-
-      <div class="metric-card">
-        <h3>52-Week High</h3>
-        <p class="metric-value">{{ stock.fiftyTwoWeekHigh ? ('$' + (stock.fiftyTwoWeekHigh | number: '1.2-2')) : 'N/A' }}</p>
-      </div>
-
-      <div class="metric-card">
-        <h3>52-Week Low</h3>
-        <p class="metric-value">{{ stock.fiftyTwoWeekLow ? ('$' + (stock.fiftyTwoWeekLow | number: '1.2-2')) : 'N/A' }}</p>
-      </div>
-
-      <div class="metric-card" *ngIf="stock.fiftyTwoWeekHigh && stock.fiftyTwoWeekLow">
-        <h3>52-Week Range</h3>
+      <div class="metric-card" *ngIf="prices.length > 1">
+        <h3>Price Range</h3>
         <div class="range-bar">
           <div class="range-fill" [style.width.%]="getRangePercent()"></div>
         </div>
-        <p class="range-text">${{ stock.fiftyTwoWeekLow | number: '1.2-2' }} — ${{ stock.fiftyTwoWeekHigh | number: '1.2-2' }}</p>
       </div>
     </div>
 
+    <div class="chart-section" *ngIf="prices.length > 0">
+      <app-candlestick-chart 
+        [prices]="prices" 
+        [title]="company.name + ' Price History'">
+      </app-candlestick-chart>
+    </div>
+
     <div class="actions">
-      <button class="buy-btn">Buy {{ stock.ticker || stock.symbol }}</button>
+      <button class="buy-btn">Buy {{ company.ticker }}</button>
       <button class="watchlist-btn">+ Add to Watchlist</button>
     </div>
   </div>

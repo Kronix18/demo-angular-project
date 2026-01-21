@@ -25,6 +25,7 @@ export class ScreenerService {
 
   runScreener(filters: Record<string, any>, limit = 50): Observable<ScreenerRunResponse> {
     // Screener can be heavier; allow longer timeout (45s)
+    console.log('ScreenerService.runScreener called with:', { filters, limit });
     return this.api.post<ScreenerRunResponse>('api/screener/run', { filters, limit }, 45000);
   }
 }
