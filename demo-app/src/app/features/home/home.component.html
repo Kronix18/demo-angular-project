@@ -1,0 +1,76 @@
+<div class="home">
+    
+  <section class="hero">
+    <div>
+      <p class="eyebrow">StockVerse</p>
+      <h1>Analyze stocks with clarity and speed.</h1>
+      <p class="lede">Unified screener, clean dashboards, fast fundamentals. Login to jump into the screener or create an account to get started.</p>
+      <div class="hero-actions">
+        <a routerLink="/screener" class="primary" aria-label="Go to screener" *ngIf="isAuthenticated">Go to Screener</a>
+        <a routerLink="/profile" class="ghost" aria-label="Profile" *ngIf="isAuthenticated">View Profile</a>
+
+      </div>
+    </div>
+    <div class="info-card" [ngClass]="{ 'full-width': isAuthenticated }">
+      <h3>Why StockVerse?</h3>
+      <ul>
+        <li><strong>Speed:</strong> instant filters on fundamentals without over-complication.</li>
+        <li><strong>Focus:</strong> no watchlists or technical clutter—just the essentials.</li>
+        <li><strong>Security:</strong> JWT-based auth with email verification and refresh tokens.</li>
+        <li><strong>Clarity:</strong> clean UI, responsive layout, accessible forms.</li>
+      </ul>
+    </div>
+    
+  </section>
+
+  <section class="forms">
+    <div class="form-card" *ngIf="!isAuthenticated;">
+      <div class="card-header">Create your account</div>
+      <form (ngSubmit)="handleRegister()">
+        <div class="grid">
+          <div>
+            <label for="reg-name">Full name</label>
+            <input id="reg-name" name="name" [(ngModel)]="registerData.name" placeholder="Jane Doe" required />
+          </div>
+          <div>
+            <label for="reg-username">Username</label>
+            <input id="reg-username" name="username" [(ngModel)]="registerData.username" placeholder="janedoe" required />
+          </div>
+        </div>
+        <label for="reg-email">Email</label>
+        <input id="reg-email" name="email" type="email" [(ngModel)]="registerData.email" placeholder="you@example.com" required />
+
+        <label for="reg-password">Password</label>
+        <input id="reg-password" name="password" type="password" [(ngModel)]="registerData.password" placeholder="••••••••" required />
+
+        <label for="reg-confirm-password">Confirm Password</label>
+        <input id="reg-confirm-password" name="confirmPassword" type="password" [(ngModel)]="registerData.confirmPassword" placeholder="••••••••" required />
+
+        <button type="submit" [disabled]="registerLoading">{{ registerLoading ? 'Creating account...' : 'Register' }}</button>
+        <div class="error-box" *ngIf="registerError">
+          <p>{{ registerError }}</p>
+        </div>
+        <div class="success-box" *ngIf="registerSuccess">
+          <p>{{ registerSuccess }}</p>
+        </div>
+      </form>
+    </div>
+    <div class="panel" *ngIf="!isAuthenticated;">
+      <div class="panel-header">Quick Login</div>
+      <form (ngSubmit)="handleLogin()">
+        <label for="home-username">Username</label>
+        <input id="home-username" name="username" [(ngModel)]="loginData.username" placeholder="your.username" required />
+
+        <label for="home-password">Password</label>
+        <input id="home-password" name="password" type="password" [(ngModel)]="loginData.password" placeholder="••••••••" required />
+
+        <button type="submit" [disabled]="loginLoading">{{ loginLoading ? 'Logging in...' : 'Login' }}</button>
+        <div class="error-box" *ngIf="loginError">
+          <p>{{ loginError }}</p>
+        </div>
+      </form>
+      
+    </div>
+    
+  </section>
+</div>

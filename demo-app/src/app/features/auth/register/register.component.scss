@@ -53,6 +53,8 @@ input {
   border-radius: 6px;
   font-size: 14px;
   transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 input:focus {

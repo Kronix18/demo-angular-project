@@ -3,12 +3,18 @@ import { authGuard } from './core/guards/auth.guard';
 import { ScreenerComponent } from './features/screener/screener.component';
 import { StockComponent } from './features/stock/stock.component';
 import { ProfileComponent } from './features/profile/profile.component';
+import { HomeComponent } from './features/home/home.component';
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: '/screener',
-    pathMatch: 'full'
+    component: HomeComponent,
+    data: { title: 'Home' }
+  },
+  {
+    path: 'home',
+    component: HomeComponent,
+    data: { title: 'Home' }
   },
   {
     path: 'screener',
