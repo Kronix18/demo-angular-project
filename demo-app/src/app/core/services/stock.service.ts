@@ -1,21 +1,25 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
+import { ApiService } from './api.service';
 
 export interface Stock {
-  symbol: string;
+  ticker: string;
   name: string;
   price: number;
-  change: number;
-  changePercent: number;
-  marketCap: number;
-  peRatio: number;
-  dividend: number;
   volume: number;
-  avgVolume: number;
-  fiftyTwoWeekHigh: number;
-  fiftyTwoWeekLow: number;
-  industry: string;
-  sector: string;
+  change_percent: number;
+  market_cap: number | null;
+  date?: string;
+  sector?: string;
+  industry?: string;
+  // Legacy fields (optional, for backwards compatibility)
+  symbol?: string;
+  change?: number;
+  peRatio?: number;
+  dividend?: number;
+  avgVolume?: number;
+  fiftyTwoWeekHigh?: number;
+  fiftyTwoWeekLow?: number;
 }
 
 @Injectable({
@@ -24,12 +28,13 @@ export interface Stock {
 export class StockService {
   private mockStocks: Stock[] = [
     {
+      ticker: 'AAPL',
       symbol: 'AAPL',
       name: 'Apple Inc.',
       price: 189.45,
       change: 2.35,
-      changePercent: 1.25,
-      marketCap: 2900000000000,
+      change_percent: 1.25,
+      market_cap: 2900000000000,
       peRatio: 28.5,
       dividend: 0.96,
       volume: 52000000,
@@ -40,12 +45,13 @@ export class StockService {
       sector: 'Technology'
     },
     {
+      ticker: 'MSFT',
       symbol: 'MSFT',
       name: 'Microsoft Corporation',
       price: 378.91,
       change: 5.23,
-      changePercent: 1.40,
-      marketCap: 2820000000000,
+      change_percent: 1.40,
+      market_cap: 2820000000000,
       peRatio: 35.2,
       dividend: 0.68,
       volume: 18000000,
@@ -56,12 +62,13 @@ export class StockService {
       sector: 'Technology'
     },
     {
+      ticker: 'NVDA',
       symbol: 'NVDA',
       name: 'NVIDIA Corporation',
       price: 875.29,
       change: -12.45,
-      changePercent: -1.40,
-      marketCap: 2150000000000,
+      change_percent: -1.40,
+      market_cap: 2150000000000,
       peRatio: 55.3,
       dividend: 0.04,
       volume: 35000000,
@@ -72,12 +79,13 @@ export class StockService {
       sector: 'Technology'
     },
     {
+      ticker: 'TSLA',
       symbol: 'TSLA',
       name: 'Tesla, Inc.',
       price: 242.84,
       change: -8.16,
-      changePercent: -3.26,
-      marketCap: 770000000000,
+      change_percent: -3.26,
+      market_cap: 770000000000,
       peRatio: 68.9,
       dividend: 0,
       volume: 125000000,
@@ -88,12 +96,13 @@ export class StockService {
       sector: 'Consumer Cyclical'
     },
     {
+      ticker: 'AMZN',
       symbol: 'AMZN',
       name: 'Amazon.com, Inc.',
       price: 183.12,
       change: 4.78,
-      changePercent: 2.68,
-      marketCap: 1920000000000,
+      change_percent: 2.68,
+      market_cap: 1920000000000,
       peRatio: 42.1,
       dividend: 0,
       volume: 42000000,
@@ -104,12 +113,13 @@ export class StockService {
       sector: 'Consumer Cyclical'
     },
     {
+      ticker: 'JPM',
       symbol: 'JPM',
       name: 'JPMorgan Chase & Co.',
       price: 191.23,
       change: 1.45,
-      changePercent: 0.76,
-      marketCap: 535000000000,
+      change_percent: 0.76,
+      market_cap: 535000000000,
       peRatio: 12.4,
       dividend: 4.20,
       volume: 8900000,
@@ -120,12 +130,13 @@ export class StockService {
       sector: 'Financial'
     },
     {
+      ticker: 'GE',
       symbol: 'GE',
       name: 'General Electric Co.',
       price: 156.32,
       change: 3.12,
-      changePercent: 2.03,
-      marketCap: 152000000000,
+      change_percent: 2.03,
+      market_cap: 152000000000,
       peRatio: 18.6,
       dividend: 0.80,
       volume: 6300000,
@@ -136,12 +147,13 @@ export class StockService {
       sector: 'Industrials'
     },
     {
+      ticker: 'KO',
       symbol: 'KO',
       name: 'Coca-Cola Company',
       price: 65.43,
       change: 0.92,
-      changePercent: 1.42,
-      marketCap: 282000000000,
+      change_percent: 1.42,
+      market_cap: 282000000000,
       peRatio: 25.3,
       dividend: 1.84,
       volume: 9800000,
@@ -156,23 +168,18 @@ export class StockService {
   private stocksSubject = new BehaviorSubject<Stock[]>(this.mockStocks);
   stocks$ = this.stocksSubject.asObservable();
 
-  constructor() {}
+  constructor(private apiService: ApiService) {}
 
   getStocks(): Observable<Stock[]> {
-    return this.stocks$;
+    return this.apiService.get<Stock[]>('stocks');
   }
 
-  getStock(symbol: string): Observable<Stock | undefined> {
-    const stock = this.mockStocks.find(s => s.symbol === symbol);
-    return of(stock);
+  getStock(symbol: string): Observable<Stock> {
+    return this.apiService.get<Stock>(`api/stocks/${symbol}`);
   }
 
   searchStocks(query: string): Observable<Stock[]> {
-    const filtered = this.mockStocks.filter(s =>
-      s.symbol.toLowerCase().includes(query.toLowerCase()) ||
-      s.name.toLowerCase().includes(query.toLowerCase())
-    );
-    return of(filtered);
+    return this.apiService.get<Stock[]>(`api/stocks/search?q=${encodeURIComponent(query)}`);
   }
 
   filterStocks(criteria: {
@@ -184,35 +191,19 @@ export class StockService {
     sector?: string;
     minVolume?: number;
   }): Observable<Stock[]> {
-    let filtered = [...this.mockStocks];
-
-    if (criteria.minPrice !== undefined) {
-      filtered = filtered.filter(s => s.price >= criteria.minPrice!);
-    }
-    if (criteria.maxPrice !== undefined) {
-      filtered = filtered.filter(s => s.price <= criteria.maxPrice!);
-    }
-    if (criteria.minPE !== undefined) {
-      filtered = filtered.filter(s => s.peRatio >= criteria.minPE!);
-    }
-    if (criteria.maxPE !== undefined) {
-      filtered = filtered.filter(s => s.peRatio <= criteria.maxPE!);
-    }
-    if (criteria.minDividend !== undefined) {
-      filtered = filtered.filter(s => s.dividend >= criteria.minDividend!);
-    }
-    if (criteria.sector) {
-      filtered = filtered.filter(s => s.sector === criteria.sector);
-    }
-    if (criteria.minVolume !== undefined) {
-      filtered = filtered.filter(s => s.volume >= criteria.minVolume!);
-    }
-
-    return of(filtered);
+    const params = new URLSearchParams();
+    if (criteria.minPrice !== undefined) params.append('minPrice', criteria.minPrice.toString());
+    if (criteria.maxPrice !== undefined) params.append('maxPrice', criteria.maxPrice.toString());
+    if (criteria.minPE !== undefined) params.append('minPE', criteria.minPE.toString());
+    if (criteria.maxPE !== undefined) params.append('maxPE', criteria.maxPE.toString());
+    if (criteria.minDividend !== undefined) params.append('minDividend', criteria.minDividend.toString());
+    if (criteria.sector) params.append('sector', criteria.sector);
+    if (criteria.minVolume !== undefined) params.append('minVolume', criteria.minVolume.toString());
+    
+    return this.apiService.get<Stock[]>(`api/stocks/filter?${params.toString()}`);
   }
 
   getSectors(): Observable<string[]> {
-    const sectors = Array.from(new Set(this.mockStocks.map(s => s.sector)));
-    return of(sectors);
+    return this.apiService.get<string[]>('api/stocks/sectors');
   }
 }

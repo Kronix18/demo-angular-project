@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { StockService, Stock } from '../../core/services/stock.service';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { ScreenerService } from '../../core/services/screener.service';
 
 @Component({
   selector: 'app-screener',
@@ -15,16 +16,16 @@ import { takeUntil } from 'rxjs/operators';
 })
 export class ScreenerComponent implements OnInit, OnDestroy {
   private stockService = inject(StockService);
+  private screenerService = inject(ScreenerService);
   filteredStocks: Stock[] = [];
   searchQuery = '';
   sectors$ = this.stockService.getSectors();
+  isLoading = false;
+  error = '';
   
   filters = {
     minPrice: undefined as number | undefined,
     maxPrice: undefined as number | undefined,
-    minPE: undefined as number | undefined,
-    maxPE: undefined as number | undefined,
-    minDividend: undefined as number | undefined,
     sector: '',
     minVolume: undefined as number | undefined
   };
@@ -32,11 +33,7 @@ export class ScreenerComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   ngOnInit(): void {
-    this.stockService.getStocks()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(stocks => {
-        this.filteredStocks = stocks;
-      });
+    this.applyFilters();
   }
 
   ngOnDestroy(): void {
@@ -45,20 +42,30 @@ export class ScreenerComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
-    const criteria = {
+    const criteria: Record<string, any> = {
       minPrice: this.filters.minPrice,
       maxPrice: this.filters.maxPrice,
-      minPE: this.filters.minPE,
-      maxPE: this.filters.maxPE,
-      minDividend: this.filters.minDividend,
       sector: this.filters.sector || undefined,
       minVolume: this.filters.minVolume ? this.filters.minVolume * 1000000 : undefined
     };
 
-    this.stockService.filterStocks(criteria)
+    this.isLoading = true;
+    this.error = '';
+
+    this.screenerService.runScreener(criteria)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(stocks => {
-        this.filteredStocks = stocks;
+      .subscribe({
+        next: res => {
+          console.log('Screener response:', res);
+          this.filteredStocks = res.results || [];
+          console.log('Filtered stocks updated:', this.filteredStocks);
+          this.isLoading = false;
+        },
+        error: err => {
+          this.isLoading = false;
+          this.error = err?.error?.error || err?.message || 'Failed to run screener.';
+          console.error('Screener error', err);
+        }
       });
   }
 
@@ -68,10 +75,31 @@ export class ScreenerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.stockService.searchStocks(query)
+    // For now, run screener with current filters and a text query if backend supports it
+    const criteria: Record<string, any> = {
+      ...this.filters,
+      query
+    };
+    if (criteria['minVolume']) {
+      criteria['minVolume'] = criteria['minVolume'] * 1000000;
+    }
+
+    this.isLoading = true;
+    this.error = '';
+
+    this.screenerService.runScreener(criteria)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(stocks => {
-        this.filteredStocks = stocks;
+      .subscribe({
+        next: res => {
+          console.log('Search response:', res);
+          this.filteredStocks = res.results || [];
+          console.log('Filtered stocks updated from search:', this.filteredStocks);
+          this.isLoading = false;
+        },
+        error: err => {
+          this.isLoading = false;
+          this.error = err?.error?.error || err?.message || 'Failed to run screener.';
+        }
       });
   }
 
@@ -79,9 +107,6 @@ export class ScreenerComponent implements OnInit, OnDestroy {
     this.filters = {
       minPrice: undefined,
       maxPrice: undefined,
-      minPE: undefined,
-      maxPE: undefined,
-      minDividend: undefined,
       sector: '',
       minVolume: undefined
     };

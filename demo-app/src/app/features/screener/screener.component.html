@@ -13,18 +13,6 @@
         <input type="number" [(ngModel)]="filters.maxPrice" (change)="applyFilters()" placeholder="999999">
       </div>
       <div class="filter-group">
-        <label>Min P/E Ratio</label>
-        <input type="number" [(ngModel)]="filters.minPE" (change)="applyFilters()" placeholder="0">
-      </div>
-      <div class="filter-group">
-        <label>Max P/E Ratio</label>
-        <input type="number" [(ngModel)]="filters.maxPE" (change)="applyFilters()" placeholder="999">
-      </div>
-      <div class="filter-group">
-        <label>Min Dividend (%)</label>
-        <input type="number" [(ngModel)]="filters.minDividend" (change)="applyFilters()" placeholder="0" step="0.1">
-      </div>
-      <div class="filter-group">
         <label>Sector</label>
         <select [(ngModel)]="filters.sector" (change)="applyFilters()">
           <option value="">All Sectors</option>
@@ -37,10 +25,8 @@
         <label>Min Volume (M)</label>
         <input type="number" [(ngModel)]="filters.minVolume" (change)="applyFilters()" placeholder="0" step="1">
       </div>
-      <div class="filter-group">
-        <button class="reset-btn" (click)="resetFilters()">Reset Filters</button>
-      </div>
     </div>
+    <button class="reset-btn" (click)="resetFilters()">Reset Filters</button>
   </div>
 
   <div class="search-section">
@@ -53,40 +39,46 @@
 
   <div class="results-section">
     <h2>Results ({{ filteredStocks.length }})</h2>
+
+    <div class="error-box" *ngIf="error">
+      <p>{{ error }}</p>
+    </div>
+
+    <div class="loading" *ngIf="isLoading">
+      <p>Running screener...</p>
+    </div>
     
-    <div class="stocks-table-container">
+    <div class="stocks-table-container" *ngIf="!isLoading">
       <table class="stocks-table">
         <thead>
           <tr>
             <th>Symbol</th>
             <th>Name</th>
             <th>Price</th>
-            <th>Change</th>
-            <th>%</th>
-            <th>P/E</th>
-            <th>Dividend</th>
+            <th>Change %</th>
             <th>Volume</th>
             <th>Market Cap</th>
+            <th>Sector</th>
+            <th>Industry</th>
+            <th>Date</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let stock of filteredStocks" [class.negative]="stock.change < 0">
-            <td class="symbol">{{ stock.symbol }}</td>
+          <tr *ngFor="let stock of filteredStocks" [class.negative]="stock.change_percent < 0">
+            <td class="symbol">{{ stock.ticker }}</td>
             <td class="name">{{ stock.name }}</td>
             <td class="price">${{ stock.price | number: '1.2-2' }}</td>
-            <td class="change" [class.positive]="stock.change >= 0" [class.negative]="stock.change < 0">
-              {{ stock.change >= 0 ? '+' : '' }}{{ stock.change | number: '1.2-2' }}
+            <td class="percent" [class.positive]="stock.change_percent >= 0" [class.negative]="stock.change_percent < 0">
+              {{ stock.change_percent >= 0 ? '+' : '' }}{{ stock.change_percent | number: '1.2-2' }}%
             </td>
-            <td class="percent" [class.positive]="stock.changePercent >= 0" [class.negative]="stock.changePercent < 0">
-              {{ stock.changePercent >= 0 ? '+' : '' }}{{ stock.changePercent | number: '1.2-2' }}%
-            </td>
-            <td class="metric">{{ stock.peRatio | number: '1.1-1' }}</td>
-            <td class="metric">{{ stock.dividend | number: '1.2-2' }}%</td>
             <td class="metric">{{ (stock.volume / 1000000) | number: '1.1-1' }}M</td>
-            <td class="metric">${{ (stock.marketCap / 1000000000) | number: '1.0-0' }}B</td>
+            <td class="metric">{{ stock.market_cap ? ('$' + (stock.market_cap / 1000000000 | number: '1.0-0') + 'B') : 'N/A' }}</td>
+            <td class="metric">{{ stock.sector || 'N/A' }}</td>
+            <td class="metric">{{ stock.industry || 'N/A' }}</td>
+            <td class="metric">{{ stock.date || 'N/A' }}</td>
             <td class="action">
-              <a [routerLink]="['/stock', stock.symbol]" class="view-btn">View</a>
+              <a [routerLink]="['/stock', stock.ticker]" class="view-btn">View</a>
             </td>
           </tr>
         </tbody>

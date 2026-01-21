@@ -12,6 +12,8 @@ import { StockService, Stock } from '../../core/services/stock.service';
 })
 export class StockComponent implements OnInit {
   stock: Stock | null = null;
+  isLoading = false;
+  error = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -22,15 +24,25 @@ export class StockComponent implements OnInit {
     this.route.params.subscribe(params => {
       const symbol = params['symbol'];
       if (symbol) {
-        this.stockService.getStock(symbol).subscribe(stock => {
-          this.stock = stock || null;
+        this.isLoading = true;
+        this.error = '';
+        this.stockService.getStock(symbol).subscribe({
+          next: (stock) => {
+            this.stock = stock;
+            this.isLoading = false;
+          },
+          error: (err) => {
+            this.isLoading = false;
+            this.error = `Failed to load stock data for ${symbol}. Please try again.`;
+            console.error('Error loading stock:', err);
+          }
         });
       }
     });
   }
 
   getRangePercent(): number {
-    if (!this.stock) return 0;
+    if (!this.stock || !this.stock.fiftyTwoWeekHigh || !this.stock.fiftyTwoWeekLow) return 0;
     const range = this.stock.fiftyTwoWeekHigh - this.stock.fiftyTwoWeekLow;
     const position = this.stock.price - this.stock.fiftyTwoWeekLow;
     return (position / range) * 100;

@@ -65,8 +65,7 @@ h2 {
   cursor: pointer;
   font-weight: 600;
   transition: background 0.3s;
-  align-self: flex-end;
-  margin-top: 32px;
+  margin-top: 15px;
 
   &:hover {
     background: #5a6268;
@@ -95,6 +94,27 @@ h2 {
   background: white;
   border-radius: 8px;
   padding: 20px;
+}
+
+.error-box {
+  background: #fee;
+  border-left: 4px solid #f66;
+  border-radius: 6px;
+  padding: 12px;
+  color: #c33;
+  margin-bottom: 12px;
+}
+
+.error-box p {
+  margin: 0;
+}
+
+.loading {
+  background: #f5f7fb;
+  border-radius: 6px;
+  padding: 16px;
+  color: #666;
+  margin-bottom: 12px;
 }
 
 .stocks-table-container {

@@ -3,7 +3,15 @@
     <a routerLink="/screener">← Back to Screener</a>
   </div>
 
-  <div *ngIf="stock" class="stock-detail">
+  <div *ngIf="isLoading" class="loading">
+    <p>Loading stock data...</p>
+  </div>
+
+  <div *ngIf="error" class="error-box">
+    <p>{{ error }}</p>
+  </div>
+
+  <div *ngIf="stock && !isLoading" class="stock-detail">
     <div class="header">
       <div class="header-left">
         <h1>{{ stock.symbol }}</h1>
@@ -13,9 +21,9 @@
       <div class="header-right">
         <div class="price-display">
           <div class="current-price">${{ stock.price | number: '1.2-2' }}</div>
-          <div class="change" [class.positive]="stock.change >= 0" [class.negative]="stock.change < 0">
-            <span class="change-value">{{ stock.change >= 0 ? '+' : '' }}{{ stock.change | number: '1.2-2' }}</span>
-            <span class="change-percent">({{ stock.changePercent >= 0 ? '+' : '' }}{{ stock.changePercent | number: '1.2-2' }}%)</span>
+          <div class="change" [class.positive]="(stock.change || 0) >= 0" [class.negative]="(stock.change || 0) < 0">
+            <span class="change-value">{{ (stock.change || 0) >= 0 ? '+' : '' }}{{ (stock.change || 0) | number: '1.2-2' }}</span>
+            <span class="change-percent">({{ (stock.change_percent || 0) >= 0 ? '+' : '' }}{{ (stock.change_percent || 0) | number: '1.2-2' }}%)</span>
           </div>
         </div>
       </div>
@@ -24,40 +32,40 @@
     <div class="metrics-grid">
       <div class="metric-card">
         <h3>Market Capitalization</h3>
-        <p class="metric-value">${{ (stock.marketCap / 1000000000) | number: '1.1-0' }}B</p>
+        <p class="metric-value">{{ stock.market_cap ? ('$' + (stock.market_cap / 1000000000 | number: '1.1-0') + 'B') : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>P/E Ratio</h3>
-        <p class="metric-value">{{ stock.peRatio | number: '1.1-1' }}</p>
+        <p class="metric-value">{{ stock.peRatio ? (stock.peRatio | number: '1.1-1') : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>Dividend Yield</h3>
-        <p class="metric-value">{{ stock.dividend | number: '1.2-2' }}%</p>
+        <p class="metric-value">{{ stock.dividend ? (stock.dividend | number: '1.2-2') + '%' : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>Volume</h3>
-        <p class="metric-value">{{ (stock.volume / 1000000) | number: '1.1-1' }}M</p>
+        <p class="metric-value">{{ stock.volume ? ((stock.volume / 1000000) | number: '1.1-1') + 'M' : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>Avg Volume (3M)</h3>
-        <p class="metric-value">{{ (stock.avgVolume / 1000000) | number: '1.1-1' }}M</p>
+        <p class="metric-value">{{ stock.avgVolume ? ((stock.avgVolume / 1000000) | number: '1.1-1') + 'M' : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>52-Week High</h3>
-        <p class="metric-value">${{ stock.fiftyTwoWeekHigh | number: '1.2-2' }}</p>
+        <p class="metric-value">{{ stock.fiftyTwoWeekHigh ? ('$' + (stock.fiftyTwoWeekHigh | number: '1.2-2')) : 'N/A' }}</p>
       </div>
 
       <div class="metric-card">
         <h3>52-Week Low</h3>
-        <p class="metric-value">${{ stock.fiftyTwoWeekLow | number: '1.2-2' }}</p>
+        <p class="metric-value">{{ stock.fiftyTwoWeekLow ? ('$' + (stock.fiftyTwoWeekLow | number: '1.2-2')) : 'N/A' }}</p>
       </div>
 
-      <div class="metric-card">
+      <div class="metric-card" *ngIf="stock.fiftyTwoWeekHigh && stock.fiftyTwoWeekLow">
         <h3>52-Week Range</h3>
         <div class="range-bar">
           <div class="range-fill" [style.width.%]="getRangePercent()"></div>
@@ -67,12 +75,8 @@
     </div>
 
     <div class="actions">
-      <button class="buy-btn">Buy {{ stock.symbol }}</button>
+      <button class="buy-btn">Buy {{ stock.ticker || stock.symbol }}</button>
       <button class="watchlist-btn">+ Add to Watchlist</button>
     </div>
-  </div>
-
-  <div *ngIf="!stock" class="loading">
-    <p>Loading stock data...</p>
   </div>
 </div>

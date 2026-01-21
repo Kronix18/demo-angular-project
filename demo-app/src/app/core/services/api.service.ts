@@ -34,15 +34,17 @@ export class ApiService {
     );
   }
 
-  post<T>(endpoint: string, data: any): Observable<T> {
+  post<T>(endpoint: string, data: any, customTimeoutMs?: number): Observable<T> {
     const url = `${this.apiUrl}/${endpoint}`;
     console.log('ApiService POST request to:', url);
     if (Object.keys(data).length > 0) {
       console.log('Request body:', data);
     }
-    
+
+    const toMs = customTimeoutMs ?? this.timeoutMs;
+
     return this.http.post<T>(url, data).pipe(
-      timeout(this.timeoutMs),
+      timeout(toMs),
       catchError(error => this.handleError(error, url))
     );
   }
