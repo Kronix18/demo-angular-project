@@ -21,27 +21,17 @@
       </div>
       <div class="chart-type-buttons">
         <button 
-          [class.active]="chartType === 'Candlestick'" 
-          (click)="changeChartType('Candlestick')"
+          [class.active]="chartType === 'candlestick'" 
+          (click)="changeChartType('candlestick')"
           title="Candlestick Chart">📊</button>
         <button 
-          [class.active]="chartType === 'Line'" 
-          (click)="changeChartType('Line')"
+          [class.active]="chartType === 'line'" 
+          (click)="changeChartType('line')"
           title="Line Chart">📈</button>
       </div>
     </div>
   </div>
-  <div class="chart-wrapper">
-    <igx-financial-chart
-      [dataSource]="chartData"
-      height="100%"
-      width="100%"
-      [chartType]="chartType"
-      thickness="2"
-      negativeBrush="rgba(220, 53, 69, 0.8)"
-      negativeBrushOutline="rgba(220, 53, 69, 1)"
-      brush="rgba(40, 167, 69, 0.8)"
-      outlinebrush="rgba(40, 167, 69, 1)">
-    </igx-financial-chart>
+  <div class="canvas-wrapper">
+    <canvas id="stockChart"></canvas>
   </div>
 </div>

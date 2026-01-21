@@ -1,63 +1,135 @@
-import { Component, Input, OnInit, OnDestroy } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IgxFinancialChartModule } from 'igniteui-angular-charts';
+import { Chart, registerables } from 'chart.js';
+import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';
+import 'chartjs-adapter-date-fns';
 import { StockPrice } from '../../../core/services/stock.service';
 
-interface OhlcData {
-  date: Date;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
+Chart.register(...registerables, CandlestickController, CandlestickElement, OhlcController, OhlcElement);
 
 @Component({
   selector: 'app-candlestick-chart',
   standalone: true,
-  imports: [CommonModule, IgxFinancialChartModule],
+  imports: [CommonModule],
   templateUrl: './candlestick-chart.component.html',
   styleUrl: './candlestick-chart.component.scss'
 })
-export class CandlestickChartComponent implements OnInit, OnDestroy {
+export class CandlestickChartComponent implements OnInit, OnChanges, OnDestroy {
   @Input() prices: StockPrice[] = [];
   @Input() title: string = 'Price History';
   
-  chartData: OhlcData[] = [];
+  private chart: Chart | null = null;
   timeRange: 'all' | '1y' | '6m' | '3m' | '1m' = 'all';
-  chartType: 'Candlestick' | 'Line' = 'Candlestick';
+  chartType: 'candlestick' | 'line' = 'candlestick';
 
   ngOnInit(): void {
     console.log('CandlestickChartComponent initialized with', this.prices.length, 'price points');
-    this.updateChartData();
+    this.createChart();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['prices'] && !changes['prices'].firstChange) {
+      console.log('Prices updated, recreating chart');
+      this.createChart();
+    }
   }
 
   ngOnDestroy(): void {
-    // Cleanup if needed
+    if (this.chart) {
+      this.chart.destroy();
+    }
   }
 
-  updateChartData(): void {
+  createChart(): void {
+    const canvas = document.getElementById('stockChart') as HTMLCanvasElement;
+    if (!canvas) {
+      console.error('Canvas element not found');
+      return;
+    }
+
+    if (this.chart) {
+      this.chart.destroy();
+    }
+
     const filteredPrices = this.getFilteredPrices();
-    this.chartData = filteredPrices.map(p => ({
-      date: new Date(p.date),
-      open: p.open,
-      high: p.high,
-      low: p.low,
-      close: p.close,
-      volume: p.volume
+    const chartData = filteredPrices.map(p => ({
+      x: new Date(p.date).getTime(),
+      o: p.open,
+      h: p.high,
+      l: p.low,
+      c: p.close
     }));
-    console.log('Chart data updated with', this.chartData.length, 'data points');
+
+    console.log('Creating chart with', chartData.length, 'data points');
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('Failed to get 2D context');
+      return;
+    }
+
+    this.chart = new Chart(ctx, {
+      type: this.chartType,
+      data: {
+        datasets: [{
+          label: this.title,
+          data: chartData,
+          borderColor: '#26a69a',
+          backgroundColor: 'rgba(38, 166, 154, 0.5)'
+        } as any]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const data = context.raw;
+                return [
+                  `Open: $${data.o.toFixed(2)}`,
+                  `High: $${data.h.toFixed(2)}`,
+                  `Low: $${data.l.toFixed(2)}`,
+                  `Close: $${data.c.toFixed(2)}`
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              unit: 'day'
+            },
+            grid: {
+              display: false
+            }
+          },
+          y: {
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        }
+      }
+    });
   }
 
   changeTimeRange(range: 'all' | '1y' | '6m' | '3m' | '1m'): void {
     console.log('Changing time range to:', range);
     this.timeRange = range;
-    this.updateChartData();
+    this.createChart();
   }
 
-  changeChartType(type: 'Candlestick' | 'Line'): void {
+  changeChartType(type: 'candlestick' | 'line'): void {
     console.log('Changing chart type to:', type);
     this.chartType = type;
+    this.createChart();
   }
 
   getFilteredPrices(): StockPrice[] {
@@ -68,22 +140,17 @@ export class CandlestickChartComponent implements OnInit, OnDestroy {
     const now = new Date();
     const cutoffDate = new Date();
     
-    // Use date arithmetic instead of setMonth to avoid edge cases
     switch (this.timeRange) {
       case '1m':
-        // Go back 30 days
         cutoffDate.setDate(now.getDate() - 30);
         break;
       case '3m':
-        // Go back 90 days
         cutoffDate.setDate(now.getDate() - 90);
         break;
       case '6m':
-        // Go back 180 days
         cutoffDate.setDate(now.getDate() - 180);
         break;
       case '1y':
-        // Go back 365 days
         cutoffDate.setDate(now.getDate() - 365);
         break;
     }
