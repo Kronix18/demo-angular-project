@@ -1,21 +1,79 @@
 <div class="profile-container">
-  <section class="profile-card" *ngIf="user(); else noUser">
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading()">
+    <div class="spinner"></div>
+    <p>Loading profile...</p>
+  </div>
+
+  <!-- Error State -->
+  <div class="error-state" *ngIf="!isLoading() && error()">
+    <p>{{ error() }}</p>
+    <button (click)="loadProfileData()">Retry</button>
+  </div>
+
+  <!-- Profile Content -->
+  <section class="profile-card" *ngIf="!isLoading() && !error() && userProfile(); else noUser">
     <header class="profile-header">
       <div class="avatar">{{ initials() }}</div>
       <div class="identity">
-        <h2>{{ user()?.name || 'Unnamed User' }}</h2>
-        <p class="email">{{ user()?.email }}</p>
-        <span class="badge" *ngIf="user()?.is_admin">Admin</span>
-        <span class="badge secondary" *ngIf="!user()?.is_admin">Member</span>
+        <h2>{{ userProfile()?.name || 'Unnamed User' }}</h2>
+        <p class="email">{{ userProfile()?.email }}</p>
+        <p class="username">@{{ userProfile()?.username }}</p>
+        <span class="badge" *ngIf="userProfile()?.role === 'admin'">Admin</span>
+        <span class="badge secondary" *ngIf="userProfile()?.role === 'user'">Member</span>
       </div>
     </header>
 
     <div class="profile-grid">
       <div class="card">
         <h3>Account</h3>
-        <div class="item"><span>User ID</span><strong>{{ user()?.id || '—' }}</strong></div>
-        <div class="item"><span>Role</span><strong>{{ user()?.is_admin ? 'Admin' : 'Member' }}</strong></div>
-        <div class="item"><span>Status</span><strong>Active</strong></div>
+        <div class="item"><span>User ID</span><strong>{{ userProfile()?.user_id || '—' }}</strong></div>
+        <div class="item"><span>Username</span><strong>{{ userProfile()?.username || '—' }}</strong></div>
+        <div class="item"><span>Role</span><strong>{{ userProfile()?.role === 'admin' ? 'Admin' : 'Member' }}</strong></div>
+        <div class="item">
+          <span>Email Status</span>
+          <strong>{{ userProfile()?.email_status || 'Unknown' }}</strong>
+        </div>
+        <div class="item" *ngIf="userProfile()?.created_at">
+          <span>Member Since</span>
+          <strong>{{ userProfile()?.created_at | date:'mediumDate' }}</strong>
+        </div>
+        <div class="item" *ngIf="userProfile()?.last_login">
+          <span>Last Login</span>
+          <strong>{{ userProfile()?.last_login | date:'mediumDate' }}</strong>
+        </div>
+      </div>
+
+      <div class="card subscription-card">
+        <h3>Subscription</h3>
+        <div class="subscription-tier">
+          <span class="tier-badge" [ngClass]="getTierBadgeClass(currentTier())">
+            {{ getTierDisplayName(currentTier()) }}
+          </span>
+          <button class="upgrade-btn" (click)="navigateToPricing()" *ngIf="currentTier() !== 'admin'">
+            Upgrade
+          </button>
+        </div>
+        <div class="item" *ngIf="getDaysRemaining() >= 0">
+          <span>Days Remaining</span>
+          <strong>{{ getDaysRemaining() }}</strong>
+        </div>
+        <div class="item">
+          <span>Screener Results</span>
+          <strong>{{ getFeatureValue(features().maxScreenerResults) }}</strong>
+        </div>
+        <div class="item">
+          <span>Watchlists</span>
+          <strong>{{ getFeatureValue(features().maxWatchlists) }}</strong>
+        </div>
+        <div class="item">
+          <span>API Access</span>
+          <strong>{{ getFeatureValue(features().apiAccess) }}</strong>
+        </div>
+        <div class="item">
+          <span>Real-time Data</span>
+          <strong>{{ getFeatureValue(features().realTimeData) }}</strong>
+        </div>
       </div>
 
       <div class="card">

@@ -4,6 +4,7 @@ import { ScreenerComponent } from './features/screener/screener.component';
 import { StockComponent } from './features/stock/stock.component';
 import { ProfileComponent } from './features/profile/profile.component';
 import { HomeComponent } from './features/home/home.component';
+import { PricingComponent } from './features/pricing/pricing.component';
 
 export const routes: Routes = [
   {
@@ -15,6 +16,11 @@ export const routes: Routes = [
     path: 'home',
     component: HomeComponent,
     data: { title: 'Home' }
+  },
+  {
+    path: 'pricing',
+    component: PricingComponent,
+    data: { title: 'Pricing Plans' }
   },
   {
     path: 'screener',
@@ -43,3 +49,4 @@ export const routes: Routes = [
     redirectTo: '/home'
   }
 ];
+

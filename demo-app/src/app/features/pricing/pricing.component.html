@@ -1,0 +1,103 @@
+<div class="pricing-container">
+  <div class="pricing-header">
+    <h1>Choose Your Plan</h1>
+    <p>Select the perfect plan for your trading needs</p>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    {{ error }}
+  </div>
+
+  <div class="plans-grid">
+    <div 
+      *ngFor="let plan of plans" 
+      class="plan-card"
+      [class.popular]="plan.popular"
+      [class.current]="isCurrentPlan(plan.tier)">
+      
+      <div class="plan-badge" *ngIf="plan.popular">
+        Most Popular
+      </div>
+      
+      <div class="plan-header">
+        <h2>{{ plan.name }}</h2>
+        <p class="plan-description">{{ plan.description }}</p>
+        <div class="plan-price">
+          <span class="price-amount">\${{ plan.price }}</span>
+          <span class="price-period" *ngIf="plan.price > 0">/month</span>
+        </div>
+      </div>
+
+      <div class="plan-features">
+        <h3>Features</h3>
+        <ul>
+          <li>
+            <span class="feature-label">Screener Results:</span>
+            <span class="feature-value">
+              {{ plan.features.maxScreenerResults === -1 ? 'Unlimited' : plan.features.maxScreenerResults }}
+            </span>
+          </li>
+          <li [class.included]="plan.features.advancedFilters">
+            <span class="feature-label">Advanced Filters:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.advancedFilters) }}</span>
+          </li>
+          <li [class.included]="plan.features.exportData">
+            <span class="feature-label">Export Data:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.exportData) }}</span>
+          </li>
+          <li [class.included]="plan.features.advancedCharts">
+            <span class="feature-label">Advanced Charts:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.advancedCharts) }}</span>
+          </li>
+          <li>
+            <span class="feature-label">Historical Data:</span>
+            <span class="feature-value">{{ plan.features.historicalDataYears }} years</span>
+          </li>
+          <li [class.included]="plan.features.technicalIndicators">
+            <span class="feature-label">Technical Indicators:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.technicalIndicators) }}</span>
+          </li>
+          <li>
+            <span class="feature-label">Watchlists:</span>
+            <span class="feature-value">
+              {{ plan.features.maxWatchlists === -1 ? 'Unlimited' : plan.features.maxWatchlists }}
+            </span>
+          </li>
+          <li [class.included]="plan.features.priceAlerts">
+            <span class="feature-label">Price Alerts:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.priceAlerts) }}</span>
+          </li>
+          <li [class.included]="plan.features.apiAccess">
+            <span class="feature-label">API Access:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.apiAccess) }}</span>
+          </li>
+          <li [class.included]="!plan.features.adsEnabled">
+            <span class="feature-label">Ad-Free:</span>
+            <span class="feature-value">{{ formatFeatureValue(!plan.features.adsEnabled) }}</span>
+          </li>
+          <li [class.included]="plan.features.prioritySupport">
+            <span class="feature-label">Priority Support:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.prioritySupport) }}</span>
+          </li>
+          <li [class.included]="plan.features.realTimeData">
+            <span class="feature-label">Real-time Data:</span>
+            <span class="feature-value">{{ formatFeatureValue(plan.features.realTimeData) }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <button 
+        class="plan-button"
+        [class]="getButtonClass(plan.tier)"
+        [disabled]="isCurrentPlan(plan.tier) || isLoading"
+        (click)="selectPlan(plan)">
+        {{ getButtonText(plan.tier) }}
+      </button>
+    </div>
+  </div>
+
+  <div class="pricing-footer">
+    <p>All plans include basic stock screening and chart viewing capabilities.</p>
+    <p>Need a custom enterprise solution? <a routerLink="/contact">Contact us</a></p>
+  </div>
+</div>

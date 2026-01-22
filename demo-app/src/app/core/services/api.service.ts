@@ -15,7 +15,10 @@ export class ApiService {
   constructor(private http: HttpClient) {}
 
   get<T>(endpoint: string): Observable<T> {
-    return this.http.get<T>(`${this.apiUrl}/${endpoint}`).pipe(
+    const url = `${this.apiUrl}/${endpoint}`;
+    console.log('ApiService GET request to:', url);
+    const headers = { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` };
+    return this.http.get<T>(url, { headers }).pipe(
       timeout(this.timeoutMs),
       retryWhen(errors =>
         errors.pipe(
@@ -30,7 +33,7 @@ export class ApiService {
           take(this.maxRetries)
         )
       ),
-      catchError(error => this.handleError(error))
+      catchError(error => this.handleError(error, url))
     );
   }
 

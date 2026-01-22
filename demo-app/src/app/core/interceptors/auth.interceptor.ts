@@ -36,12 +36,16 @@ export class AuthInterceptor implements HttpInterceptor {
 
     // Check if token is expired before making request
     if (accessToken && this.authService.isTokenExpired()) {
+      console.log('AuthInterceptor: Token expired, refreshing...');
       return this.handle401Error(req, next);
     }
 
     // Add token to request
     if (accessToken) {
+      console.log('AuthInterceptor: Adding Bearer token to request:', req.url);
       req = this.addToken(req, accessToken);
+    } else {
+      console.warn('AuthInterceptor: No access token available for request:', req.url);
     }
 
     return next.handle(req).pipe(
@@ -55,6 +59,7 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   private addToken(request: HttpRequest<any>, token: string): HttpRequest<any> {
+    console.log('AuthInterceptor: Token being added:', token.substring(0, 20) + '...');
     return request.clone({
       setHeaders: {
         Authorization: `Bearer ${token}`

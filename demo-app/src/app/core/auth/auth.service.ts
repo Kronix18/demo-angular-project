@@ -1,6 +1,6 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal, effect, inject } from '@angular/core';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { tap, catchError } from 'rxjs/operators';
+import { tap, catchError, switchMap } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { ApiService } from '../services/api.service';
 
@@ -108,6 +108,13 @@ export class AuthService {
     localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
     this.currentUser.set(null);
     this.isLoggedIn.next(false);
+    
+    // Clear subscription data on logout
+    // Note: Import SubscriptionService dynamically to avoid circular dependency
+    import('../subscriptions/subscription.service').then(module => {
+      const subscriptionService = inject(module.SubscriptionService);
+      subscriptionService.clearSubscription();
+    }).catch(err => console.error('Failed to clear subscription:', err));
   }
 
   isAuthenticated(): boolean {
