@@ -6,11 +6,11 @@
     <div class="filters-grid">
       <div class="filter-group">
         <label>Min Price ($)</label>
-        <input type="number" [(ngModel)]="filters.minPrice" (change)="onFilterChange()" placeholder="0">
+        <input type="number" [(ngModel)]="filters.minPrice" (input)="onFilterChange()" placeholder="0">
       </div>
       <div class="filter-group">
         <label>Max Price ($)</label>
-        <input type="number" [(ngModel)]="filters.maxPrice" (change)="onFilterChange()" placeholder="999999">
+        <input type="number" [(ngModel)]="filters.maxPrice" (input)="onFilterChange()" placeholder="999999">
       </div>
       <div class="filter-group">
         <label>Sector</label>
@@ -23,7 +23,15 @@
       </div>
       <div class="filter-group">
         <label>Min Volume (M)</label>
-        <input type="number" [(ngModel)]="filters.minVolume" (change)="onFilterChange()" placeholder="0" step="1">
+        <input type="number" [(ngModel)]="filters.minVolume" (input)="onFilterChange()" placeholder="0" step="1">
+      </div>
+      <div class="filter-group">
+        <label>Min Change %</label>
+        <input type="number" [(ngModel)]="filters.minChangePercent" (input)="onFilterChange()" placeholder="-100" step="0.1">
+      </div>
+      <div class="filter-group">
+        <label>Max Change %</label>
+        <input type="number" [(ngModel)]="filters.maxChangePercent" (input)="onFilterChange()" placeholder="100" step="0.1">
       </div>
     </div>
     <button class="reset-btn" (click)="resetFilters()">Reset Filters</button>
@@ -52,15 +60,33 @@
       <table class="stocks-table">
         <thead>
           <tr>
-            <th>Symbol</th>
-            <th>Name</th>
-            <th>Price</th>
-            <th>Change %</th>
-            <th>Volume</th>
-            <th>Market Cap</th>
-            <th>Sector</th>
-            <th>Industry</th>
-            <th>Date</th>
+            <th class="sortable" (click)="sortBy('ticker')">
+              Symbol <span class="sort-icon">{{ getSortIcon('ticker') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('name')">
+              Name <span class="sort-icon">{{ getSortIcon('name') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('price')">
+              Price <span class="sort-icon">{{ getSortIcon('price') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('change_percent')">
+              Change % <span class="sort-icon">{{ getSortIcon('change_percent') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('volume')">
+              Volume <span class="sort-icon">{{ getSortIcon('volume') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('market_cap')">
+              Market Cap <span class="sort-icon">{{ getSortIcon('market_cap') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('sector')">
+              Sector <span class="sort-icon">{{ getSortIcon('sector') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('industry')">
+              Industry <span class="sort-icon">{{ getSortIcon('industry') }}</span>
+            </th>
+            <th class="sortable" (click)="sortBy('date')">
+              Date <span class="sort-icon">{{ getSortIcon('date') }}</span>
+            </th>
             <th>Action</th>
           </tr>
         </thead>

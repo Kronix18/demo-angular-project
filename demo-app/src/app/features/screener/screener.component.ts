@@ -31,8 +31,14 @@ export class ScreenerComponent implements OnInit, OnDestroy {
     minPrice: undefined as number | undefined,
     maxPrice: undefined as number | undefined,
     sector: '',
-    minVolume: undefined as number | undefined
+    minVolume: undefined as number | undefined,
+    minChangePercent: undefined as number | undefined,
+    maxChangePercent: undefined as number | undefined
   };
+
+  // Sorting state
+  sortColumn: string = '';
+  sortDirection: 'asc' | 'desc' = 'asc';
 
   private destroy$ = new Subject<void>();
 
@@ -94,6 +100,14 @@ export class ScreenerComponent implements OnInit, OnDestroy {
         }
       }
 
+      // Change percent filter
+      if (this.filters.minChangePercent !== undefined && stock.change_percent < this.filters.minChangePercent) {
+        return false;
+      }
+      if (this.filters.maxChangePercent !== undefined && stock.change_percent > this.filters.maxChangePercent) {
+        return false;
+      }
+
       // Search query filter
       if (this.searchQuery.trim()) {
         const query = this.searchQuery.toLowerCase();
@@ -107,7 +121,13 @@ export class ScreenerComponent implements OnInit, OnDestroy {
       return true;
     });
 
+    // Apply current sort after filtering
+    if (this.sortColumn) {
+      this.applySort();
+    }
+
     console.log('Filtered stocks:', this.filteredStocks.length);
+    this.cdr.markForCheck();
   }
 
   onFilterChange(): void {
@@ -126,9 +146,69 @@ export class ScreenerComponent implements OnInit, OnDestroy {
       minPrice: undefined,
       maxPrice: undefined,
       sector: '',
-      minVolume: undefined
+      minVolume: undefined,
+      minChangePercent: undefined,
+      maxChangePercent: undefined
     };
     this.searchQuery = '';
     this.applyFiltersLocal();
+  }
+
+  /**
+   * Sort table by column
+   */
+  sortBy(column: string): void {
+    if (this.sortColumn === column) {
+      // Toggle direction if same column
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      // New column, default to ascending
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+    this.applySort();
+  }
+
+  /**
+   * Apply current sort to filtered stocks
+   */
+  private applySort(): void {
+    if (!this.sortColumn) return;
+
+    this.filteredStocks.sort((a: any, b: any) => {
+      let aValue = a[this.sortColumn];
+      let bValue = b[this.sortColumn];
+
+      // Handle null/undefined values
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+
+      // String comparison
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      // Compare values
+      let comparison = 0;
+      if (aValue > bValue) {
+        comparison = 1;
+      } else if (aValue < bValue) {
+        comparison = -1;
+      }
+
+      return this.sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Get sort icon for column header
+   */
+  getSortIcon(column: string): string {
+    if (this.sortColumn !== column) return '↕';
+    return this.sortDirection === 'asc' ? '↑' : '↓';
   }
 }

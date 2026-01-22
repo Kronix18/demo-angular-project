@@ -2,7 +2,7 @@ import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { StockService, StockDetail, Company, StockPrice } from '../../core/services/stock.service';
-import { CandlestickChartComponent } from '../../shared/components/candlestick-chart/candlestick-chart.component';
+import { CandlestickChartComponent } from './candlestick-chart/candlestick-chart.component';
 
 @Component({
   selector: 'app-stock',
