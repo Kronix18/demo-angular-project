@@ -30,7 +30,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | Task | File | Status | Notes |
 |------|------|--------|-------|
 | 0.1 | phase-0-audit/0.1-env-repo-hygiene.md | DONE (see task file) | graphify installed, baseline recorded, first checkpoint built |
-| 0.2 | phase-0-audit/0.2-python-port-inventory.md | NOT STARTED | was "0.2" before; never actually produced a doc |
+| 0.2 | phase-0-audit/0.2-python-port-inventory.md | DONE (see task file) | inventory produced |
 | 0.3 | phase-0-audit/0.3-api-spec-alignment.md | NOT STARTED | align spec with test-data reality |
 | 1.1 | phase-1-auth-navbar/1.1-auth-service-state.md | NOT STARTED | BLOCKING user complaint (login never fires) |
 | 1.2 | phase-1-auth-navbar/1.2-navbar-composition.md | NOT STARTED | BLOCKING user complaint (only Pricing shows) |
