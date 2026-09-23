@@ -20,7 +20,11 @@ export interface RegisterCredentials {
 export class AuthService {
   private readonly ADMIN_EMAIL = 'admin@demo.angular-project.local';
   private readonly ADMIN_PASSWORD = 'changeme';
-  private isLoggedInSubject = new BehaviorSubject<boolean>(false);
+  // Rehydrate from sessionStorage so a page refresh keeps the user logged in
+  // (the subject must start with the persisted value, not a hardcoded false).
+  private isLoggedInSubject = new BehaviorSubject<boolean>(
+    sessionStorage.getItem('isLoggedIn') === 'true'
+  );
   public isLoggedIn$ = this.isLoggedInSubject.asObservable();
 
   login(credentials: LoginCredentials): Observable<boolean> {

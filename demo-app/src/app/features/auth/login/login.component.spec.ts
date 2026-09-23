@@ -4,16 +4,19 @@ import { LoginComponent } from './login.component';
 
 describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
-
-  const routerStub = {
-    navigateByUrl: () => Promise.resolve(true),
-    navigate: () => Promise.resolve(true),
-    url: '/auth/login',
-    events: { subscribe: () => () => {} },
-  };
+  let navigateByUrl: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     sessionStorage.clear();
+
+    // Fresh stub per test so recorded calls never leak between specs.
+    navigateByUrl = vi.fn().mockResolvedValue(true);
+    const routerStub = {
+      navigateByUrl,
+      navigate: vi.fn().mockResolvedValue(true),
+      url: '/auth/login',
+      events: { subscribe: () => () => {} },
+    };
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
@@ -27,11 +30,6 @@ describe('LoginComponent', () => {
   });
 
   it('navigates to "/" after submitting valid credentials', async () => {
-    const router = TestBed.inject(Router) as unknown as {
-      navigateByUrl: (url: string) => Promise<boolean>;
-    };
-    const navigateSpy = vi.spyOn(router, 'navigateByUrl');
-
     fixture = TestBed.createComponent(LoginComponent);
     const component = fixture.componentInstance;
     component.email = 'admin@demo.angular-project.local';
@@ -42,16 +40,11 @@ describe('LoginComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(navigateSpy).toHaveBeenCalled();
-    expect(navigateSpy).toHaveBeenCalledWith('/');
+    expect(navigateByUrl).toHaveBeenCalled();
+    expect(navigateByUrl).toHaveBeenCalledWith('/');
   });
 
   it('does not navigate and shows an inline error element after submitting invalid credentials', async () => {
-    const router = TestBed.inject(Router) as unknown as {
-      navigateByUrl: (url: string) => Promise<boolean>;
-    };
-    const navigateSpy = vi.spyOn(router, 'navigateByUrl');
-
     fixture = TestBed.createComponent(LoginComponent);
     const component = fixture.componentInstance;
     component.email = 'admin@demo.angular-project.local';
@@ -62,7 +55,7 @@ describe('LoginComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(navigateByUrl).not.toHaveBeenCalled();
 
     const errorEl = (fixture.nativeElement as HTMLElement).querySelector('.login-error');
     expect(errorEl).not.toBeNull();

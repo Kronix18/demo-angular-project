@@ -7,6 +7,16 @@ import { AuthService } from '../../../core/auth/auth.service';
   selector: 'app-login',
   standalone: true,
   imports: [FormsModule],
+  styles: [
+    `
+      .login-error {
+        color: var(--auth-error-color, #dc3545);
+        font-size: 14px;
+        font-weight: 600;
+        margin: 12px 0 0 0;
+      }
+    `,
+  ],
   template: `
     <div class="login-page">
       <header>
@@ -21,14 +31,18 @@ import { AuthService } from '../../../core/auth/auth.service';
         <form (ngSubmit)="onSubmit()">
           <div>
             <label for="email">Email</label>
-            <input type="email" id="email" [(ngModel)]="email" required>
+            <input type="email" id="email" name="email" [(ngModel)]="email" required>
           </div>
           <div>
             <label for="password">Password</label>
-            <input type="password" id="password" [(ngModel)]="password" required>
+            <input type="password" id="password" name="password" [(ngModel)]="password" required>
           </div>
           <button type="submit" class="primary">Sign In</button>
         </form>
+
+        @if (errorMessage) {
+          <p class="login-error">{{ errorMessage }}</p>
+        }
 
         <p class="hint">
           For demo purposes, you can use the default account:
@@ -42,16 +56,20 @@ import { AuthService } from '../../../core/auth/auth.service';
 export class LoginComponent {
   email = '';
   password = '';
+  errorMessage = '';
 
   constructor(private authService: AuthService, private router: Router) {}
 
   onSubmit(): void {
-    if (this.authService.login({ email: this.email, password: this.password })) {
-      // Login successful
-      this.router.navigateByUrl('/');
-    } else {
-      // Login failed
-      alert('Invalid email or password');
-    }
+    this.authService
+      .login({ email: this.email, password: this.password })
+      .subscribe((success) => {
+        if (success) {
+          this.errorMessage = '';
+          this.router.navigateByUrl('/');
+        } else {
+          this.errorMessage = 'Invalid email or password';
+        }
+      });
   }
 }
