@@ -1,77 +1,57 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
-  templateUrl: './login.component.html',
-  styleUrl: './login.component.scss'
+  imports: [FormsModule],
+  template: `
+    <div class="login-page">
+      <header>
+        <nav>
+          <a routerLink="/">Home</a>
+          <a routerLink="/register">Sign Up</a>
+        </nav>
+      </header>
+
+      <main class="login-form">
+        <h2>Sign In</h2>
+        <form (ngSubmit)="onSubmit()">
+          <div>
+            <label for="email">Email</label>
+            <input type="email" id="email" [(ngModel)]="email" required>
+          </div>
+          <div>
+            <label for="password">Password</label>
+            <input type="password" id="password" [(ngModel)]="password" required>
+          </div>
+          <button type="submit" class="primary">Sign In</button>
+        </form>
+
+        <p class="hint">
+          For demo purposes, you can use the default account:
+          <br><strong>Email:</strong> admin@demo.angular-project.local
+          <br><strong>Password:</strong> changeme
+        </p>
+      </main>
+    </div>
+  `,
 })
-export class LoginComponent implements OnInit, OnDestroy {
-  private authService = inject(AuthService);
-  private router = inject(Router);
-  private destroy$ = new Subject<void>();
-
-  username = '';
+export class LoginComponent {
+  email = '';
   password = '';
-  isLoading = false;
-  isAuthenticated = false;
-  error = '';
 
-  ngOnInit(): void {
-    if (this.authService.isAuthenticated()) {
-      this.isAuthenticated = true;
-      this.goToDashboard();
-      return;
+  constructor(private authService: AuthService, private router: Router) {}
+
+  onSubmit(): void {
+    if (this.authService.login({ email: this.email, password: this.password })) {
+      // Login successful
+      this.router.navigateByUrl('/');
+    } else {
+      // Login failed
+      alert('Invalid email or password');
     }
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
-  handleLogin(): void {
-    if (!this.username) {
-      this.error = 'Please enter a username';
-      return;
-    }
-
-    this.isLoading = true;
-    this.error = '';
-
-    this.authService.login({
-      username: this.username,
-      password: this.password
-    })
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.isAuthenticated = true;
-          this.isLoading = false;
-          this.goToDashboard();
-        },
-        error: (err) => {
-          this.error = err?.message || 'Login failed. Please try again.';
-          this.isLoading = false;
-        }
-      });
-  }
-
-  handleLogout(): void {
-    this.authService.logout();
-    this.isAuthenticated = false;
-    this.username = '';
-    this.password = '';
-  }
-
-  goToDashboard(): void {
-    this.router.navigate(['/screener']);
   }
 }

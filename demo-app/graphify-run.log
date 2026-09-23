@@ -1,0 +1,9 @@
+[graphify extract] deep mode enabled: richer semantic extraction
+[graphify extract] scanning C:\Users\kevin\Documents\Programming\demo-angular-project\demo-app
+[graphify extract] --code-only: skipping 50 non-code file(s) (50 docs, 0 papers, 0 images) — no LLM extraction
+[graphify extract] found 49 code, 0 docs, 0 papers, 0 images
+[graphify extract] 19 file(s) not classified (no supported extension or shebang), skipped: .editorconfig, .gitignore, app.scss, candlestick-chart.component.scss, chart-viewer.scss, favicon.ico (+13 more)
+[graphify extract] AST extraction on 49 code files...
+[graphify extract] wrote C:\Users\kevin\Documents\Programming\demo-angular-project\demo-app\graphify-out\graph.json: 379 nodes, 647 edges, 17 communities
+[graphify extract] wrote C:\Users\kevin\Documents\Programming\demo-angular-project\demo-app\graphify-out\.graphify_analysis.json
+[graphify extract] next: run `graphify cluster-only C:\Users\kevin\Documents\Programming\demo-angular-project\demo-app` to generate GRAPH_REPORT.md and name communities

@@ -1,44 +1,45 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/guards/auth.guard';
-import { ScreenerComponent } from './features/screener/screener.component';
-import { StockComponent } from './features/stock/stock.component';
-import { ProfileComponent } from './features/profile/profile.component';
-import { HomeComponent } from './features/home/home.component';
-import { PricingComponent } from './features/pricing/pricing.component';
+import { HomepageComponent } from './pages/homepage/homepage.component';
+// We will create the rest of the components as placeholders below.
 
 export const routes: Routes = [
   {
     path: '',
-    component: HomeComponent,
+    component: HomepageComponent,
     data: { title: 'Home' }
   },
   {
     path: 'home',
-    component: HomeComponent,
+    component: HomepageComponent,
     data: { title: 'Home' }
   },
   {
     path: 'pricing',
-    component: PricingComponent,
+    loadComponent: () => import('./features/pricing/pricing.component').then(m => m.PricingComponent),
     data: { title: 'Pricing Plans' }
   },
   {
     path: 'screener',
-    component: ScreenerComponent,
+    loadComponent: () => import('./features/screener/screener.component').then(m => m.ScreenerComponent),
     data: { title: 'Stock Screener' },
-    canActivate: [authGuard]
+    canActivate: [() => true] // Placeholder guard, replace with authGuard later
+  },
+  {
+    path: 'charts/:symbol',
+    loadComponent: () => import('./charts/chart-viewer/chart-viewer.component').then(m => m.ChartViewerComponent),
+    data: { title: 'Chart Viewer' }
   },
   {
     path: 'profile',
-    component: ProfileComponent,
+    loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent),
     data: { title: 'Your Profile' },
-    canActivate: [authGuard]
+    canActivate: [() => true] // Placeholder guard
   },
   {
     path: 'stock/:symbol',
-    component: StockComponent,
+    loadComponent: () => import('./features/stock/stock.component').then(m => m.StockComponent),
     data: { title: 'Stock Details' },
-    canActivate: [authGuard]
+    canActivate: [() => true] // Placeholder guard
   },
   {
     path: 'auth',
@@ -49,4 +50,3 @@ export const routes: Routes = [
     redirectTo: '/home'
   }
 ];
-

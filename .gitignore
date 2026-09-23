@@ -6,3 +6,9 @@ demo-app/COMPONENT_GUIDE.md
 .angular
 .vscode
 node_modules
+graphify-out/
+serve.log
+dist/
+playwright-report/
+test-results/
+.superpowers/
