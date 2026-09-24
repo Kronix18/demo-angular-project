@@ -1,8 +1,8 @@
-import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService } from '../../core/services/chart-data.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
@@ -86,6 +86,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   private chartDataService: ChartDataService;
   private route: ActivatedRoute;
+  private router: Router;
   // ZONELESS app (no zone.js polyfill): async callbacks (HTTP subscribe) do
   // NOT trigger change detection — markForCheck() after state updates makes
   // the @if(loading)/@if(error) blocks re-render (2.2 fix, verified live:
@@ -95,17 +96,24 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   constructor(
     chartDataService: ChartDataService,
     route: ActivatedRoute,
+    router: Router,
     cdr: ChangeDetectorRef
   ) {
     this.chartDataService = chartDataService;
     this.route = route;
+    this.router = router;
     this.cdr = cdr;
   }
 
   ngOnInit(): void {
     this.route.params.subscribe((params) => {
-      this.currentSymbol = params['symbol'] || 'msft';
-      this.loadChartData(this.currentSymbol, this.currentInterval);
+      const symbol = params['symbol'] || 'msft';
+      // Skip re-fire when the symbol is unchanged (router.navigate with
+      // replaceUrl re-emits params without re-creating the component; without
+      // this guard every toolbar symbol change fetched TWICE).
+      if (symbol === this.currentSymbol) return;
+      this.currentSymbol = symbol;
+      this.loadChartData(symbol, this.currentInterval);
     });
   }
 
@@ -135,6 +143,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   onToolbarSymbolChange(symbol: string): void {
     this.currentSymbol = symbol;
+    // Keep the URL in sync (2.3): refresh/deep-link preserves the symbol.
+    // replaceState — no navigation, no component re-creation.
+    this.router.navigate(['/charts', symbol], { replaceUrl: true });
     this.loadChartData(symbol, this.currentInterval);
   }
 

@@ -52,7 +52,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 1.2 | phase-1-auth-navbar/1.2-navbar-composition.md | DONE (see task file) | navbar composed for both auth states; verify-1-2.cjs ready for controller browser run |
 | 1.3 | phase-1-auth-navbar/1.3-guards-and-login-page.md | DONE (see task file) | authGuard live on /screener,/profile,/stock/:symbol with returnUrl; login page links fixed; verify-1-3.cjs 13/13 |
 | 2.1 | phase-2-chart-data/2.1-test-data-pipeline.md | DONE (data layer ONLY — /charts page still shows stuck Loading until 2.2) | 8 Stooq files served from public/test-data; URL+epoch-ms fixed; 26/26 specs; verify-2-1.cjs 15/15 (data assertions only) |
-| 2.2 | phase-2-chart-data/2.2-chartjs-registration.md | NOT STARTED | chart cannot construct today |
+| 2.2 | phase-2-chart-data/2.2-chartjs-registration.md | DONE (pixel-verified: candles render on msft+qqq) | chart-setup module, canvas-in-DOM, zoneless markForCheck; 32/32 suite |
 | 2.3 | phase-2-chart-data/2.3-toolbar-integration-redo.md | NOT STARTED | previous "completed" claim was false |
 | 3.1 | phase-3-panes-interaction/3.1-volume-pane.md | NOT STARTED | verify dual-axis actually renders |
 | 3.2 | phase-3-panes-interaction/3.2-zoom-pan.md | NOT STARTED | plugin installed, never registered |
