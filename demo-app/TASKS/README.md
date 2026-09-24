@@ -15,6 +15,22 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
    open the route in a browser (Playwright via the browser tool), assert the DOM,
    check the console is clean, take a screenshot as evidence. Never hand this to
    the user as "please verify".
+   **THOROUGHNESS RULE (Kevin, 2026-09-24 — after 2.1's data-only pass was
+   rejected)**: a task passes verification only if the USER-VISIBLE outcome
+   works, not a sub-layer of it. Concretely:
+   - A "renders" claim requires pixel-level proof: canvas present + nonzero size
+     + non-trivial drawn content (pixel count AND color variance thresholds;
+     blank/filled canvas = FAIL). DOM presence alone is never enough.
+   - A data/integration task behind a broken UI is NOT a pass: state plainly
+     what still fails on the page ("chart area shows stuck Loading..." = fail
+     of the rendering task, even if the fetch layer is green).
+   - Assertions must match the task's user-facing claim, not the convenient
+     subset. If the scope genuinely covers only a sub-layer, the verification
+     section must say exactly that — never print a bare "N/N PASS" for a page
+     that is visibly broken.
+   - Every verify script must capture and REPORT console errors, stuck loading
+     states, and missing elements — and must fail the run if the page's final
+     state isn't the state the task promised.
 4. **No inline styles / no hardcoded colors**: all styling via CSS custom
    properties defined in the theme SCSS file(s).
 5. **Documentation updated in the same task** so another agent can pick up:
@@ -35,7 +51,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 1.1 | phase-1-auth-navbar/1.1-auth-service-state.md | DONE (see task file) | auth state rehydrates; login subscribes |
 | 1.2 | phase-1-auth-navbar/1.2-navbar-composition.md | DONE (see task file) | navbar composed for both auth states; verify-1-2.cjs ready for controller browser run |
 | 1.3 | phase-1-auth-navbar/1.3-guards-and-login-page.md | DONE (see task file) | authGuard live on /screener,/profile,/stock/:symbol with returnUrl; login page links fixed; verify-1-3.cjs 13/13 |
-| 2.1 | phase-2-chart-data/2.1-test-data-pipeline.md | DONE (browser-verified) | 8 Stooq files served from public/test-data; URL+epoch-ms fixed; 26/26 specs; verify-2-1.cjs 15/15 |
+| 2.1 | phase-2-chart-data/2.1-test-data-pipeline.md | DONE (data layer ONLY — /charts page still shows stuck Loading until 2.2) | 8 Stooq files served from public/test-data; URL+epoch-ms fixed; 26/26 specs; verify-2-1.cjs 15/15 (data assertions only) |
 | 2.2 | phase-2-chart-data/2.2-chartjs-registration.md | NOT STARTED | chart cannot construct today |
 | 2.3 | phase-2-chart-data/2.3-toolbar-integration-redo.md | NOT STARTED | previous "completed" claim was false |
 | 3.1 | phase-3-panes-interaction/3.1-volume-pane.md | NOT STARTED | verify dual-axis actually renders |
