@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService } from '../../core/services/chart-data.service';
@@ -84,10 +84,23 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   currentSymbol: string = '';
   currentInterval: string = '1d';
 
+  private chartDataService: ChartDataService;
+  private route: ActivatedRoute;
+  // ZONELESS app (no zone.js polyfill): async callbacks (HTTP subscribe) do
+  // NOT trigger change detection — markForCheck() after state updates makes
+  // the @if(loading)/@if(error) blocks re-render (2.2 fix, verified live:
+  // without it the loading overlay stays stuck over the rendered chart).
+  private cdr: ChangeDetectorRef;
+
   constructor(
-    private chartDataService: ChartDataService,
-    private route: ActivatedRoute
-  ) {}
+    chartDataService: ChartDataService,
+    route: ActivatedRoute,
+    cdr: ChangeDetectorRef
+  ) {
+    this.chartDataService = chartDataService;
+    this.route = route;
+    this.cdr = cdr;
+  }
 
   ngOnInit(): void {
     this.route.params.subscribe((params) => {
@@ -109,11 +122,13 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
           this.error = 'No data available';
         }
         this.loading = false;
+        this.cdr.markForCheck(); // zoneless: schedule CD after async state change
       },
       error: (err) => {
         console.error('Failed to load chart data:', err);
         this.error = 'Failed to load chart data';
         this.loading = false;
+        this.cdr.markForCheck(); // zoneless: schedule CD after async state change
       },
     });
   }
