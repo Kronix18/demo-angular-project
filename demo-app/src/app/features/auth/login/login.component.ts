@@ -1,12 +1,12 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   styles: [
     `
       .login-error {
@@ -21,8 +21,8 @@ import { AuthService } from '../../../core/auth/auth.service';
     <div class="login-page">
       <header>
         <nav>
-          <a routerLink="/">Home</a>
-          <a routerLink="/register">Sign Up</a>
+          <a routerLink="/home">Home</a>
+          <a routerLink="/auth/register">Sign Up</a>
         </nav>
       </header>
 
@@ -58,6 +58,8 @@ export class LoginComponent {
   password = '';
   errorMessage = '';
 
+  private readonly route = inject(ActivatedRoute);
+
   constructor(private authService: AuthService, private router: Router) {}
 
   onSubmit(): void {
@@ -66,7 +68,10 @@ export class LoginComponent {
       .subscribe((success) => {
         if (success) {
           this.errorMessage = '';
-          this.router.navigateByUrl('/');
+          // Where the guard intercepted the user from (e.g. /profile);
+          // fall back to the home root when login was opened directly.
+          const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+          this.router.navigateByUrl(returnUrl || '/');
         } else {
           this.errorMessage = 'Invalid email or password';
         }

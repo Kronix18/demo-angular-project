@@ -34,7 +34,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 0.3 | phase-0-audit/0.3-api-spec-alignment.md | DONE (see task file) | spec aligned with demo data + 0.2 findings |
 | 1.1 | phase-1-auth-navbar/1.1-auth-service-state.md | DONE (see task file) | auth state rehydrates; login subscribes |
 | 1.2 | phase-1-auth-navbar/1.2-navbar-composition.md | DONE (see task file) | navbar composed for both auth states; verify-1-2.cjs ready for controller browser run |
-| 1.3 | phase-1-auth-navbar/1.3-guards-and-login-page.md | NOT STARTED | guard redirects to dead route |
+| 1.3 | phase-1-auth-navbar/1.3-guards-and-login-page.md | DONE (see task file) | authGuard live on /screener,/profile,/stock/:symbol with returnUrl; login page links fixed; verify-1-3.cjs 13/13 |
 | 2.1 | phase-2-chart-data/2.1-test-data-pipeline.md | NOT STARTED | chart data is currently unfetchable |
 | 2.2 | phase-2-chart-data/2.2-chartjs-registration.md | NOT STARTED | chart cannot construct today |
 | 2.3 | phase-2-chart-data/2.3-toolbar-integration-redo.md | NOT STARTED | previous "completed" claim was false |

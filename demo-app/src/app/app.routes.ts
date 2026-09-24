@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { HomepageComponent } from './pages/homepage/homepage.component';
+import { authGuard } from './core/guards/auth.guard';
 // We will create the rest of the components as placeholders below.
 
 export const routes: Routes = [
@@ -22,7 +23,7 @@ export const routes: Routes = [
     path: 'screener',
     loadComponent: () => import('./features/screener/screener.component').then(m => m.ScreenerComponent),
     data: { title: 'Stock Screener' },
-    canActivate: [() => true] // Placeholder guard, replace with authGuard later
+    canActivate: [authGuard]
   },
   {
     path: 'charts/:symbol',
@@ -33,13 +34,13 @@ export const routes: Routes = [
     path: 'profile',
     loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent),
     data: { title: 'Your Profile' },
-    canActivate: [() => true] // Placeholder guard
+    canActivate: [authGuard]
   },
   {
     path: 'stock/:symbol',
     loadComponent: () => import('./features/stock/stock.component').then(m => m.StockComponent),
     data: { title: 'Stock Details' },
-    canActivate: [() => true] // Placeholder guard
+    canActivate: [authGuard]
   },
   {
     path: 'auth',
