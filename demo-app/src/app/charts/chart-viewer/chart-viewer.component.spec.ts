@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChartViewerComponent } from './chart-viewer.component';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 
 describe('ChartViewerComponent', () => {
@@ -12,7 +14,18 @@ describe('ChartViewerComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ChartViewerComponent, FormsModule],
       providers: [
-        { provide: ActivatedRoute, useValue: { paramMap: of({ get: (key: string) => { return key === 'symbol' ? 'AAPL' : null; } }) } }
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            // The component subscribes to route.params (not paramMap) in
+            // ngOnInit — the old mock only provided paramMap, so `params`
+            // was undefined and the spec died with "subscribe of undefined".
+            params: of({ symbol: 'MSFT' }),
+            paramMap: of({ get: (key: string) => { return key === 'symbol' ? 'MSFT' : null; } })
+          }
+        }
       ]
     }).compileComponents();
   });

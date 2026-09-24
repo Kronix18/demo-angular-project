@@ -35,7 +35,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 1.1 | phase-1-auth-navbar/1.1-auth-service-state.md | DONE (see task file) | auth state rehydrates; login subscribes |
 | 1.2 | phase-1-auth-navbar/1.2-navbar-composition.md | DONE (see task file) | navbar composed for both auth states; verify-1-2.cjs ready for controller browser run |
 | 1.3 | phase-1-auth-navbar/1.3-guards-and-login-page.md | DONE (see task file) | authGuard live on /screener,/profile,/stock/:symbol with returnUrl; login page links fixed; verify-1-3.cjs 13/13 |
-| 2.1 | phase-2-chart-data/2.1-test-data-pipeline.md | NOT STARTED | chart data is currently unfetchable |
+| 2.1 | phase-2-chart-data/2.1-test-data-pipeline.md | DONE (browser-verified) | 8 Stooq files served from public/test-data; URL+epoch-ms fixed; 26/26 specs; verify-2-1.cjs 15/15 |
 | 2.2 | phase-2-chart-data/2.2-chartjs-registration.md | NOT STARTED | chart cannot construct today |
 | 2.3 | phase-2-chart-data/2.3-toolbar-integration-redo.md | NOT STARTED | previous "completed" claim was false |
 | 3.1 | phase-3-panes-interaction/3.1-volume-pane.md | NOT STARTED | verify dual-axis actually renders |
