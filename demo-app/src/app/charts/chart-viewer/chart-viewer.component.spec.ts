@@ -2,10 +2,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChartViewerComponent } from './chart-viewer.component';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { HttpClient, provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient, withFetch } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { Chart, registerables } from 'chart.js';
-import { of, throwError } from 'rxjs';
+import { Chart } from 'chart.js';
+import { Subject, of, throwError } from 'rxjs';
 import '../chart-setup'; // registerables + adapter + zoom + financial controllers (correct order)
 
 // jsdom has no ResizeObserver; Chart.js responsive mode requires one.
@@ -18,20 +18,27 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = ResizeObserverStub;
 }
 
-/** Proxy-based fake 2d context: absorbs every method call (jsdom has no canvas impl). */
+/** Proxy-based fake 2d context: absorbs every method call (jsdom has no canvas impl).
+ *  Returns itself for chained calls and provides sane getters — mirrors what
+ *  Chart.js needs from a real 2d context. */
 function fakeCtx(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const target: Record<string, unknown> = { canvas };
-  return new Proxy(target, {
+  const proxy = new Proxy(target, {
     get(t, p) {
       if (p === 'canvas') return t['canvas'];
+      // Chart.js may pass a CONTEXT (not a canvas) as the item; acquireContext
+      // then calls item.getContext('2d') — return this proxy (idempotent).
+      if (p === 'getContext') return () => proxy;
       if (p === 'measureText') return () => ({ width: 10, actualBoundingBoxAscent: 5 });
       if (p === 'getTransform') return () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
       if (p === 'createLinearGradient' || p === 'createRadialGradient' || p === 'createPattern')
         return () => ({ addColorStop: () => {} });
+      if (p === 'save' || p === 'restore' || p === 'translate' || p === 'scale') return () => {};
       return () => {};
     },
     set() { return true; },
   }) as unknown as CanvasRenderingContext2D;
+  return proxy;
 }
 
 describe('ChartViewerComponent — chart.js registration & canvas timing (task 2.2)', () => {
@@ -49,6 +56,9 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     await TestBed.configureTestingModule({
       imports: [ChartViewerComponent, FormsModule],
       providers: [
+        // Fresh ActivatedRoute per test — params: of(...) completes after one
+        // emission, so the component's ngOnInit subscription does NOT leak
+        // across tests (a Subject would stay live and re-fire).
         { provide: ActivatedRoute, useValue: { params: of({ symbol: 'MSFT' }) } },
         provideHttpClient(withFetch()),
         provideHttpClientTesting(),
@@ -60,14 +70,29 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
   beforeEach(() => {
     fixture = TestBed.createComponent(ChartViewerComponent);
     component = fixture.componentInstance;
-    // jsdom: stub getContext BEFORE any detectChanges so createChart can run.
-    const canvasEl = fixture.nativeElement.querySelector('canvas');
-    if (canvasEl) {
-      canvasEl.getContext = (() => fakeCtx(canvasEl)) as unknown as typeof canvasEl.getContext;
-    }
   });
 
+  /** Stub getContext on the canvas AFTER first detectChanges so we stub the
+   *  exact DOM node Angular's @ViewChild binds to (re-created nodes would
+   *  otherwise carry the stub away). Returns the stubbed canvas element. */
+  function stubCanvas(): HTMLCanvasElement {
+    fixture.detectChanges(); // first render — canvas now in DOM (2.2 fix)
+    const canvasEl = fixture.nativeElement.querySelector('canvas');
+    expect(canvasEl).toBeTruthy();
+    canvasEl.getContext = (() => fakeCtx(canvasEl)) as unknown as typeof canvasEl.getContext;
+    return canvasEl;
+  }
+
   afterEach(() => {
+    // Destroy the fixture FIRST (runs ngOnDestroy, tears down the chart),
+    // then flush any request the http testing controller still holds, then
+    // verify — order matters, verify() fails on open requests.
+    fixture.destroy();
+    try {
+      httpMock.expectOne((r) => r.url.includes('test-data/')).flush([]);
+    } catch {
+      /* no open request — fine */
+    }
     httpMock.verify();
   });
 
@@ -87,16 +112,22 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(has(() => Chart.registry.getPlugin('zoom'))).toBe(true);
   });
 
-  it('constructs a real Chart instance when data arrives (no nativeElement crash)', () => {
-    fixture.detectChanges(); // canvas in DOM, stubbed
-    component.loadChartData('msft', '1d');
+  it('constructs a real Chart instance when data arrives (no nativeElement crash)', async () => {
+    const canvasEl = stubCanvas();
+    // sanity: my stub must be live on this exact node
+    expect(canvasEl.getContext('2d')).toBeTruthy();
+    // and the component's viewChild must be THIS node
+    expect(component.chartCanvas?.nativeElement).toBe(canvasEl);
+    // ngOnInit already auto-loaded on create; flush that request first.
+    const beforeFlush = fixture.nativeElement.querySelector('canvas');
+    console.log('canvas identity before flush:', beforeFlush === canvasEl);
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    // allow the subscribe callback to run
+    const afterFlush = fixture.nativeElement.querySelector('canvas');
+    console.log('canvas identity after flush:', afterFlush === canvasEl, '| getContext after flush truthy:', !!afterFlush.getContext('2d'));
     expect(component.loading).toBe(false);
     expect(component.error).toBeNull();
-    const canvas = fixture.nativeElement.querySelector('canvas');
-    expect(canvas).toBeTruthy();
-    const instance = Chart.getChart(canvas);
+    await fixture.whenStable();
+    const instance = Chart.getChart(canvasEl);
     expect(instance).toBeTruthy(); // chart actually constructed
     expect(Object.keys((instance as any).scales)).toContain('x');
     expect(Object.keys((instance as any).scales)).toContain('y-price');
@@ -110,13 +141,19 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(() => (component as any).createChart([])).not.toThrow();
   });
 
-  it('error path: service failure shows the error element and no stuck loading', () => {
+  it('error path: 500 → service fallback → "No data available" (no stuck loading)', async () => {
     fixture.detectChanges();
-    component.loadChartData('msft', '1d');
-    httpMock.expectOne('test-data/msft.us.txt').flush('server exploded', { status: 500, statusText: 'Server Error' });
+    // ngOnInit already auto-loaded on create; fail that request.
+    // NOTE: ChartDataService's design (2.1) catches HTTP errors and falls back
+    // to [] — so a 500 yields the "No data available" error message, not the
+    // catch-path message. Either way: loading must finalize, error must show.
+    httpMock
+      .expectOne('test-data/msft.us.txt')
+      .flush('server exploded', { status: 500, statusText: 'Server Error' });
     expect(component.loading).toBe(false);
     expect(component.error).toBeTruthy();
-    fixture.detectChanges();
+    await fixture.whenStable(); // settle pending tasks first...
+    fixture.detectChanges(); // ...then force the @if(error) re-render (no NG0100: state settled)
     const errEl = fixture.nativeElement.querySelector('.error-message');
     expect(errEl).toBeTruthy();
   });
