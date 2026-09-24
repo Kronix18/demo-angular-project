@@ -18,6 +18,7 @@ export class App implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   isAuthenticated = false;
+  userEmail = '';
   title = 'Stock Screener';
 
   ngOnInit(): void {
@@ -25,6 +26,7 @@ export class App implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(isAuth => {
         this.isAuthenticated = isAuth;
+        this.userEmail = isAuth ? this.authService.getUserEmail() ?? '' : '';
       });
   }
 

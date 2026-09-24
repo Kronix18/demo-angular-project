@@ -3,17 +3,23 @@
   <nav class="navbar">
     <div class="navbar-content">
       <h1 class="logo" routerLink="/home">Stock Screener</h1>
-      
+
       <div class="nav-links">
-        <a routerLink="/screener" class="nav-link" *ngIf="isAuthenticated">Screener</a>
+        <a routerLink="/home" class="nav-link">Home</a>
+        <a routerLink="/screener" class="nav-link">Screener</a>
         <a routerLink="/pricing" class="nav-link">Pricing</a>
-        <a routerLink="/profile" class="nav-link" *ngIf="isAuthenticated">Profile</a>
       </div>
 
       <div class="nav-actions">
-        <span class="auth-status" *ngIf="isAuthenticated">
-          ✓ Logged In
-        </span>
+        <a
+          *ngIf="isAuthenticated"
+          routerLink="/profile"
+          class="account-link"
+          [title]="userEmail"
+          [attr.aria-label]="'My Account: ' + userEmail"
+        >
+          My Account
+        </a>
         <button class="logout-btn" *ngIf="isAuthenticated" (click)="handleLogout()">
           Logout
         </button>
@@ -37,4 +43,3 @@
     <p>&copy; 2024 Stock Screener. Basic stock analysis tools without technical indicators or watchlists.</p>
   </footer>
 </div>
-
