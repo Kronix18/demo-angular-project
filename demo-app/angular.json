@@ -68,7 +68,13 @@
               "buildTarget": "demo-app:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options":{
+            "allowedHosts": [
+              "localhost",
+              "screener.poredos.eu"
+            ]
+          }
         },
         "test": {
           "builder": "@angular/build:unit-test"
