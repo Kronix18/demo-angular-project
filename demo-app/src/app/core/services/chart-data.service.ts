@@ -5,6 +5,21 @@ import { map, catchError } from 'rxjs/operators';
 import { OHLCV } from '../models/ohlcv.model';
 
 /**
+ * Symbols with demo data (single source of truth — 0.3 spec). No AAPL.
+ * The toolbar datalist (2.3) and the error-page hint (6.3) both read this.
+ */
+export const AVAILABLE_SYMBOLS = [
+  'ia',
+  'msft',
+  'mu',
+  'nvda',
+  'pltr',
+  'qqew',
+  'qqq',
+  'qqqe',
+] as const;
+
+/**
  * Demo-phase chart data source: Stooq daily `.us.txt` files served as static
  * assets from `public/test-data/` (see API-BACKEND-SPEC.md — the data contract).
  *
