@@ -12,6 +12,13 @@ import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component'
 import '../chart-setup';
 import 'chartjs-chart-financial';
 
+/**
+ * Multi-pane chart viewer (3.1 REVISED per Kevin / Ruling 7): TradingView-style
+ * TRUE panes — price candles in their own pane (~75% height) and volume bars in
+ * a separate bottom pane (~25%, own y-scale, never overlapping the candles).
+ * Two Chart instances share the x-range (identical time-scale min/max), so
+ * zoom/pan (3.2) can sync both panes by updating the same range.
+ */
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
@@ -27,11 +34,14 @@ import 'chartjs-chart-financial';
         <div class="loading-overlay">Loading chart...</div>
       }
 
-      <!-- Canvas ALWAYS in DOM (2.2 timing fix: the pre-fix *ngIf hid it while
-           loading, so @ViewChild was undefined when data arrived and
-           createChart crashed on nativeElement). -->
-      <div class="canvas-wrap">
-        <canvas #chartCanvas></canvas>
+      <!-- Price pane (candles only) -->
+      <div class="pane price-pane" data-pane="price">
+        <canvas #priceCanvas></canvas>
+      </div>
+
+      <!-- Volume pane (separate scale — TradingView layout, no overlap) -->
+      <div class="pane volume-pane" data-pane="volume">
+        <canvas #volumeCanvas></canvas>
       </div>
 
       @if (error) {
@@ -49,11 +59,18 @@ import 'chartjs-chart-financial';
         display: flex;
         flex-direction: column;
       }
-      .canvas-wrap {
+      .pane {
         position: relative;
-        flex: 1 1 auto;
-        min-height: 320px;
         width: 100%;
+      }
+      .price-pane {
+        flex: 3 1 0; /* ~75% of the vertical space */
+        min-height: 280px;
+      }
+      .volume-pane {
+        flex: 1 1 0; /* ~25% — separate pane, own scale */
+        min-height: 90px;
+        border-top: 1px solid var(--c-border, #d1d5db);
       }
       canvas {
         width: 100% !important;
@@ -77,8 +94,10 @@ import 'chartjs-chart-financial';
   ],
 })
 export class ChartViewerComponent implements OnInit, OnDestroy {
-  @ViewChild('chartCanvas') chartCanvas?: ElementRef<HTMLCanvasElement>;
-  protected chart: Chart | null = null;
+  @ViewChild('priceCanvas') priceCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('volumeCanvas') volumeCanvas?: ElementRef<HTMLCanvasElement>;
+  private priceChart: Chart | null = null;
+  private volumeChart: Chart | null = null;
   loading = true;
   error: string | null = null;
   currentSymbol: string = '';
@@ -89,8 +108,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private router: Router;
   // ZONELESS app (no zone.js polyfill): async callbacks (HTTP subscribe) do
   // NOT trigger change detection — markForCheck() after state updates makes
-  // the @if(loading)/@if(error) blocks re-render (2.2 fix, verified live:
-  // without it the loading overlay stays stuck over the rendered chart).
+  // the @if(loading)/@if(error) blocks re-render (2.2 fix, verified live).
   private cdr: ChangeDetectorRef;
 
   constructor(
@@ -117,15 +135,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Public since 2.2 (was private): the toolbar/state refactor (2.3/4.x) and
-  // the specs drive reloads through it.
+  // Public since 2.2: the toolbar/state refactor (2.3/4.x) and specs drive
+  // reloads through it.
   loadChartData(symbol: string, interval: string): void {
     this.loading = true;
     this.error = null;
     this.chartDataService.getOHLCV(symbol, interval, 100).subscribe({
       next: (data) => {
         if (data && data.length > 0) {
-          this.createChart(data);
+          this.createCharts(data);
         } else {
           this.error = 'No data available';
         }
@@ -144,7 +162,6 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   onToolbarSymbolChange(symbol: string): void {
     this.currentSymbol = symbol;
     // Keep the URL in sync (2.3): refresh/deep-link preserves the symbol.
-    // replaceState — no navigation, no component re-creation.
     this.router.navigate(['/charts', symbol], { replaceUrl: true });
     this.loadChartData(symbol, this.currentInterval);
   }
@@ -154,85 +171,95 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     this.loadChartData(this.currentSymbol, interval);
   }
 
-  private createChart(data: OHLCV[]): void {
-    // Belt-and-braces guard (2.2): never crash on a missing canvas reference
-    // (the pre-fix failure mode).
-    const canvas = this.chartCanvas?.nativeElement;
-    if (!canvas) {
-      console.warn('createChart: canvas not ready; skipping chart creation');
+  /** X extent shared by both panes — identical min/max keeps them aligned. */
+  private sharedXExtent(data: OHLCV[]): { min: number; max: number } {
+    const timestamps = data.map((d) => d.timestamp);
+    const min = Math.min(...timestamps);
+    const max = Math.max(...timestamps);
+    // pad each side by ~1 bar so edge candles/bars aren't clipped
+    const pad = data.length > 1 ? (max - min) / (data.length - 1) : 86400000;
+    return { min: min - pad, max: max + pad };
+  }
+
+  private destroyCharts(): void {
+    if (this.priceChart) {
+      this.priceChart.destroy();
+      this.priceChart = null;
+    }
+    if (this.volumeChart) {
+      this.volumeChart.destroy();
+      this.volumeChart = null;
+    }
+  }
+
+  private createCharts(data: OHLCV[]): void {
+    // Belt-and-braces guard: never crash on missing canvas references.
+    const priceEl = this.priceCanvas?.nativeElement;
+    const volEl = this.volumeCanvas?.nativeElement;
+    if (!priceEl || !volEl) {
+      console.warn('createCharts: panes not ready; skipping chart creation');
       return;
     }
 
-    if (this.chart) {
-      this.chart.destroy();
-      this.chart = null;
-    }
+    this.destroyCharts();
 
     const priceData = data.map((d) => ({
-      x: d.timestamp,
-      o: d.open,
-      h: d.high,
-      l: d.low,
-      c: d.close,
+      x: d.timestamp, o: d.open, h: d.high, l: d.low, c: d.close,
     }));
     const volumeData = data.map((d) => ({
-      x: d.timestamp,
-      y: d.volume,
+      x: d.timestamp, y: d.volume,
     }));
 
-    const datasets: any = [
-      {
-        type: 'candlestick',
-        label: 'Price',
-        data: priceData,
-        yAxisID: 'y-price',
-      },
-      {
-        type: 'bar',
-        label: 'Volume',
-        data: volumeData,
-        yAxisID: 'y-volume',
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        borderColor: 'rgba(75, 192, 192, 1)',
-      },
-    ];
+    const xExtent = this.sharedXExtent(data);
+    // Identical time-scale config across panes — the shared-x contract.
+    const xScale = {
+      type: 'time',
+      time: { unit: 'day' },
+      min: xExtent.min,
+      max: xExtent.max,
+      ticks: { source: 'data', maxRotation: 0, autoSkip: true },
+    };
 
-    // Pass the CANVAS (not the context): Chart.js acquires the context itself
-    // and expects item.getContext('2d') — passing a pre-acquired context breaks
-    // its context.canvas === item identity check.
-    this.chart = new Chart(canvas, {
+    // PRICE pane: candlestick only (volume lives in its own pane now).
+    this.priceChart = new Chart(priceEl, {
       type: 'candlestick',
-      data: { datasets } as any,
+      data: { datasets: [{ type: 'candlestick', label: 'Price', data: priceData }] } as any,
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { position: 'top' as const },
+          legend: { display: false }, // TradingView hides the legend; 10.2 adds rows
           tooltip: { enabled: true, mode: 'index', intersect: false },
         },
         scales: {
-          x: {
-            type: 'time',
-            time: { unit: 'day' },
-            ticks: { source: 'data', maxRotation: 0, autoSkip: true },
-          },
-          'y-price': { type: 'linear', position: 'left' as const },
-          'y-volume': {
-            type: 'linear',
-            position: 'right' as const,
-            grid: { drawOnChartArea: false },
-            beginAtZero: true,
-          },
+          x: xScale,
+          y: { type: 'linear', position: 'left' as const },
+        },
+      } as any,
+    });
+
+    // VOLUME pane: bars on their own scale — starts at 0, never overlaps price.
+    this.volumeChart = new Chart(volEl, {
+      type: 'bar',
+      data: { datasets: [{ label: 'Volume', data: volumeData, backgroundColor: 'rgba(75, 192, 192, 0.5)', borderColor: 'rgba(75, 192, 192, 1)' }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true, mode: 'index', intersect: false },
+        },
+        scales: {
+          x: { ...xScale, display: false }, // single x-axis labels on the price pane
+          y: { type: 'linear', position: 'right' as const, beginAtZero: true, grid: { drawOnChartArea: false } },
         },
       } as any,
     });
   }
 
   ngOnDestroy(): void {
-    if (this.chart) {
-      this.chart.destroy();
-      this.chart = null;
-    }
+    this.destroyCharts();
   }
 }

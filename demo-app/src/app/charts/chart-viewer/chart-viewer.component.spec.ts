@@ -76,15 +76,19 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     component = fixture.componentInstance;
   });
 
-  /** Stub getContext on the canvas AFTER first detectChanges so we stub the
-   *  exact DOM node Angular's @ViewChild binds to (re-created nodes would
-   *  otherwise carry the stub away). Returns the stubbed canvas element. */
+  /** Stub getContext on BOTH pane canvases AFTER first detectChanges so we
+   *  stub the exact DOM nodes Angular's viewChildren bind to. Returns the
+   *  price pane canvas (the first). */
   function stubCanvas(): HTMLCanvasElement {
-    fixture.detectChanges(); // first render — canvas now in DOM (2.2 fix)
-    const canvasEl = fixture.nativeElement.querySelector('canvas');
-    expect(canvasEl).toBeTruthy();
-    canvasEl.getContext = (() => fakeCtx(canvasEl)) as unknown as typeof canvasEl.getContext;
-    return canvasEl;
+    fixture.detectChanges(); // first render — canvases now in DOM (2.2 fix)
+    const canvases = Array.from(
+      fixture.nativeElement.querySelectorAll('canvas')
+    ) as HTMLCanvasElement[];
+    expect(canvases.length).toBeGreaterThanOrEqual(2);
+    for (const c of canvases) {
+      c.getContext = (() => fakeCtx(c)) as unknown as typeof c.getContext;
+    }
+    return canvases[0];
   }
 
   afterEach(() => {
@@ -118,54 +122,52 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
   it('constructs a real Chart instance when data arrives (no nativeElement crash)', async () => {
     const canvasEl = stubCanvas();
-    // sanity: my stub must be live on this exact node
+    // sanity: my stub must be live on this exact node, and the price pane's
+    // viewChild must be THIS node (pane[0] = price)
     expect(canvasEl.getContext('2d')).toBeTruthy();
-    // and the component's viewChild must be THIS node
-    expect(component.chartCanvas?.nativeElement).toBe(canvasEl);
+    expect(component.priceCanvas?.nativeElement).toBe(canvasEl);
     // ngOnInit already auto-loaded on create; flush that request first.
-    const beforeFlush = fixture.nativeElement.querySelector('canvas');
-    console.log('canvas identity before flush:', beforeFlush === canvasEl);
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    const afterFlush = fixture.nativeElement.querySelector('canvas');
-    console.log('canvas identity after flush:', afterFlush === canvasEl, '| getContext after flush truthy:', !!afterFlush.getContext('2d'));
     expect(component.loading).toBe(false);
     expect(component.error).toBeNull();
     await fixture.whenStable();
     const instance = Chart.getChart(canvasEl);
     expect(instance).toBeTruthy(); // chart actually constructed
     expect(Object.keys((instance as any).scales)).toContain('x');
-    expect(Object.keys((instance as any).scales)).toContain('y-price');
-    expect(Object.keys((instance as any).scales)).toContain('y-volume');
+    expect(Object.keys((instance as any).scales)).toContain('y');
   });
 
-  it('volume dataset: bar type on y-volume axis, begins at zero', async () => {
+  it('volume pane: separate chart, bar dataset, begins at zero', async () => {
     const canvasEl = stubCanvas();
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
     await fixture.whenStable();
-    const inst: any = Chart.getChart(canvasEl);
-    expect(inst).toBeTruthy();
-    const volDataset = inst.data.datasets.find((d: any) => (d as any).type === 'bar' || d.label === 'Volume');
-    expect(volDataset).toBeTruthy();
-    expect(volDataset.yAxisID).toBe('y-volume');
-    // bars must start at 0: beginAtZero on the volume scale (option-level check;
-    // pixel/decimal proof is the live browser verification's job — jsdom has
-    // no real canvas dimensions so getPixelForValue returns NaN here).
-    const volScale = inst.scales['y-volume'];
+    const el = fixture.nativeElement as HTMLElement;
+    const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
+    const volChart: any = Chart.getChart(volCanvas);
+    expect(volChart).toBeTruthy();
+    const volDataset = volChart.data.datasets[0];
+    expect(volDataset.label).toBe('Volume');
+    // bars must start at 0: beginAtZero (option-level check; pixel/decimal proof
+    // is the live browser verification's job — jsdom has no real dimensions).
+    const volScale = volChart.scales['y'];
     expect(volScale).toBeTruthy();
-    expect(volScale.beginAtZero || inst.options.scales['y-volume'].beginAtZero).toBe(true);
+    expect(volScale.beginAtZero || volChart.options.scales.y.beginAtZero).toBe(true);
   });
 
-  it('volume values map each OHLCV point to {x, y: volume}', async () => {
+  it('volume values map each OHLCV point to {x, y: volume} (ASC, volume pane)', async () => {
     const canvasEl = stubCanvas();
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS); // ngOnInit's request
     await fixture.whenStable();
-    const inst: any = Chart.getChart(canvasEl);
-    const volDataset = inst.data.datasets.find((d: any) => d.label === 'Volume');
-    const priceDataset = inst.data.datasets.find((d: any) => d.label === 'Price');
-    console.log('CHART vol points:', volDataset.data.length, '| price points:', priceDataset.data.length,
-      '| vol[0]:', JSON.stringify(volDataset.data[0]));
-    expect(volDataset.data.length).toBe(priceDataset.data.length);
+    const el = fixture.nativeElement as HTMLElement;
+    const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
+    const volChart: any = Chart.getChart(volCanvas);
+    const priceCanvas = el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement;
+    const priceChart: any = Chart.getChart(priceCanvas);
+    const volDataset = volChart.data.datasets[0];
+    expect(volDataset.data.length).toBe(priceChart.data.datasets[0].data.length);
     expect(volDataset.data.length).toBe(3);
+    // ASC order (3.1 GREEN fix): data[0] = OLDEST; Chart.js financial requires
+    // ascending — DESC dropped the oldest point (RED-proven).
     expect(volDataset.data[0]).toEqual({ x: Date.UTC(2024, 0, 10), y: 1000 });
     expect(volDataset.data[volDataset.data.length - 1]).toEqual({ x: Date.UTC(2024, 0, 12), y: 900 });
   });
@@ -200,11 +202,12 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(volChart.scales.x.max).toBe(priceChart.scales.x.max);
   });
 
-  it('createChart guards against a missing canvas reference (no crash)', () => {
-    // Simulate the pre-fix crash condition: viewChild undefined.
-    (component as any).chartCanvas = undefined;
+  it('createCharts guards against missing pane references (no crash)', () => {
+    // Simulate the pre-fix crash condition: viewChildren undefined.
+    (component as any).priceCanvas = undefined;
+    (component as any).volumeCanvas = undefined;
     // Must NOT throw (pre-fix: "Cannot read properties of undefined (reading 'nativeElement')").
-    expect(() => (component as any).createChart([])).not.toThrow();
+    expect(() => (component as any).createCharts([])).not.toThrow();
   });
 
   it('error path: 500 → service fallback → "No data available" (no stuck loading)', async () => {
