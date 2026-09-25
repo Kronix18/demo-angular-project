@@ -24,7 +24,7 @@ describe('ChartStateService (task 4.1)', () => {
     const s = await firstValueFrom(svc.state$);
     expect(s.symbol).toBe('msft');
     expect(s.interval).toBe('1d');
-    expect(s.range).toBe('6m');
+    expect(s.range).toBe('6M');
     expect(s.indicators).toEqual([]);
   });
 
@@ -34,7 +34,7 @@ describe('ChartStateService (task 4.1)', () => {
     const s = await firstValueFrom(svc.state$);
     expect(s.symbol).toBe('nvda');
     expect(s.interval).toBe('1d'); // unchanged
-    expect(s.range).toBe('6m'); // unchanged
+    expect(s.range).toBe('6M'); // unchanged
   });
 
   it('setInterval and setRange update their fields', async () => {
@@ -73,7 +73,7 @@ describe('ChartStateService (task 4.1)', () => {
     const s = await firstValueFrom(svc.state$);
     expect(s.symbol).toBe('msft');
     expect(s.interval).toBe('1d');
-    expect(s.range).toBe('6m');
+    expect(s.range).toBe('6M');
     expect(sessionStorage.getItem('chart-state')).toBeNull();
   });
 });

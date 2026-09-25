@@ -15,7 +15,7 @@ const STORAGE_KEY = 'chart-state';
 const DEFAULTS: ChartState = {
   symbol: 'msft',
   interval: '1d',
-  range: '6m',
+  range: '6M', // matches the RANGE_PRESETS constant case (4.3 buttons)
   indicators: [],
 };
 
