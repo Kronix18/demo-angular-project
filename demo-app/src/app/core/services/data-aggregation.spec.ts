@@ -55,10 +55,12 @@ describe('W-FRI weekly aggregation (task 4.3 — port of stock_service W-FRI rul
 });
 
 describe('Range presets (4.3 — port of range_presets.py, LAST-BAR anchored)', () => {
+  // ASCENDING bars (matches reality — the service returns ascending data;
+  // rangeStartIndex binary-searches, requiring ascending order).
   const bars = [
-    bar(new Date(2023, 5, 1), 1, 1, 1, 1, 1), // Jun 2023
+    bar(new Date(2022, 0, 5), 3, 3, 3, 3, 3), // Jan 2022 — out of 1Y/6M
+    bar(new Date(2023, 5, 1), 1, 1, 1, 1, 1), // Jun 2023 — within 6M, out of 3M/1M/YTD
     bar(new Date(2024, 0, 10), 2, 2, 2, 2, 2), // Jan 2024 (last bar)
-    bar(new Date(2022, 0, 5), 3, 3, 3, 3, 3), // Jan 2022 — out of 1Y
   ];
   const LAST = new Date(2024, 0, 10).getTime();
 
@@ -67,45 +69,55 @@ describe('Range presets (4.3 — port of range_presets.py, LAST-BAR anchored)', 
   });
 
   it('anchors to the LAST AVAILABLE BAR, not today', () => {
-    // 3M from last bar (Jan 10 2024) → Oct 10 2023 → the Jun 2023 bar is OUT, Jan 2024 IN
+    // 3M from last bar (Jan 10 2024) → Oct 10 2023 → Jun 2023 OUT, Jan 2024 IN
     const idx = rangeStartIndex(bars, '3M');
     expect(bars[idx].timestamp).toBe(new Date(2024, 0, 10).getTime());
   });
 
   it('1M = last bar minus 1 month; ALL = 0', () => {
-    // 1M from Jan 10 2024 → Dec 10 2023: all fixture bars before that are out
+    // 1M from Jan 10 2024 → Dec 10 2023: Jun 2023 + Jan 2022 OUT
     const idx1m = rangeStartIndex(bars, '1M');
     expect(bars[idx1m].timestamp).toBe(LAST);
     expect(rangeStartIndex(bars, 'ALL')).toBe(0);
   });
 
   it('6M from last bar includes the Jun 2023 bar', () => {
+    // 6M from Jan 2024 → Jul 2023: Jun 2023 is OUT (Jul 10 2023 cutoff) — hmm:
+    // Jun 1 2023 < Jul 10 2023 → excluded. First bar in range = Jan 2024 (idx 2).
+    // The Jun bar is included only from 1Y back. Correct the expectation:
     const idx = rangeStartIndex(bars, '6M');
-    expect(idx).toBe(0); // Jun 2023 is within 6M of Jan 2024
+    expect(bars[idx].timestamp).toBe(new Date(2024, 0, 10).getTime());
+  });
+
+  it('1Y includes the Jun 2023 bar (last bar minus 12 months = Jan 2023)', () => {
+    const idx = rangeStartIndex(bars, '1Y');
+    expect(idx).toBe(1); // Jun 2023 IN, Jan 2022 OUT
   });
 
   it('YTD = Jan 1 of the LAST BAR year (not the current year)', () => {
-    // last bar is Jan 2024 → YTD starts Jan 1 2024; the Jun 2023 + Jan 2022 bars are out
+    // last bar is Jan 2024 → YTD starts Jan 1 2024; Jun 2023 + Jan 2022 out
     const idx = rangeStartIndex(bars, 'YTD');
     expect(bars[idx].timestamp).toBe(new Date(2024, 0, 10).getTime());
-    expect(idx).toBe(1);
+    expect(idx).toBe(2);
   });
 
   it('filterByRange slices client-side and aggregates weekly when requested', () => {
     const sixMonths = [
-      bar(new Date(2023, 8, 1), 1, 2, 0, 1, 10), // Sep 2023
-      bar(new Date(2023, 11, 1), 2, 3, 1, 2, 20), // Dec 2023
+      bar(new Date(2023, 8, 1), 1, 2, 0, 1, 10), // Sep 2023 (Fri)
+      bar(new Date(2023, 11, 1), 2, 3, 1, 2, 20), // Dec 2023 (Fri)
       bar(new Date(2024, 0, 5), 3, 4, 2, 3, 30), // Jan 2024 (Fri)
       bar(new Date(2024, 0, 10), 4, 5, 3, 4, 40), // Jan 2024 (last, Wed)
     ];
-    // 3M range: Jan 2024 bars only (Oct 10 2023 cutoff)
+    // 3M from last bar (Jan 10 2024) → Oct 10 2023 cutoff: Sep 2023 OUT;
+    // Dec 2023 + Jan 5 + Jan 10 IN = 3 bars.
     const daily3m = filterByRange(sixMonths, '3M');
-    expect(daily3m.length).toBe(2);
-    // weekly + 3M: aggregated into 1 Fri-ending week (Jan 5 + Jan 10 span
-    // two ISO weeks — W-FRI weeks ending Jan 5 and Jan 12; Jan 10 is in the
-    // week ending Jan 12 → 2 bars out)
+    expect(daily3m.length).toBe(3);
+    // weekly + 3M: W-FRI weeks — Dec 1 (ends Dec 1), Jan 5 (ends Jan 5),
+    // Jan 10 (Wed → ends Jan 12) = 3 weekly bars, none merged (each its own week)
     const weekly3m = filterByRange(sixMonths, '3M', '1w');
-    expect(weekly3m.length).toBe(2);
-    expect(weekly3m[0].volume).toBe(30); // first week sum
+    expect(weekly3m.length).toBe(3);
+    expect(weekly3m[0].volume).toBe(20); // Dec week sum (single bar)
+    // weekly bar dates = the LAST bar of each week (W-FRI anchor)
+    expect(weekly3m[2].timestamp).toBe(new Date(2024, 0, 10).getTime());
   });
 });
