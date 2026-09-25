@@ -326,6 +326,12 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         },
       } as any,
     });
+    // Dev-only test handle: expose the chart instances for the Playwright
+    // verification scripts (window.Chart is module-scoped in this app).
+    // ngDevMode is stripped in production builds — no production pollution.
+    if (typeof ngDevMode !== 'undefined' && ngDevMode) {
+      (window as any).__charts = { price: this.priceChart, volume: this.volumeChart };
+    }
   }
 
   /** Minimum visible x-range: ~10 bars (Python range_controller port) — prevents
