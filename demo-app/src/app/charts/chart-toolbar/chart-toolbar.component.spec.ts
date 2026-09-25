@@ -1,12 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChartToolbarComponent } from './chart-toolbar.component';
 import { FormsModule } from '@angular/forms';
+import { ChartStateService } from '../../core/services/chart-state.service';
 
-describe('ChartToolbarComponent — submit semantics + real demo symbols (task 2.3)', () => {
+describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
   let fixture: ComponentFixture<ChartToolbarComponent>;
   let component: ChartToolbarComponent;
+  let store: ChartStateService;
 
   beforeEach(async () => {
+    sessionStorage.clear();
     await TestBed.configureTestingModule({
       imports: [ChartToolbarComponent, FormsModule],
     }).compileComponents();
@@ -15,7 +18,12 @@ describe('ChartToolbarComponent — submit semantics + real demo symbols (task 2
   beforeEach(() => {
     fixture = TestBed.createComponent(ChartToolbarComponent);
     component = fixture.componentInstance;
+    store = TestBed.inject(ChartStateService);
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
   });
 
   it('renders symbol input, interval select, and Update button', () => {
@@ -44,7 +52,7 @@ describe('ChartToolbarComponent — submit semantics + real demo symbols (task 2
     }
   });
 
-  it('typing in the symbol input does NOT emit per keystroke (submit semantics)', () => {
+  it('typing in the symbol input does NOT emit per keystroke and does NOT write the store', () => {
     const emissions: string[] = [];
     component.symbolChange.subscribe((s) => emissions.push(s));
     const input = fixture.nativeElement.querySelector('#symbol') as HTMLInputElement;
@@ -55,35 +63,45 @@ describe('ChartToolbarComponent — submit semantics + real demo symbols (task 2
     input.value = 'nvda';
     input.dispatchEvent(new Event('input'));
     expect(emissions.length).toBe(0); // nothing until submit
+    expect(store.snapshot().symbol).toBe('msft'); // store untouched while typing
   });
 
-  it('pressing Enter in the symbol input emits symbolChange ONCE with the full value', () => {
+  it('pressing Enter writes the store (single source of truth) — no @Output events remain', () => {
     const emissions: string[] = [];
     component.symbolChange.subscribe((s) => emissions.push(s));
     const input = fixture.nativeElement.querySelector('#symbol') as HTMLInputElement;
     input.value = 'nvda';
-    input.dispatchEvent(new Event('input')); // update ngModel
+    input.dispatchEvent(new Event('input'));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(emissions).toEqual(['nvda']);
+    expect(store.snapshot().symbol).toBe('nvda'); // the STORE is the output
+    expect(emissions.length).toBe(0); // no EventEmitter emissions
   });
 
-  it('Update button click emits symbolChange ONCE with the current input value', () => {
-    const emissions: string[] = [];
-    component.symbolChange.subscribe((s) => emissions.push(s));
+  it('interval select change writes the store', () => {
+    const select = fixture.nativeElement.querySelector('#interval') as HTMLSelectElement;
+    select.value = '1w';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(store.snapshot().interval).toBe('1w');
+  });
+
+  it('Update button click writes the store with the current input value', () => {
     const input = fixture.nativeElement.querySelector('#symbol') as HTMLInputElement;
     input.value = 'qqq';
     input.dispatchEvent(new Event('input'));
     (fixture.nativeElement.querySelector('button') as HTMLButtonElement).click();
-    expect(emissions).toEqual(['qqq']);
+    expect(store.snapshot().symbol).toBe('qqq');
   });
 
-  it('interval select change emits intervalChange with the string value (not event object)', () => {
+  it('interval select change emits intervalChange with the string value and writes the store', () => {
     const emissions: string[] = [];
     component.intervalChange.subscribe((v) => emissions.push(v));
     const select = fixture.nativeElement.querySelector('#interval') as HTMLSelectElement;
     select.value = '1w';
     select.dispatchEvent(new Event('change'));
-    expect(emissions).toEqual(['1w']); // a string, not '[object Object]' or undefined
+    fixture.detectChanges();
+    expect(emissions).toEqual(['1w']); // string value (event-object bug stays fixed)
+    expect(store.snapshot().interval).toBe('1w'); // AND the store is written
   });
 
   it('interval select offers 1d and 1w; intraday options (1m/5m/1h) are DISABLED with a hint', () => {
