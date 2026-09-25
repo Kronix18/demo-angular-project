@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 import { ChartViewerComponent } from './chart-viewer.component';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -200,6 +201,60 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     // shared x range: both charts' x scale min/max match
     expect(volChart.scales.x.min).toBe(priceChart.scales.x.min);
     expect(volChart.scales.x.max).toBe(priceChart.scales.x.max);
+  });
+
+  it('ZOOM: both panes have wheel+pan enabled with data limits (3.2)', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
+    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
+    for (const [name, chart] of [['price', priceChart], ['volume', volChart]] as const) {
+      const zoomOpts = chart.options.plugins?.zoom;
+      expect(zoomOpts, name + ' has zoom options').toBeTruthy();
+      expect(zoomOpts.zoom?.wheel?.enabled, name + ' wheel zoom').toBe(true);
+      expect(zoomOpts.pan?.enabled, name + ' pan').toBe(true);
+      expect(zoomOpts.limits?.x, name + ' x limits').toBeTruthy();
+    }
+    // limits must reference the data extent (no panning into the void)
+    const lim = priceChart.options.plugins.zoom.limits.x;
+    expect(lim.min).toBeLessThanOrEqual(priceChart.scales.x.min);
+    expect(lim.max).toBeGreaterThanOrEqual(priceChart.scales.x.max);
+  });
+
+  it('ZOOM: reset button exists and calls resetZoom on BOTH panes (3.2)', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const resetBtn = el.querySelector('.reset-zoom-btn') as HTMLButtonElement;
+    expect(resetBtn).toBeTruthy();
+    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
+    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
+    const pSpy = vi.spyOn(priceChart, 'resetZoom');
+    const vSpy = vi.spyOn(volChart, 'resetZoom');
+    resetBtn.click();
+    expect(pSpy).toHaveBeenCalled();
+    expect(vSpy).toHaveBeenCalled();
+  });
+
+  it('ZOOM: zooming the price pane syncs the volume pane x-range (3.2)', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
+    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
+    // simulate a zoom on the price pane: zoomScale x to a sub-range
+    const full = priceChart.scales.x;
+    const subMin = full.min + (full.max - full.min) * 0.25;
+    const subMax = full.min + (full.max - full.min) * 0.75;
+    priceChart.zoomScale('x', { min: subMin, max: subMax });
+    // the sync handler must apply the same range to the volume pane
+    expect(volChart.scales.x.min).toBe(subMin);
+    expect(volChart.scales.x.max).toBe(subMax);
   });
 
   it('createCharts guards against missing pane references (no crash)', () => {
