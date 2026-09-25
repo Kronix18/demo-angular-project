@@ -30,7 +30,7 @@ describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('#symbol')).toBeTruthy();
     expect(el.querySelector('#interval')).toBeTruthy();
-    const btn = el.querySelector('button');
+    const btn = el.querySelector('.toolbar-group:not(.range-group) button');
     expect(btn?.textContent).toContain('Update');
   });
 
@@ -83,7 +83,10 @@ describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
     const input = fixture.nativeElement.querySelector('#symbol') as HTMLInputElement;
     input.value = 'qqq';
     input.dispatchEvent(new Event('input'));
-    (fixture.nativeElement.querySelector('button') as HTMLButtonElement).click();
+    const updateBtn = fixture.nativeElement.querySelector(
+      '.toolbar-group:not(.range-group) button'
+    ) as HTMLButtonElement;
+    updateBtn.click();
     expect(store.snapshot().symbol).toBe('qqq');
   });
 

@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
 import { ChartStateService } from '../../core/services/chart-state.service';
+import { RANGE_PRESETS } from '../../core/services/data-aggregation';
 
 /**
  * Chart toolbar (4.2): a DUMB component — writes to ChartStateService (the
@@ -45,6 +46,18 @@ import { ChartStateService } from '../../core/services/chart-state.service';
         </select>
       </div>
 
+      <!-- 4.3: range presets (last-bar-anchored; client-side slice) -->
+      <div class="toolbar-group range-group" role="group" aria-label="Time range">
+        @for (r of ranges; track r) {
+          <button
+            type="button"
+            class="range-btn"
+            [class.active]="range === r"
+            (click)="onRangeChange(r)"
+          >{{ r }}</button>
+        }
+      </div>
+
       <div class="toolbar-group">
         <button type="button" (click)="submitSymbol()">Update Chart</button>
       </div>
@@ -66,6 +79,31 @@ import { ChartStateService } from '../../core/services/chart-state.service';
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
+      }
+
+      /* 4.3: range preset buttons — TradingView-style bottom-bar row */
+      .range-group {
+        flex-direction: row;
+        gap: 0.25rem;
+        align-items: flex-end;
+      }
+      .range-btn {
+        padding: 0.375rem 0.625rem;
+        border: 1px solid transparent;
+        border-radius: var(--border-radius-sm, 4px);
+        background: transparent;
+        color: var(--c-text, #1f2937);
+        cursor: pointer;
+        font-size: 0.8125rem;
+        font-weight: 500;
+      }
+      .range-btn:hover {
+        background: rgba(37, 99, 235, 0.08);
+        color: var(--c-primary, #2563eb);
+      }
+      .range-btn.active {
+        background: var(--c-primary, #2563eb);
+        color: #fff;
       }
 
       label {
@@ -112,6 +150,9 @@ export class ChartToolbarComponent {
   // 4.2: no @Output events — the store is the output channel.
   symbol = 'msft';
   interval = '1d';
+  // 4.3: range presets from the aggregation module; active state from the store.
+  ranges = [...RANGE_PRESETS];
+  range: string = '6m';
 
   // Only symbols with demo data (0.3 spec) — drives the datalist.
   symbols = [...AVAILABLE_SYMBOLS];
@@ -122,6 +163,7 @@ export class ChartToolbarComponent {
     const snap = this.store.snapshot();
     this.symbol = snap.symbol;
     this.interval = snap.interval;
+    this.range = snap.range;
   }
 
   /** Enter key / Update button: write the store ONCE with the current input value. */
@@ -136,5 +178,11 @@ export class ChartToolbarComponent {
   onIntervalChange(value: string): void {
     this.interval = value;
     this.store.setInterval(value);
+  }
+
+  /** 4.3: range preset button — write the store. */
+  onRangeChange(range: string): void {
+    this.range = range;
+    this.store.setRange(range);
   }
 }

@@ -3,6 +3,7 @@ import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService } from '../../core/services/chart-data.service';
 import { ChartStateService } from '../../core/services/chart-state.service';
+import { filterByRange } from '../../core/services/data-aggregation';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
@@ -192,6 +193,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   error: string | null = null;
   currentSymbol: string = '';
   currentInterval: string = '1d';
+  currentRange: string = '6m';
 
   private chartDataService: ChartDataService;
   private route: ActivatedRoute;
@@ -226,29 +228,43 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         this.chartState.setSymbol(symbol);
       }
     });
-    // Derive loads from state: symbol/interval/range changes reload the data.
+    // Derive loads from state: symbol changes refetch (new data file);
+    // interval/range changes re-render from the cached data (4.3: one fetch).
     this.chartState.state$
-      .pipe(
-        map((s) => ({ symbol: s.symbol, interval: s.interval })),
-        distinctUntilChanged((a, b) => a.symbol === b.symbol && a.interval === b.interval),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe(({ symbol, interval }) => {
-        this.currentSymbol = symbol;
-        this.currentInterval = interval;
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((s) => {
+        const symbolChanged = s.symbol !== this.currentSymbol;
+        const intervalChanged = s.interval !== this.currentInterval;
+        this.currentSymbol = s.symbol;
+        this.currentInterval = s.interval;
+        this.currentRange = s.range;
         // Keep the URL in sync (2.3): refresh/deep-link preserves the symbol.
-        this.router.navigate(['/charts', symbol], { replaceUrl: true });
-        this.loadChartData(symbol, interval);
+        if (symbolChanged) {
+          this.router.navigate(['/charts', s.symbol], { replaceUrl: true });
+        }
+        if (symbolChanged || intervalChanged) {
+          this.loadChartData(s.symbol, s.interval);
+        } else if (this.allData.length) {
+          // range change (or anything else): re-render from cached data
+          this.createCharts(this.allData);
+        }
       });
   }
+
+  /** All bars fetched for the current symbol (one fetch per symbol, 4.3). */
+  private allData: OHLCV[] = [];
 
   // Public since 2.2: the toolbar/state refactor (2.3/4.x) and specs drive
   // reloads through it.
   loadChartData(symbol: string, interval: string): void {
     this.loading = true;
     this.error = null;
-    this.chartDataService.getOHLCV(symbol, interval, 100).subscribe({
+    // 4.3: fetch enough bars for the widest range (daily data: 1Y ≈ 260 bars,
+    // ALL = everything — the service's limit caps it; 1000 covers ~4y of msft).
+    const barsNeeded = this.currentRange === 'ALL' ? 1000 : 400;
+    this.chartDataService.getOHLCV(symbol, interval, barsNeeded).subscribe({
       next: (data) => {
+        this.allData = data;
         if (data && data.length > 0) {
           this.createCharts(data);
         } else {
@@ -298,10 +314,18 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
     this.destroyCharts();
 
-    const priceData = data.map((d) => ({
+    // 4.3: display data = range slice (last-bar-anchored, client-side) +
+    // weekly aggregation when the interval is 1w.
+    const display = filterByRange(data, this.currentRange as any, this.currentInterval);
+    if (!display.length) {
+      this.error = 'No data in range';
+      return;
+    }
+
+    const priceData = display.map((d) => ({
       x: d.timestamp, o: d.open, h: d.high, l: d.low, c: d.close,
     }));
-    const volumeData = data.map((d) => ({
+    const volumeData = display.map((d) => ({
       x: d.timestamp, y: d.volume,
     }));
 
