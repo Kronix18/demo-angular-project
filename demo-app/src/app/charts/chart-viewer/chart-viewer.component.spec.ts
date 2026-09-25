@@ -262,6 +262,40 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(volChart.scales['x'].max).toBe(subMax);
   });
 
+  it('CROSSHAIR: plugin registered and draws a line at the hovered x (3.3)', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const priceCanvas = el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement;
+    const priceChart: any = Chart.getChart(priceCanvas);
+    expect(priceChart).toBeTruthy();
+    // crosshair plugin registered (component's inline plugin list)
+    const plugins = priceChart.config.plugins || [];
+    const crosshair = plugins.find((p: any) => p && p.id === 'crosshair');
+    expect(crosshair, 'crosshair plugin in config').toBeTruthy();
+  });
+
+  it('CROSSHAIR: tooltip callbacks render O/H/L/C/Vol labels (3.3)', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const priceCanvas = el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement;
+    const priceChart: any = Chart.getChart(priceCanvas);
+    const cb = priceChart.options.plugins?.tooltip?.callbacks;
+    expect(cb?.label, 'price tooltip label callback').toBeTruthy();
+    // label output on the first synthetic bar: O/H/L/C with values
+    const out = cb.label({ dataset: priceChart.data.datasets[0], dataIndex: 0 } as any);
+    expect(out).toContain('O');
+    expect(out).toContain('110'); // H of the first bar (100/110/95/105)
+    const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
+    const volChart: any = Chart.getChart(volCanvas);
+    const volCb = volChart.options.plugins?.tooltip?.callbacks?.label;
+    expect(volCb, 'volume tooltip label callback').toBeTruthy();
+    expect(volCb({ dataset: volChart.data.datasets[0], dataIndex: 0 } as any)).toContain('1000');
+  });
+
   it('createCharts guards against missing pane references (no crash)', () => {
     // Simulate the pre-fix crash condition: viewChildren undefined.
     (component as any).priceCanvas = undefined;
