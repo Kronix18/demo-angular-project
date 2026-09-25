@@ -13,6 +13,60 @@ import '../chart-setup';
 import 'chartjs-chart-financial';
 
 /**
+ * 3.3 Crosshair plugin (module-level const): draws a 1px vertical line at the
+ * active tooltip's x-position on the pane being drawn — the TradingView
+ * crosshair behavior (port of the Python viewer's crosshair.py UX contract).
+ * Color read from the CSS custom property at runtime (token compliance; the
+ * fallback hardcode is a fallback only).
+ */
+const crosshairPlugin = {
+  id: 'crosshair',
+  afterDatasetsDraw(chart: Chart): void {
+    const active = chart.tooltip?.getActiveElements?.() ?? [];
+    if (!active.length) return;
+    const x = active[0].element?.x;
+    if (typeof x !== 'number' || !isFinite(x)) return;
+    const { ctx, chartArea, scales } = chart;
+    if (!ctx || !chartArea) return;
+    // crosshair color from CSS var (fallback included)
+    let color = '#758696';
+    try {
+      const v = getComputedStyle(chart.canvas).getPropertyValue('--c-crosshair').trim();
+      if (v) color = v;
+    } catch { /* jsdom/non-DOM: fallback */ }
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = color;
+    ctx.moveTo(x, chartArea.top);
+    ctx.lineTo(x, chartArea.bottom);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
+/** Tooltip label callbacks (3.3): O/H/L/C for the price pane, Vol for the volume
+ *  pane — TradingView-style readouts. */
+const priceTooltipCallbacks = {
+  label(item: any): string {
+    const raw = item?.raw ?? {};
+    const fmt = (v: unknown) => typeof v === 'number' ? v.toFixed(2) : String(v ?? '-');
+    return `O ${fmt(raw.o)}  H ${fmt(raw.h)}  L ${fmt(raw.l)}  C ${fmt(raw.c)}`;
+  },
+};
+const volumeTooltipCallbacks = {
+  label(item: any): string {
+    const v = item?.raw?.y;
+    return `Vol ${typeof v === 'number' ? v.toLocaleString('en-US') : String(v ?? '-')}`;
+  },
+};
+
+// 3.3: register the crosshair plugin globally (after its definition — no TDZ).
+// The `crosshair: true` option key on each chart enables it per chart.
+Chart.register(crosshairPlugin);
+
+/**
  * Multi-pane chart viewer (3.1 REVISED per Kevin / Ruling 7): TradingView-style
  * TRUE panes — price candles in their own pane (~75% height) and volume bars in
  * a separate bottom pane (~25%, own y-scale, never overlapping the candles).
@@ -297,8 +351,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false }, // TradingView hides the legend; 10.2 adds rows
-          tooltip: { enabled: true, mode: 'index', intersect: false },
+          tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: priceTooltipCallbacks },
           zoom: zoomOptions(xExtent),
+          crosshair: true, // enables the crosshair plugin (3.3)
         },
         scales: {
           x: xScale,
@@ -317,8 +372,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
-          tooltip: { enabled: true, mode: 'index', intersect: false },
+          tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: volumeTooltipCallbacks },
           zoom: zoomOptions(xExtent),
+          crosshair: true, // enables the crosshair plugin (3.3)
         },
         scales: {
           x: { ...xScale, display: false }, // single x-axis labels on the price pane

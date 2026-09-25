@@ -270,10 +270,10 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const priceCanvas = el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement;
     const priceChart: any = Chart.getChart(priceCanvas);
     expect(priceChart).toBeTruthy();
-    // crosshair plugin registered (component's inline plugin list)
-    const plugins = priceChart.config.plugins || [];
-    const crosshair = plugins.find((p: any) => p && p.id === 'crosshair');
-    expect(crosshair, 'crosshair plugin in config').toBeTruthy();
+    // crosshair plugin globally registered (registry check — module-level const)
+    expect(Chart.registry.getPlugin('crosshair'), 'crosshair in registry').toBeTruthy();
+    // and enabled per chart via the crosshair option key
+    expect(priceChart.options.plugins?.crosshair, 'crosshair option key').toBe(true);
   });
 
   it('CROSSHAIR: tooltip callbacks render O/H/L/C/Vol labels (3.3)', async () => {
@@ -285,15 +285,17 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const priceChart: any = Chart.getChart(priceCanvas);
     const cb = priceChart.options.plugins?.tooltip?.callbacks;
     expect(cb?.label, 'price tooltip label callback').toBeTruthy();
-    // label output on the first synthetic bar: O/H/L/C with values
-    const out = cb.label({ dataset: priceChart.data.datasets[0], dataIndex: 0 } as any);
-    expect(out).toContain('O');
-    expect(out).toContain('110'); // H of the first bar (100/110/95/105)
+    // label output with a real raw point (Chart.js passes the data point as raw)
+    const out = cb.label({ dataset: priceChart.data.datasets[0], dataIndex: 0, raw: priceChart.data.datasets[0].data[0] } as any);
+    expect(out).toContain('O 100.00');
+    expect(out).toContain('H 110.00');
+    expect(out).toContain('L 95.00');
+    expect(out).toContain('C 105.00');
     const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
     const volChart: any = Chart.getChart(volCanvas);
     const volCb = volChart.options.plugins?.tooltip?.callbacks?.label;
     expect(volCb, 'volume tooltip label callback').toBeTruthy();
-    expect(volCb({ dataset: volChart.data.datasets[0], dataIndex: 0 } as any)).toContain('1000');
+    expect(volCb({ dataset: volChart.data.datasets[0], dataIndex: 0, raw: volChart.data.datasets[0].data[0] } as any)).toContain('1,000');
   });
 
   it('createCharts guards against missing pane references (no crash)', () => {
