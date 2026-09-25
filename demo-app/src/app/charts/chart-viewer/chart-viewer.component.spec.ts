@@ -233,6 +233,9 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(resetBtn).toBeTruthy();
     const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
     const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
+    console.log('component priceChart set:', !!component['priceChart'], '| volChart set:', !!component['volumeChart']);
+    console.log('same instances?', component['priceChart'] === priceChart, component['volumeChart'] === volChart);
+    console.log('volChart.resetZoom type:', typeof volChart.resetZoom);
     const pSpy = vi.spyOn(priceChart, 'resetZoom');
     const vSpy = vi.spyOn(volChart, 'resetZoom');
     resetBtn.click();
@@ -248,13 +251,15 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
     const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
     // simulate a zoom on the price pane: zoomScale x to a sub-range
-    const full = priceChart.scales.x;
+    const full = priceChart.scales['x'];
     const subMin = full.min + (full.max - full.min) * 0.25;
     const subMax = full.min + (full.max - full.min) * 0.75;
     priceChart.zoomScale('x', { min: subMin, max: subMax });
-    // the sync handler must apply the same range to the volume pane
-    expect(volChart.scales.x.min).toBe(subMin);
-    expect(volChart.scales.x.max).toBe(subMax);
+    // The sync runs deferred (queueMicrotask) after the zoom's update cycle —
+    // wait for it before asserting.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(volChart.scales['x'].min).toBe(subMin);
+    expect(volChart.scales['x'].max).toBe(subMax);
   });
 
   it('createCharts guards against missing pane references (no crash)', () => {
