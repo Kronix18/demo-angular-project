@@ -169,6 +169,37 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(volDataset.data[0]).toEqual({ x: Date.UTC(2024, 0, 10), y: 1000 });
     expect(volDataset.data[volDataset.data.length - 1]).toEqual({ x: Date.UTC(2024, 0, 12), y: 900 });
   });
+  it('MULTI-PANE: separate price + volume canvases, volume below price', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const canvases = el.querySelectorAll('canvas');
+    // TWO canvases: price pane + volume pane (TradingView layout — no overlap)
+    expect(canvases.length).toBe(2);
+    const priceCanvas = el.querySelector('[data-pane="price"] canvas');
+    const volCanvas = el.querySelector('[data-pane="volume"] canvas');
+    expect(priceCanvas).toBeTruthy();
+    expect(volCanvas).toBeTruthy();
+    // price pane is the FIRST/main canvas; volume the second
+    expect(priceCanvas).toBe(canvases[0]);
+    expect(volCanvas).toBe(canvases[1]);
+    // two Chart instances, one per pane
+    const priceChart: any = Chart.getChart(priceCanvas as HTMLCanvasElement);
+    const volChart: any = Chart.getChart(volCanvas as HTMLCanvasElement);
+    expect(priceChart).toBeTruthy();
+    expect(volChart).toBeTruthy();
+    // price chart: candlestick only, no volume dataset
+    expect(priceChart.data.datasets.length).toBe(1);
+    expect(priceChart.data.datasets[0].type).toBe('candlestick');
+    // volume chart: bar dataset with the same point count
+    expect(volChart.data.datasets[0].data.length).toBe(priceChart.data.datasets[0].data.length);
+    // shared x range: both charts' x scale min/max match
+    expect(volChart.scales.x.min).toBe(priceChart.scales.x.min);
+    expect(volChart.scales.x.max).toBe(priceChart.scales.x.max);
+  });
+
   it('createChart guards against a missing canvas reference (no crash)', () => {
     // Simulate the pre-fix crash condition: viewChild undefined.
     (component as any).chartCanvas = undefined;
