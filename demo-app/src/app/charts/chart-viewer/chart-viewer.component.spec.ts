@@ -46,7 +46,11 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
   let component: ChartViewerComponent;
   let httpMock: HttpTestingController;
 
+  // Real Stooq format: header line FIRST (the parser skips lines[0] as the
+  // header) — without it the first DATA row is eaten as the header (caught
+  // by 3.1's RED spec: 3 rows in, 2 points on the chart, oldest missing).
   const MSFT_ROWS = [
+    '<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>',
     'MSFT.US,D,20240110,000000,100,110,95,105,1000,0',
     'MSFT.US,D,20240111,000000,105,115,100,112,1200,0',
     'MSFT.US,D,20240112,000000,112,120,108,118,900,0',
@@ -134,6 +138,37 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(Object.keys((instance as any).scales)).toContain('y-volume');
   });
 
+  it('volume dataset: bar type on y-volume axis, begins at zero', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    await fixture.whenStable();
+    const inst: any = Chart.getChart(canvasEl);
+    expect(inst).toBeTruthy();
+    const volDataset = inst.data.datasets.find((d: any) => (d as any).type === 'bar' || d.label === 'Volume');
+    expect(volDataset).toBeTruthy();
+    expect(volDataset.yAxisID).toBe('y-volume');
+    // bars must start at 0: beginAtZero on the volume scale (option-level check;
+    // pixel/decimal proof is the live browser verification's job — jsdom has
+    // no real canvas dimensions so getPixelForValue returns NaN here).
+    const volScale = inst.scales['y-volume'];
+    expect(volScale).toBeTruthy();
+    expect(volScale.beginAtZero || inst.options.scales['y-volume'].beginAtZero).toBe(true);
+  });
+
+  it('volume values map each OHLCV point to {x, y: volume}', async () => {
+    const canvasEl = stubCanvas();
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS); // ngOnInit's request
+    await fixture.whenStable();
+    const inst: any = Chart.getChart(canvasEl);
+    const volDataset = inst.data.datasets.find((d: any) => d.label === 'Volume');
+    const priceDataset = inst.data.datasets.find((d: any) => d.label === 'Price');
+    console.log('CHART vol points:', volDataset.data.length, '| price points:', priceDataset.data.length,
+      '| vol[0]:', JSON.stringify(volDataset.data[0]));
+    expect(volDataset.data.length).toBe(priceDataset.data.length);
+    expect(volDataset.data.length).toBe(3);
+    expect(volDataset.data[0]).toEqual({ x: Date.UTC(2024, 0, 10), y: 1000 });
+    expect(volDataset.data[volDataset.data.length - 1]).toEqual({ x: Date.UTC(2024, 0, 12), y: 900 });
+  });
   it('createChart guards against a missing canvas reference (no crash)', () => {
     // Simulate the pre-fix crash condition: viewChild undefined.
     (component as any).chartCanvas = undefined;

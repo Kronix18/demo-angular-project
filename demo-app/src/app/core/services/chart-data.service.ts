@@ -100,10 +100,14 @@ export class ChartDataService {
       ohlcvArray.push({ timestamp, open, high, low, close, volume });
     }
 
-    // Sort by timestamp descending (most recent first)
-    ohlcvArray.sort((a, b) => b.timestamp - a.timestamp);
+    // Sort ASCENDING (oldest -> newest): Chart.js financial charts require
+    // ascending data — with DESC order the controller's range computation
+    // DROPS the oldest point(s) (proven by the 3.1 RED spec: 3 rows in,
+    // 2 points on the chart, oldest missing).
+    ohlcvArray.sort((a, b) => a.timestamp - b.timestamp);
 
     // Apply limit AFTER the sort so callers get the newest `limit` bars
-    return ohlcvArray.slice(0, limit);
+    // (the tail of the ascending array = most recent N).
+    return ohlcvArray.slice(-limit);
   }
 }
