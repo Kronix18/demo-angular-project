@@ -55,7 +55,13 @@ import 'chartjs-chart-financial';
     `
       .chart-container {
         position: relative;
-        height: 100%;
+        /* Definite viewport height: the parent flex chain (app-container →
+           main-content → here) never resolves a definite height (measured:
+           container stuck at content size 460px, dead gap below). calc()
+           makes the height definite regardless of the parent chain: viewport
+           minus navbar (70) + paddings (64) + toolbar (~89) + footer (~65). */
+        height: calc(100vh - 288px);
+        min-height: 480px;
         display: flex;
         flex-direction: column;
       }
@@ -64,11 +70,18 @@ import 'chartjs-chart-financial';
         width: 100%;
       }
       .price-pane {
-        flex: 3 1 0; /* ~75% of the vertical space */
+        /* Viewport-relative fill: the app-container/main-content flex chain
+           doesn't propagate a definite height (app.scss is served stale —
+           changes verified in the file but not in the served CSS), so the
+           panes size themselves: price ~62vh (toolbar+padding above, volume
+           below), volume ~21vh. No overlap, no dead gap — measured live. */
+        flex: 3 1 0;
+        height: 62vh;
         min-height: 280px;
       }
       .volume-pane {
-        flex: 1 1 0; /* ~25% — separate pane, own scale */
+        flex: 1 1 0;
+        height: 21vh;
         min-height: 90px;
         border-top: 1px solid var(--c-border, #d1d5db);
       }

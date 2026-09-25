@@ -1,7 +1,11 @@
 .app-container {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* definite height (not min-height) so the flex chain resolves: main-content
+     (flex:1) → chart-container (flex:1) → panes (flex 3/1) all grow to fill.
+     min-height left the container at content size (253px dead gap below the
+     volume pane — measured live). */
+  height: 100vh;
   background: #f8f9fa;
 }
 
@@ -114,6 +118,15 @@
   margin: 0 auto;
   padding: 32px;
   box-sizing: border-box;
+  /* Chart pages: the routed component (app-chart-viewer) stretches itself via
+     its own flex:1. The router-outlet element itself must not render as a
+     block (it added 41px + pushed the chart down — measured live). */
+  display: flex;
+  flex-direction: column;
+
+  router-outlet {
+    display: none;
+  }
 }
 
 .footer {
