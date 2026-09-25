@@ -1,14 +1,13 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
+import { ChartStateService } from '../../core/services/chart-state.service';
 
 /**
- * Chart toolbar (2.3): submit semantics — the symbol input emits only on
- * Enter/Update (never per keystroke); the interval select emits on change.
- * Handlers take the plain STRING value (ngModelChange passes the value, not
- * an event object — the pre-fix code read event.target.value on a string,
- * producing undefined). Defaults and the symbol list come from the demo data
- * contract (AVAILABLE_SYMBOLS, 0.3 spec) — no fake symbols, no dead deps.
+ * Chart toolbar (4.2): a DUMB component — writes to ChartStateService (the
+ * single source of truth), keeps submit semantics (symbol emits once on
+ * Enter/Update, never per keystroke). Form values initialize FROM the store.
+ * No @Output events: the viewer derives loads from state changes (4.2 wiring).
  */
 @Component({
   selector: 'app-chart-toolbar',
@@ -110,27 +109,32 @@ import { AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
   ],
 })
 export class ChartToolbarComponent {
-  @Output() symbolChange = new EventEmitter<string>();
-  @Output() intervalChange = new EventEmitter<string>();
-
-  // Demo-data default (msft has the largest dataset; AAPL does not exist).
+  // 4.2: no @Output events — the store is the output channel.
   symbol = 'msft';
   interval = '1d';
 
   // Only symbols with demo data (0.3 spec) — drives the datalist.
   symbols = [...AVAILABLE_SYMBOLS];
 
-  /** Enter key / Update button: emit ONCE with the current input value. */
+  constructor(private store: ChartStateService) {
+    // Initialize form values FROM the store (rehydration: refresh keeps the
+    // user's symbol/interval — single source of truth).
+    const snap = this.store.snapshot();
+    this.symbol = snap.symbol;
+    this.interval = snap.interval;
+  }
+
+  /** Enter key / Update button: write the store ONCE with the current input value. */
   submitSymbol(): void {
     const value = (this.symbol || '').trim().toLowerCase();
     if (!value) return;
     this.symbol = value;
-    this.symbolChange.emit(value);
+    this.store.setSymbol(value);
   }
 
-  /** ngModelChange passes the VALUE (string) — not an event object. */
+  /** ngModelChange passes the VALUE (string) — write the store. */
   onIntervalChange(value: string): void {
     this.interval = value;
-    this.intervalChange.emit(value);
+    this.store.setInterval(value);
   }
 }

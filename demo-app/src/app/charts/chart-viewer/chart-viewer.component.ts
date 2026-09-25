@@ -1,10 +1,13 @@
-import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService } from '../../core/services/chart-data.service';
+import { ChartStateService } from '../../core/services/chart-state.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
+import { map, distinctUntilChanged } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
 // anywhere — it registers registerables + adapter + zoom + the financial
 // controllers/elements (side-effect import alone is unreliable: ESM/CJS
@@ -79,9 +82,7 @@ Chart.register(crosshairPlugin);
   imports: [CommonModule, ChartToolbarComponent],
   template: `
     <div class="chart-container">
-      <app-chart-toolbar
-        (symbolChange)="onToolbarSymbolChange($event)"
-        (intervalChange)="onToolbarIntervalChange($event)">
+      <app-chart-toolbar>
       </app-chart-toolbar>
 
       @if (loading) {
@@ -199,29 +200,46 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   // NOT trigger change detection — markForCheck() after state updates makes
   // the @if(loading)/@if(error) blocks re-render (2.2 fix, verified live).
   private cdr: ChangeDetectorRef;
+  private chartState: ChartStateService;
+  private destroyRef = inject(DestroyRef);
 
   constructor(
     chartDataService: ChartDataService,
     route: ActivatedRoute,
     router: Router,
-    cdr: ChangeDetectorRef
+    cdr: ChangeDetectorRef,
+    chartState: ChartStateService
   ) {
     this.chartDataService = chartDataService;
     this.route = route;
     this.router = router;
     this.cdr = cdr;
+    this.chartState = chartState;
   }
 
   ngOnInit(): void {
+    // 4.2 wiring: the toolbar writes to ChartStateService; the viewer derives
+    // its data loads from state changes. Route param seeds the state ONCE.
     this.route.params.subscribe((params) => {
       const symbol = params['symbol'] || 'msft';
-      // Skip re-fire when the symbol is unchanged (router.navigate with
-      // replaceUrl re-emits params without re-creating the component; without
-      // this guard every toolbar symbol change fetched TWICE).
-      if (symbol === this.currentSymbol) return;
-      this.currentSymbol = symbol;
-      this.loadChartData(symbol, this.currentInterval);
+      if (symbol !== this.chartState.snapshot().symbol) {
+        this.chartState.setSymbol(symbol);
+      }
     });
+    // Derive loads from state: symbol/interval/range changes reload the data.
+    this.chartState.state$
+      .pipe(
+        map((s) => ({ symbol: s.symbol, interval: s.interval })),
+        distinctUntilChanged((a, b) => a.symbol === b.symbol && a.interval === b.interval),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(({ symbol, interval }) => {
+        this.currentSymbol = symbol;
+        this.currentInterval = interval;
+        // Keep the URL in sync (2.3): refresh/deep-link preserves the symbol.
+        this.router.navigate(['/charts', symbol], { replaceUrl: true });
+        this.loadChartData(symbol, interval);
+      });
   }
 
   // Public since 2.2: the toolbar/state refactor (2.3/4.x) and specs drive
@@ -246,18 +264,6 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck(); // zoneless: schedule CD after async state change
       },
     });
-  }
-
-  onToolbarSymbolChange(symbol: string): void {
-    this.currentSymbol = symbol;
-    // Keep the URL in sync (2.3): refresh/deep-link preserves the symbol.
-    this.router.navigate(['/charts', symbol], { replaceUrl: true });
-    this.loadChartData(symbol, this.currentInterval);
-  }
-
-  onToolbarIntervalChange(interval: string): void {
-    this.currentInterval = interval;
-    this.loadChartData(this.currentSymbol, interval);
   }
 
   /** X extent shared by both panes — identical min/max keeps them aligned. */

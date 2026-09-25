@@ -52,9 +52,7 @@ describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
     }
   });
 
-  it('typing in the symbol input does NOT emit per keystroke and does NOT write the store', () => {
-    const emissions: string[] = [];
-    component.symbolChange.subscribe((s) => emissions.push(s));
+  it('typing in the symbol input does NOT write the store (submit semantics)', () => {
     const input = fixture.nativeElement.querySelector('#symbol') as HTMLInputElement;
     input.value = 'n';
     input.dispatchEvent(new Event('input'));
@@ -62,19 +60,15 @@ describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
     input.dispatchEvent(new Event('input'));
     input.value = 'nvda';
     input.dispatchEvent(new Event('input'));
-    expect(emissions.length).toBe(0); // nothing until submit
     expect(store.snapshot().symbol).toBe('msft'); // store untouched while typing
   });
 
-  it('pressing Enter writes the store (single source of truth) — no @Output events remain', () => {
-    const emissions: string[] = [];
-    component.symbolChange.subscribe((s) => emissions.push(s));
+  it('pressing Enter writes the store (single source of truth)', () => {
     const input = fixture.nativeElement.querySelector('#symbol') as HTMLInputElement;
     input.value = 'nvda';
     input.dispatchEvent(new Event('input'));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(store.snapshot().symbol).toBe('nvda'); // the STORE is the output
-    expect(emissions.length).toBe(0); // no EventEmitter emissions
   });
 
   it('interval select change writes the store', () => {
@@ -93,15 +87,12 @@ describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
     expect(store.snapshot().symbol).toBe('qqq');
   });
 
-  it('interval select change emits intervalChange with the string value and writes the store', () => {
-    const emissions: string[] = [];
-    component.intervalChange.subscribe((v) => emissions.push(v));
+  it('interval select change writes the store (string value, no events)', () => {
     const select = fixture.nativeElement.querySelector('#interval') as HTMLSelectElement;
     select.value = '1w';
     select.dispatchEvent(new Event('change'));
     fixture.detectChanges();
-    expect(emissions).toEqual(['1w']); // string value (event-object bug stays fixed)
-    expect(store.snapshot().interval).toBe('1w'); // AND the store is written
+    expect(store.snapshot().interval).toBe('1w'); // the STORE is the output
   });
 
   it('interval select offers 1d and 1w; intraday options (1m/5m/1h) are DISABLED with a hint', () => {
@@ -117,8 +108,11 @@ describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
     expect(byValue('1h')?.disabled).toBe(true);
   });
 
-  it('has no dead FormBuilder/symbols-as-AAPL code (constructor takes no deps)', () => {
-    // FormBuilder was injected but never used (dead code) — constructor must be empty of deps
-    expect(component.constructor.length).toBe(0);
+  it('has no dead FormBuilder injection (store is the only dep, and it is used)', () => {
+    // FormBuilder was injected but never used (2.3 dead code) — removed.
+    // 4.2: the constructor takes exactly the store, and submitSymbol uses it.
+    expect(component.constructor.length).toBe(1);
+    // live use: writing via the store works (proven by the other tests)
+    expect(typeof (component as any).store).toBe('object');
   });
 });
