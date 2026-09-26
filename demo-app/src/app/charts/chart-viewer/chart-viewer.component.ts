@@ -347,42 +347,43 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const chartBars =
       this.currentInterval === '1w' ? aggregateWeeklyWFri(data) : data;
 
-    // CATEGORY AXIS (Kevin: weekend/holiday gaps must be removed): bars are
-    // evenly spaced by INDEX — non-trading days don't exist as slots. Labels =
-    // per-bar date strings; the tooltip/crosshair read the bar's timestamp
-    // from the data point. This also makes pan/zoom uniform (index-based),
-    // fixing the weak pan sensitivity at high bar density.
-    const dateLabel = (ts: number) => this.formatBarDate(ts);
-    const labels = chartBars.map((d) => dateLabel(d.timestamp));
+    // X-AXIS ARCHITECTURE (root-caused live): chartjs-plugin-zoom's pan writes
+    // numeric min/max into category-scale options, which breaks
+    // chartjs-chart-financial's controller (element x = -32768, y collapses
+    // 0..1, candles vanish after pan). The proven combo: LINEAR x-scale with
+    // x = bar INDEX — the plugin handles linear scales natively, the
+    // financial controller gets numeric x, and weekend/holiday gaps vanish
+    // (indices skip non-trading days). Date labels via ticks.callback.
+    const dateForIndex = (i: number) => {
+      const b = chartBars[Math.min(Math.max(0, i), chartBars.length - 1)];
+      return b ? this.formatBarDate(b.timestamp) : '';
+    };
 
-    // Dataset points: x = the label (category axis uses label equality)
     const priceData = chartBars.map((d, i) => ({
-      x: labels[i], o: d.open, h: d.high, l: d.low, c: d.close,
+      x: i, o: d.open, h: d.high, l: d.low, c: d.close,
       t: d.timestamp, // raw timestamp for the tooltip title
     }));
     const volumeData = chartBars.map((d, i) => ({
-      x: labels[i], y: d.volume,
+      x: i, y: d.volume,
     }));
 
-    // VIEW extent = the preset window as CATEGORY INDICES (the range slice's
-    // first/last bar positions in chartBars) — the view zooms to frame the
-    // preset; pan/zoom reveals the rest. ±1 bar pad so edges aren't clipped.
+    // VIEW extent = the preset window as INDEX range (the slice's bounds, ±1
+    // bar pad) — the view zooms to frame the preset; pan/zoom reveals the rest.
     const sliceStart = chartBars.indexOf(rangeSlice[0]);
     const sliceEnd = chartBars.indexOf(rangeSlice[rangeSlice.length - 1]);
     const viewMin = Math.max(0, sliceStart - 1);
     const viewMax = Math.min(chartBars.length - 1, sliceEnd + 1);
-    // zoom LIMITS span the full index range (zoom back out to ALL stays possible)
     const fullMin = 0;
     const fullMax = chartBars.length - 1;
-    // min ~10 visible bars (Python range_controller port)
-    this.currentBarWidth = 1;
 
     const xScale = {
-      type: 'category' as const,
-      labels,
-      min: viewMin > 0 ? labels[viewMin] : undefined, // category min/max = label strings
-      max: labels[viewMax],
-      ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
+      type: 'linear' as const,
+      min: viewMin,
+      max: viewMax,
+      ticks: {
+        maxRotation: 0, autoSkip: true, maxTicksLimit: 10,
+        callback: (_value: any, index: number) => dateForIndex(index),
+      },
     };
 
     // 3.2: zoom/pan on the x-axis only, clamped to the data extent (no panning
@@ -409,7 +410,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         x: {
           min: extent.min,
           max: extent.max,
-          minRange: 10, // ~10 visible bars (category units)
+          minRange: 10, // ~10 visible bars (index units)
         },
       },
     });
@@ -419,7 +420,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     // (the dates render below the VOLUME pane).
     this.priceChart = new Chart(priceEl, {
       type: 'candlestick',
-      data: { labels, datasets: [{ type: 'candlestick', label: 'Price', data: priceData }] } as any,
+      data: { datasets: [{ type: 'candlestick', label: 'Price', data: priceData }] } as any,
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -443,7 +444,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const downColor = '#ef5350';
     this.volumeChart = new Chart(volEl, {
       type: 'bar',
-      data: { labels, datasets: [{
+      data: { datasets: [{
         label: 'Volume',
         data: volumeData,
         backgroundColor: (ctx: any) => {
@@ -489,14 +490,13 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private currentBarWidth = 0;
 
   /** 3.2: apply the source pane's current x-range to the other pane. DEFERRED
-   *  via queueMicrotask (re-entrant updates mid-cycle throw). LOOP GUARD: both
-   *  panes' onPan/onZoom fire on any interaction — without an equality guard
-   *  the panes echo ranges back and forth (the volume→price echo resets the
-   *  price view; measured live: a 5-drag pan moved the view only ~1 day). */
+   *  via queueMicrotask (re-entrant updates mid-cycle throw). Loop guard
+   *  prevents the pan/zoom echo (both panes fire callbacks on interaction).
+   *  LINEAR x-scale: numeric min/max — plugin-native, no label conversion. */
   private syncXRange(sourceChart: Chart): void {
     queueMicrotask(() => {
       const target = sourceChart === this.priceChart ? this.volumeChart : this.priceChart;
-      if (!target || target === sourceChart) return;
+      if (!target) return;
       const scale = sourceChart.scales['x'] as any;
       if (scale?.min == null || scale?.max == null) return;
       const tScale = target.scales['x'] as any;

@@ -167,11 +167,11 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const volDataset = volChart.data.datasets[0];
     expect(volDataset.data.length).toBe(priceChart.data.datasets[0].data.length);
     expect(volDataset.data.length).toBe(3);
-    // ASC order: data[0] = OLDEST; x = the category LABEL (weekend-free axis)
+    // ASC order: data[0] = OLDEST; x = bar index (linear axis, weekend-free)
     expect(volDataset.data[0].y).toBe(1000);
-    expect(volDataset.data[0].x).toContain('Jan 10'); // label form
+    expect(volDataset.data[0].x).toBe(0);
     expect(volDataset.data[2].y).toBe(900);
-    expect(volDataset.data[2].x).toContain('Jan 12');
+    expect(volDataset.data[2].x).toBe(2);
   });
   it('MULTI-PANE: separate price + volume canvases, volume below price', async () => {
     const canvasEl = stubCanvas();
@@ -244,24 +244,23 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(vSpy).toHaveBeenCalled();
   });
 
-  it('ZOOM: zooming the price pane syncs the volume pane x-range (3.2, category indices)', async () => {
+  it('ZOOM: zooming the price pane syncs the volume pane x-range (3.2, index units)', async () => {
     const canvasEl = stubCanvas();
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
     const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
-    // category axis: the plugin's zoomScale works in INDEXES (numbers)
-    const labels: string[] = priceChart.data.labels;
-    const mid = Math.floor(labels.length / 2);
-    priceChart.zoomScale('x', { min: mid, max: labels.length - 1 });
+    // linear index axis: zoom to the last half
+    const last = priceChart.data.datasets[0].data.length - 1;
+    const mid = Math.floor(last / 2);
+    priceChart.zoomScale('x', { min: mid, max: last });
     // The sync runs deferred (queueMicrotask) after the zoom's update cycle.
     await new Promise((r) => setTimeout(r, 300));
     // sync contract: the volume pane's x-range EQUALS the price pane's
-    // (both resolve to the same category indices)
     expect(volChart.scales['x'].min).toBe(priceChart.scales['x'].min);
     expect(volChart.scales['x'].max).toBe(priceChart.scales['x'].max);
-    expect(volChart.scales['x'].min).toBe(mid); // actually zoomed to the sub-range
+    expect(priceChart.scales['x'].min).toBe(mid); // actually zoomed
   });
 
   it('CROSSHAIR: plugin registered and draws a line at the hovered x (3.3)', async () => {
@@ -300,20 +299,22 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(volCb({ dataset: volChart.data.datasets[0], dataIndex: 0, raw: volChart.data.datasets[0].data[0] } as any)).toContain('1,000');
   });
 
-  it('CATEGORY AXIS: evenly-spaced bars, no weekend/holiday slots (4.3+fix)', async () => {
+  it('LINEAR INDEX AXIS: evenly-spaced bars, no weekend slots (4.3+fix)', async () => {
     const canvasEl = stubCanvas();
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
-    // x scale is a category axis (bar-index spacing — no weekend gaps)
-    expect(priceChart.scales['x'].type).toBe('category');
-    // labels = per-bar dates (no weekend slots — every label is a trading day)
-    const labels = priceChart.data.labels;
-    expect(labels.length).toBe(priceChart.data.datasets[0].data.length);
-    // no duplicated/weekend labels: consecutive labels differ
-    for (let i = 1; i < labels.length; i++) {
-      expect(labels[i]).not.toBe(labels[i - 1]);
+    // x scale is LINEAR over bar indices (no weekend/holiday slots — the
+    // plugin-native scale; non-trading days simply don't exist)
+    expect(priceChart.scales['x'].type).toBe('linear');
+    const first = priceChart.data.datasets[0].data[0];
+    expect(first.x).toBe(0); // x = bar index
+    expect(first.t).toBeTruthy(); // raw timestamp rides along for tooltips
+    // strict ASC timestamps (weekend days absent — trading days only)
+    const ts = priceChart.data.datasets[0].data.map((p: any) => p.t);
+    for (let i = 1; i < ts.length; i++) {
+      expect(ts[i]).toBeGreaterThan(ts[i - 1]);
     }
   });
 
