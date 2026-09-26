@@ -3,7 +3,7 @@ import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService } from '../../core/services/chart-data.service';
 import { ChartStateService } from '../../core/services/chart-state.service';
-import { filterByRange } from '../../core/services/data-aggregation';
+import { filterByRange, aggregateWeeklyWFri } from '../../core/services/data-aggregation';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
@@ -259,10 +259,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   loadChartData(symbol: string, interval: string): void {
     this.loading = true;
     this.error = null;
-    // 4.3: fetch enough bars for the widest range (daily data: 1Y ≈ 260 bars,
-    // ALL = everything — the service's limit caps it; 1000 covers ~4y of msft).
-    const barsNeeded = this.currentRange === 'ALL' ? 1000 : 400;
-    this.chartDataService.getOHLCV(symbol, interval, barsNeeded).subscribe({
+    // 4.3 PAN FIX (Kevin: "when you pan the chart, the bars before don't load"):
+    // fetch the FULL file (no cap chop — msft holds ~10k bars) and let the
+    // range preset FRAME THE VIEW only. Bars outside the preset stay in the
+    // chart (off-screen); pan/zoom reveals them — TradingView behavior.
+    this.chartDataService.getOHLCV(symbol, interval, 100000).subscribe({
       next: (data) => {
         this.allData = data;
         if (data && data.length > 0) {
@@ -314,32 +315,33 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
     this.destroyCharts();
 
-    // 4.3: display data = range slice (last-bar-anchored, client-side) +
-    // weekly aggregation when the interval is 1w.
-    const display = filterByRange(data, this.currentRange as any, this.currentInterval);
-    if (!display.length) {
+    // 4.3 PAN FIX: chart datasets carry ALL bars (nothing chopped — pan/zoom
+    // reveals bars outside the preset); the range preset only FRAMES the VIEW:
+    // the x-scale min/max = the preset window (computed from the slice bounds).
+    const rangeSlice = filterByRange(data, this.currentRange as any, this.currentInterval);
+    if (!rangeSlice.length) {
       this.error = 'No data in range';
       return;
     }
 
-    const priceData = display.map((d) => ({
+    // FULL data on the charts (weekly-aggregated only when interval=1w — the
+    // aggregation applies to the whole file so pan-left shows weekly bars).
+    const chartBars =
+      this.currentInterval === '1w' ? aggregateWeeklyWFri(data) : data;
+    const priceData = chartBars.map((d) => ({
       x: d.timestamp, o: d.open, h: d.high, l: d.low, c: d.close,
     }));
-    const volumeData = display.map((d) => ({
+    const volumeData = chartBars.map((d) => ({
       x: d.timestamp, y: d.volume,
     }));
 
-    // 4.3 FIX (Kevin: "it just chops off the dates before hand instead of
-    // zooming in the amount it should be"): the VIEW extent must come from the
-    // DISPLAYED data (the range slice), not the full array — otherwise the
-    // sliced bars are compressed into a corner of the full-width scale instead
-    // of the view zooming to frame them. The zoom LIMITS still span the full
-    // data extent (zooming back out to ALL stays possible).
-    const viewExtent = this.sharedXExtent(display);
-    const fullExtent = this.sharedXExtent(data);
-    // Raw bar width from the DISPLAYED data — feeds the zoom minRange limit.
-    const rawSpan = viewExtent.max - viewExtent.min;
-    this.currentBarWidth = display.length > 1 ? rawSpan / (display.length + 1) : 86400000;
+    // VIEW extent = the preset window (the range slice's bounds, ±1 bar pad) —
+    // the view zooms to frame the preset; pan/zoom reveals the rest.
+    const viewExtent = this.sharedXExtent(rangeSlice);
+    const fullExtent = this.sharedXExtent(chartBars);
+    // Raw bar width from the FULL data — feeds the zoom minRange limit.
+    const rawSpan = fullExtent.max - fullExtent.min;
+    this.currentBarWidth = chartBars.length > 1 ? rawSpan / (chartBars.length + 1) : 86400000;
 
     const xExtent = viewExtent; // VIEW extent (displayed data) — frames the slice
     // Identical time-scale config across panes — the shared-x contract.
@@ -440,18 +442,20 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   /** Bar width in ms (raw data extent / count) — set at chart creation. */
   private currentBarWidth = 0;
 
-  /** 3.2: apply the price pane's current x-range to the volume pane so pan/zoom
-   *  stays synchronized across panes. DEFERRED via queueMicrotask: the zoom
-   *  plugin fires onZoomComplete/onPanComplete INSIDE the source chart's update
-   *  cycle — mutating the other chart's options and updating it re-entrantly
-   *  mid-cycle throws inside Chart.js option resolution (name.startsWith crash,
-   *  caught live). Deferring runs the sync after the cycle completes. */
+  /** 3.2: apply the source pane's current x-range to the other pane. DEFERRED
+   *  via queueMicrotask (re-entrant updates mid-cycle throw). LOOP GUARD: both
+   *  panes' onPan/onZoom fire on any interaction — without an equality guard
+   *  the panes echo ranges back and forth (the volume→price echo resets the
+   *  price view; measured live: a 5-drag pan moved the view only ~1 day). */
   private syncXRange(sourceChart: Chart): void {
     queueMicrotask(() => {
       const target = sourceChart === this.priceChart ? this.volumeChart : this.priceChart;
       if (!target || target === sourceChart) return;
       const scale = sourceChart.scales['x'] as any;
       if (scale?.min == null || scale?.max == null) return;
+      const tScale = target.scales['x'] as any;
+      // loop guard: already in sync → nothing to do (breaks the echo)
+      if (tScale?.min === scale.min && tScale?.max === scale.max) return;
       (target.options.scales as any).x = {
         ...(target.options.scales as any).x,
         min: scale.min,
