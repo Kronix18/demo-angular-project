@@ -329,10 +329,19 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       x: d.timestamp, y: d.volume,
     }));
 
-    const xExtent = this.sharedXExtent(data);
-    // Raw bar width (unpadded extent / bars) — feeds the zoom minRange limit.
-    const rawSpan = xExtent.max - xExtent.min;
-    this.currentBarWidth = data.length > 1 ? rawSpan / (data.length + 1) : 86400000;
+    // 4.3 FIX (Kevin: "it just chops off the dates before hand instead of
+    // zooming in the amount it should be"): the VIEW extent must come from the
+    // DISPLAYED data (the range slice), not the full array — otherwise the
+    // sliced bars are compressed into a corner of the full-width scale instead
+    // of the view zooming to frame them. The zoom LIMITS still span the full
+    // data extent (zooming back out to ALL stays possible).
+    const viewExtent = this.sharedXExtent(display);
+    const fullExtent = this.sharedXExtent(data);
+    // Raw bar width from the DISPLAYED data — feeds the zoom minRange limit.
+    const rawSpan = viewExtent.max - viewExtent.min;
+    this.currentBarWidth = display.length > 1 ? rawSpan / (display.length + 1) : 86400000;
+
+    const xExtent = viewExtent; // VIEW extent (displayed data) — frames the slice
     // Identical time-scale config across panes — the shared-x contract.
     const xScale = {
       type: 'time',
@@ -382,7 +391,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         plugins: {
           legend: { display: false }, // TradingView hides the legend; 10.2 adds rows
           tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: priceTooltipCallbacks },
-          zoom: zoomOptions(xExtent),
+          zoom: zoomOptions(fullExtent),
           crosshair: true, // enables the crosshair plugin (3.3)
         },
         scales: {
@@ -403,7 +412,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         plugins: {
           legend: { display: false },
           tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: volumeTooltipCallbacks },
-          zoom: zoomOptions(xExtent),
+          zoom: zoomOptions(fullExtent),
           crosshair: true, // enables the crosshair plugin (3.3)
         },
         scales: {
