@@ -155,9 +155,9 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(volScale.beginAtZero || volChart.options.scales.y.beginAtZero).toBe(true);
   });
 
-  it('volume values map each OHLCV point to {x, y: volume} (ASC, volume pane)', async () => {
+  it('volume values map each bar (ASC, volume pane, category-x)', async () => {
     const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS); // ngOnInit's request
+    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
@@ -167,10 +167,11 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const volDataset = volChart.data.datasets[0];
     expect(volDataset.data.length).toBe(priceChart.data.datasets[0].data.length);
     expect(volDataset.data.length).toBe(3);
-    // ASC order (3.1 GREEN fix): data[0] = OLDEST; Chart.js financial requires
-    // ascending — DESC dropped the oldest point (RED-proven).
-    expect(volDataset.data[0]).toEqual({ x: Date.UTC(2024, 0, 10), y: 1000 });
-    expect(volDataset.data[volDataset.data.length - 1]).toEqual({ x: Date.UTC(2024, 0, 12), y: 900 });
+    // ASC order: data[0] = OLDEST; x = the category LABEL (weekend-free axis)
+    expect(volDataset.data[0].y).toBe(1000);
+    expect(volDataset.data[0].x).toContain('Jan 10'); // label form
+    expect(volDataset.data[2].y).toBe(900);
+    expect(volDataset.data[2].x).toContain('Jan 12');
   });
   it('MULTI-PANE: separate price + volume canvases, volume below price', async () => {
     const canvasEl = stubCanvas();
@@ -243,23 +244,24 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(vSpy).toHaveBeenCalled();
   });
 
-  it('ZOOM: zooming the price pane syncs the volume pane x-range (3.2)', async () => {
+  it('ZOOM: zooming the price pane syncs the volume pane x-range (3.2, category indices)', async () => {
     const canvasEl = stubCanvas();
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
     const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
-    // simulate a zoom on the price pane: zoomScale x to a sub-range
-    const full = priceChart.scales['x'];
-    const subMin = full.min + (full.max - full.min) * 0.25;
-    const subMax = full.min + (full.max - full.min) * 0.75;
-    priceChart.zoomScale('x', { min: subMin, max: subMax });
-    // The sync runs deferred (queueMicrotask) after the zoom's update cycle —
-    // wait for it before asserting.
+    // category axis: the plugin's zoomScale works in INDEXES (numbers)
+    const labels: string[] = priceChart.data.labels;
+    const mid = Math.floor(labels.length / 2);
+    priceChart.zoomScale('x', { min: mid, max: labels.length - 1 });
+    // The sync runs deferred (queueMicrotask) after the zoom's update cycle.
     await new Promise((r) => setTimeout(r, 300));
-    expect(volChart.scales['x'].min).toBe(subMin);
-    expect(volChart.scales['x'].max).toBe(subMax);
+    // sync contract: the volume pane's x-range EQUALS the price pane's
+    // (both resolve to the same category indices)
+    expect(volChart.scales['x'].min).toBe(priceChart.scales['x'].min);
+    expect(volChart.scales['x'].max).toBe(priceChart.scales['x'].max);
+    expect(volChart.scales['x'].min).toBe(mid); // actually zoomed to the sub-range
   });
 
   it('CROSSHAIR: plugin registered and draws a line at the hovered x (3.3)', async () => {

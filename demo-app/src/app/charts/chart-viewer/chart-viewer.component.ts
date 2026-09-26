@@ -53,6 +53,16 @@ const crosshairPlugin = {
 /** Tooltip label callbacks (3.3): O/H/L/C for the price pane, Vol for the volume
  *  pane — TradingView-style readouts. */
 const priceTooltipCallbacks = {
+  title(items: any[]): string {
+    // category axis: the bar's raw timestamp rides on the data point (t)
+    const raw = items?.[0]?.raw;
+    if (typeof raw?.t === 'number') {
+      return new Date(raw.t).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+      });
+    }
+    return String(items?.[0]?.label ?? '');
+  },
   label(item: any): string {
     const raw = item?.raw ?? {};
     const fmt = (v: unknown) => typeof v === 'number' ? v.toFixed(2) : String(v ?? '-');
@@ -293,6 +303,14 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     return { min: min - pad, max: max + pad };
   }
 
+  /** Per-bar date label for the category axis (no weekend slots — one label
+   *  per TRADING day). */
+  private formatBarDate(ts: number): string {
+    return new Date(ts).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: '2-digit',
+    });
+  }
+
   private destroyCharts(): void {
     if (this.priceChart) {
       this.priceChart.destroy();
@@ -328,29 +346,43 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     // aggregation applies to the whole file so pan-left shows weekly bars).
     const chartBars =
       this.currentInterval === '1w' ? aggregateWeeklyWFri(data) : data;
-    const priceData = chartBars.map((d) => ({
-      x: d.timestamp, o: d.open, h: d.high, l: d.low, c: d.close,
+
+    // CATEGORY AXIS (Kevin: weekend/holiday gaps must be removed): bars are
+    // evenly spaced by INDEX — non-trading days don't exist as slots. Labels =
+    // per-bar date strings; the tooltip/crosshair read the bar's timestamp
+    // from the data point. This also makes pan/zoom uniform (index-based),
+    // fixing the weak pan sensitivity at high bar density.
+    const dateLabel = (ts: number) => this.formatBarDate(ts);
+    const labels = chartBars.map((d) => dateLabel(d.timestamp));
+
+    // Dataset points: x = the label (category axis uses label equality)
+    const priceData = chartBars.map((d, i) => ({
+      x: labels[i], o: d.open, h: d.high, l: d.low, c: d.close,
+      t: d.timestamp, // raw timestamp for the tooltip title
     }));
-    const volumeData = chartBars.map((d) => ({
-      x: d.timestamp, y: d.volume,
+    const volumeData = chartBars.map((d, i) => ({
+      x: labels[i], y: d.volume,
     }));
 
-    // VIEW extent = the preset window (the range slice's bounds, ±1 bar pad) —
-    // the view zooms to frame the preset; pan/zoom reveals the rest.
-    const viewExtent = this.sharedXExtent(rangeSlice);
-    const fullExtent = this.sharedXExtent(chartBars);
-    // Raw bar width from the FULL data — feeds the zoom minRange limit.
-    const rawSpan = fullExtent.max - fullExtent.min;
-    this.currentBarWidth = chartBars.length > 1 ? rawSpan / (chartBars.length + 1) : 86400000;
+    // VIEW extent = the preset window as CATEGORY INDICES (the range slice's
+    // first/last bar positions in chartBars) — the view zooms to frame the
+    // preset; pan/zoom reveals the rest. ±1 bar pad so edges aren't clipped.
+    const sliceStart = chartBars.indexOf(rangeSlice[0]);
+    const sliceEnd = chartBars.indexOf(rangeSlice[rangeSlice.length - 1]);
+    const viewMin = Math.max(0, sliceStart - 1);
+    const viewMax = Math.min(chartBars.length - 1, sliceEnd + 1);
+    // zoom LIMITS span the full index range (zoom back out to ALL stays possible)
+    const fullMin = 0;
+    const fullMax = chartBars.length - 1;
+    // min ~10 visible bars (Python range_controller port)
+    this.currentBarWidth = 1;
 
-    const xExtent = viewExtent; // VIEW extent (displayed data) — frames the slice
-    // Identical time-scale config across panes — the shared-x contract.
     const xScale = {
-      type: 'time',
-      time: { unit: 'day' },
-      min: xExtent.min,
-      max: xExtent.max,
-      ticks: { source: 'data', maxRotation: 0, autoSkip: true },
+      type: 'category' as const,
+      labels,
+      min: viewMin > 0 ? labels[viewMin] : undefined, // category min/max = label strings
+      max: labels[viewMax],
+      ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
     };
 
     // 3.2: zoom/pan on the x-axis only, clamped to the data extent (no panning
@@ -377,15 +409,17 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         x: {
           min: extent.min,
           max: extent.max,
-          minRange: this.minVisibleRange(extent),
+          minRange: 10, // ~10 visible bars (category units)
         },
       },
     });
 
     // PRICE pane: candlestick only (volume lives in its own pane now).
+    // 4.3 layout: price y-axis on the RIGHT (aligned with volume y); NO x labels
+    // (the dates render below the VOLUME pane).
     this.priceChart = new Chart(priceEl, {
       type: 'candlestick',
-      data: { datasets: [{ type: 'candlestick', label: 'Price', data: priceData }] } as any,
+      data: { labels, datasets: [{ type: 'candlestick', label: 'Price', data: priceData }] } as any,
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -393,20 +427,32 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         plugins: {
           legend: { display: false }, // TradingView hides the legend; 10.2 adds rows
           tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: priceTooltipCallbacks },
-          zoom: zoomOptions(fullExtent),
+          zoom: zoomOptions({ min: fullMin, max: fullMax }),
           crosshair: true, // enables the crosshair plugin (3.3)
         },
         scales: {
-          x: xScale,
-          y: { type: 'linear', position: 'left' as const },
+          x: { ...xScale, display: false }, // dates below the volume pane
+          y: { type: 'linear', position: 'right' as const },
         },
       } as any,
     });
 
     // VOLUME pane: bars on their own scale — starts at 0, never overlaps price.
+    // 4.3 volume coloring: up days green, down days red (close vs open).
+    const upColor = '#26a69a';
+    const downColor = '#ef5350';
     this.volumeChart = new Chart(volEl, {
       type: 'bar',
-      data: { datasets: [{ label: 'Volume', data: volumeData, backgroundColor: 'rgba(75, 192, 192, 0.5)', borderColor: 'rgba(75, 192, 192, 1)' }] },
+      data: { labels, datasets: [{
+        label: 'Volume',
+        data: volumeData,
+        backgroundColor: (ctx: any) => {
+          const idx = ctx.dataIndex;
+          const bar = chartBars[idx];
+          if (!bar) return upColor;
+          return bar.close >= bar.open ? upColor : downColor;
+        },
+      }] } as any,
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -414,11 +460,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         plugins: {
           legend: { display: false },
           tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: volumeTooltipCallbacks },
-          zoom: zoomOptions(fullExtent),
+          zoom: zoomOptions({ min: fullMin, max: fullMax }),
           crosshair: true, // enables the crosshair plugin (3.3)
         },
         scales: {
-          x: { ...xScale, display: false }, // single x-axis labels on the price pane
+          x: { ...xScale, display: true }, // 4.3 layout: dates BELOW the volume pane
           y: { type: 'linear', position: 'right' as const, beginAtZero: true, grid: { drawOnChartArea: false } },
         },
       } as any,
