@@ -110,8 +110,11 @@ describe('ChartDataService (Stooq test-data pipeline)', () => {
       expect(await promise).toEqual([]);
     });
 
-    it('sorts ASCENDING (oldest first — Chart.js financial requirement) and limit takes the newest N', async () => {
-      const promise = requestMsft(3);
+    it('returns ALL bars (no chop): the range preset frames the VIEW, not the data (4.3 pan fix)', async () => {
+      // 5 rows + limit 100 → all 5 returned (pan needs bars outside the preset
+      // in memory — Kevin: "when you pan the chart, the bars before don't load").
+      // The range preset only positions the viewport (TradingView model).
+      const promise = requestMsft(100);
       flushMsft(stooq([
         'MSFT.US,D,20240103,000000,3,3,3,3,30,0',
         'MSFT.US,D,20240101,000000,1,1,1,1,10,0',
@@ -120,14 +123,8 @@ describe('ChartDataService (Stooq test-data pipeline)', () => {
         'MSFT.US,D,20240102,000000,2,2,2,2,20,0',
       ]));
       const rows = await promise;
-      // 5 rows, limit 3 → the NEWEST 3, in ASCENDING order:
-      // Jan 3, Jan 10, Jan 15 (Jan 1 + Jan 2 dropped by the limit, not the sort).
-      expect(rows.map(r => r.timestamp)).toEqual([
-        Date.UTC(2024, 0, 3),
-        Date.UTC(2024, 0, 10),
-        Date.UTC(2024, 0, 15),
-      ]);
-      // strictly ascending (Chart.js financial drops points from DESC arrays)
+      expect(rows.length).toBe(5); // ALL bars — no client-side chop
+      // still ascending
       for (let i = 1; i < rows.length; i++) {
         expect(rows[i].timestamp).toBeGreaterThan(rows[i - 1].timestamp);
       }
