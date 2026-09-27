@@ -50,6 +50,17 @@ const crosshairPlugin = {
   },
 };
 
+/** Compact volume formatting (Kevin): 1,000,000 → 1M, 100,000 → 100K,
+ *  1,000,000,000 → 1B, 1,500 → 1.5K, 1,000 → 1K (no trailing .0). */
+function compactVolume(v: number): string {
+  const abs = Math.abs(v);
+  const trim = (s: string) => s.replace(/\.0$/, '');
+  if (abs >= 1e9) return trim((v / 1e9).toFixed(1)) + 'B';
+  if (abs >= 1e6) return trim((v / 1e6).toFixed(1)) + 'M';
+  if (abs >= 1e3) return trim((v / 1e3).toFixed(1)) + 'K';
+  return String(v);
+}
+
 /** Tooltip label callbacks (3.3): O/H/L/C for the price pane, Vol for the volume
  *  pane — TradingView-style readouts. */
 const priceTooltipCallbacks = {
@@ -72,7 +83,7 @@ const priceTooltipCallbacks = {
 const volumeTooltipCallbacks = {
   label(item: any): string {
     const v = item?.raw?.y;
-    return `Vol ${typeof v === 'number' ? v.toLocaleString('en-US') : String(v ?? '-')}`;
+    return `Vol ${typeof v === 'number' ? compactVolume(v) : String(v ?? '-')}`;
   },
 };
 
@@ -388,8 +399,18 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
     // VIEW extent = the preset window as INDEX range (the slice's bounds, ±1
     // bar pad) — the view zooms to frame the preset; pan/zoom reveals the rest.
-    const sliceStart = chartBars.indexOf(rangeSlice[0]);
-    const sliceEnd = chartBars.indexOf(rangeSlice[rangeSlice.length - 1]);
+    // MATCH BY TIMESTAMP (not object reference): the weekly path re-aggregates
+    // into NEW bar objects, so indexOf fails (-1) and the view collapses to
+    // min=0/max=-2 (measured live: weekly 6M showed nothing). Timestamps are
+    // unique per bar in both paths.
+    const sliceStartTs = rangeSlice[0].timestamp;
+    const sliceEndTs = rangeSlice[rangeSlice.length - 1].timestamp;
+    let sliceStart = chartBars.findIndex((b) => b.timestamp >= sliceStartTs);
+    if (sliceStart < 0) sliceStart = 0;
+    let sliceEnd = sliceStart;
+    for (let i = sliceStart; i < chartBars.length; i++) {
+      if (chartBars[i].timestamp <= sliceEndTs) sliceEnd = i; else break;
+    }
     const viewMin = Math.max(0, sliceStart - 1);
     const viewMax = Math.min(chartBars.length - 1, sliceEnd + 1);
     const fullMin = 0;
@@ -490,7 +511,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         },
         scales: {
           x: { ...xScale, display: true }, // 4.3 layout: dates BELOW the volume pane
-          y: { type: 'linear', position: 'right' as const, beginAtZero: true, grid: { drawOnChartArea: false }, afterFit: fixedAxisAfterFit },
+          y: { type: 'linear', position: 'right' as const, beginAtZero: true, grid: { drawOnChartArea: false }, afterFit: fixedAxisAfterFit,
+               ticks: { callback: (v: any) => compactVolume(Number(v)) } },
         },
       } as any,
     });

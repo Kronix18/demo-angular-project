@@ -296,7 +296,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const volChart: any = Chart.getChart(volCanvas);
     const volCb = volChart.options.plugins?.tooltip?.callbacks?.label;
     expect(volCb, 'volume tooltip label callback').toBeTruthy();
-    expect(volCb({ dataset: volChart.data.datasets[0], dataIndex: 0, raw: volChart.data.datasets[0].data[0] } as any)).toContain('1,000');
+    expect(volCb({ dataset: volChart.data.datasets[0], dataIndex: 0, raw: volChart.data.datasets[0].data[0] } as any)).toContain('1K');
   });
 
   it('LINEAR INDEX AXIS: evenly-spaced bars, no weekend slots (4.3+fix)', async () => {
