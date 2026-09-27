@@ -80,6 +80,25 @@ const volumeTooltipCallbacks = {
 // The `crosshair: true` option key on each chart enables it per chart.
 Chart.register(crosshairPlugin);
 
+// Y-axis width alignment (Kevin: "volume sticks out further left than the
+// price"): the panes' y-axes have different label widths (price "520" vs
+// volume "200,000,000") → different plot-area widths → bars/candles at the
+// same index sit at different x pixels.
+const FIXED_AXIS_WIDTH = 90;
+const alignWidthsPlugin = {
+  id: 'alignWidths',
+  // FIXED y-axis width (TradingView does the same): the scale-level afterFit
+  // recipe — the only hook that reliably sticks (post-fit assignments and
+  // sibling-update loops from plugin hooks broke the chart into the -32768
+  // sentinel state — measured live). Both panes get a deterministic 90px
+  // y-axis so the plot areas align horizontally.
+  afterFit(chart: Chart): void {
+    const inst = chart as any;
+    if (inst.scales?.y) inst.scales.y.width = FIXED_AXIS_WIDTH;
+  },
+};
+Chart.register(alignWidthsPlugin);
+
 /**
  * Multi-pane chart viewer (3.1 REVISED per Kevin / Ruling 7): TradingView-style
  * TRUE panes — price candles in their own pane (~75% height) and volume bars in
@@ -418,6 +437,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     // PRICE pane: candlestick only (volume lives in its own pane now).
     // 4.3 layout: price y-axis on the RIGHT (aligned with volume y); NO x labels
     // (the dates render below the VOLUME pane).
+    // FIXED y-axis width (Kevin: "volume sticks out further left"): both panes'
+    // y-axes forced to the same width so the plot areas align horizontally.
+    // The SCALE-level afterFit is the recipe that reliably sticks (post-fit
+    // assignments + sibling-update plugin hooks broke the chart — measured).
+    const fixedAxisAfterFit = (scale: any) => { scale.width = FIXED_AXIS_WIDTH; };
     this.priceChart = new Chart(priceEl, {
       type: 'candlestick',
       data: { datasets: [{ type: 'candlestick', label: 'Price', data: priceData }] } as any,
@@ -433,7 +457,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         },
         scales: {
           x: { ...xScale, display: false }, // dates below the volume pane
-          y: { type: 'linear', position: 'right' as const },
+          y: { type: 'linear', position: 'right' as const, afterFit: fixedAxisAfterFit },
         },
       } as any,
     });
@@ -466,7 +490,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         },
         scales: {
           x: { ...xScale, display: true }, // 4.3 layout: dates BELOW the volume pane
-          y: { type: 'linear', position: 'right' as const, beginAtZero: true, grid: { drawOnChartArea: false } },
+          y: { type: 'linear', position: 'right' as const, beginAtZero: true, grid: { drawOnChartArea: false }, afterFit: fixedAxisAfterFit },
         },
       } as any,
     });
