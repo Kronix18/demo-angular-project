@@ -442,7 +442,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       max: viewMax,
       ticks: {
         maxRotation: 0, autoSkip: true, maxTicksLimit: 10,
-        callback: (_value: any, index: number) => dateForIndex(index),
+        // The callback's SECOND arg is the TICK index (0..9 with maxTicksLimit),
+        // NOT the bar index — mapping it directly showed 1986 dates under 2026
+        // candles (measured live). The FIRST arg is the VALUE = the bar index
+        // on this linear scale — use it for the date lookup.
+        callback: (value: any) => dateForIndex(value),
       },
     };
 
