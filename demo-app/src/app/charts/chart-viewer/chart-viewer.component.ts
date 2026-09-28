@@ -18,21 +18,40 @@ import 'chartjs-chart-financial';
 
 /**
  * 3.3 Crosshair plugin (module-level const): draws a 1px vertical line at the
- * active tooltip's x-position on the pane being drawn — the TradingView
- * crosshair behavior (port of the Python viewer's crosshair.py UX contract).
- * Color read from the CSS custom property at runtime (token compliance; the
- * fallback hardcode is a fallback only).
+ * active tooltip's x-position — the TradingView crosshair behavior (port of the
+ * Python viewer's crosshair.py UX contract).
+ * CROSS-PANE (Kevin: "dashed line going through both, on whichever you hover"):
+ * the hovered pane's tooltip drives a SHARED hover-index (window.__charts.hoverX);
+ * BOTH charts draw the line at that index — one continuous line through price
+ * AND volume panes. Color read from the CSS custom property at runtime.
  */
 const crosshairPlugin = {
   id: 'crosshair',
+  // capture the hover x on EVERY pane (the shared line is driven by whichever
+  // pane is hovered); cleared on mouse-out
+  beforeEvent(chart: Chart, event: any): void {
+    if (!(window as any).__charts) (window as any).__charts = {};
+    if (event?.event?.type === 'mousemove') {
+      const x = event.event.x;
+      if (typeof x === 'number' && isFinite(x)) {
+        (window as any).__charts.hoverX = x;
+      }
+    } else if (event?.event?.type === 'mouseout') {
+      (window as any).__charts.hoverX = null;
+    }
+  },
   afterDatasetsDraw(chart: Chart): void {
-    const active = chart.tooltip?.getActiveElements?.() ?? [];
-    if (!active.length) return;
-    const x = active[0].element?.x;
+    // shared hover index (set by whichever pane the user is hovering); fall
+    // back to this chart's own tooltip active elements
+    const shared = (window as any).__charts?.hoverX;
+    let x = shared;
+    if (x == null) {
+      const active = chart.tooltip?.getActiveElements?.() ?? [];
+      x = active.length ? active[0].element?.x : null;
+    }
     if (typeof x !== 'number' || !isFinite(x)) return;
-    const { ctx, chartArea, scales } = chart;
+    const { ctx, chartArea } = chart;
     if (!ctx || !chartArea) return;
-    // crosshair color from CSS var (fallback included)
     let color = '#758696';
     try {
       const v = getComputedStyle(chart.canvas).getPropertyValue('--c-crosshair').trim();
@@ -183,7 +202,8 @@ Chart.register(alignWidthsPlugin);
         flex: 1 1 0;
         height: 21vh;
         min-height: 90px;
-        border-top: 1px solid var(--c-border, #d1d5db);
+        /* no visible separation: the dashed crosshair runs continuously through
+           both panes (Kevin) — no border divider */
       }
       canvas {
         width: 100% !important;
