@@ -1109,6 +1109,76 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('chart settings, context menu, keyboard navigation (11.11)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); localStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const key = (k: string, init: KeyboardEventInit = {}) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, ...init }));
+
+    it('the gear opens chart settings; grid, crosshair, last price line and OHLC status line can be switched off', async () => {
+      const st = fresh();
+      await loaded();
+      expect(q('[data-ohlc]')).toBeTruthy();
+      (q('[data-chart-settings]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-chart-settings-dialog')).toBeTruthy();
+      for (const k of ['gridV', 'gridH', 'crosshair', 'lastPrice', 'ohlc']) (q(`[data-view="${k}"]`) as HTMLInputElement).click();
+      (q('[data-ok]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().view).toEqual({ gridH: false, gridV: false, crosshair: false, lastPrice: false, ohlc: false });
+      const c = chartOf();
+      expect(c.options.scales.x.grid.display).toBe(false);
+      expect(c.options.scales.y.grid.display).toBe(false);
+      expect(c.$crosshairOn).toBe(false);
+      expect(c.$lastPriceOn).toBe(false);
+      expect(q('[data-ohlc]')).toBeNull();
+      expect(q('app-chart-settings-dialog')).toBeNull();
+    });
+
+    it('right-click opens a context menu: reset view, horizontal line at the price, settings, remove drawings', async () => {
+      fresh();
+      await loaded();
+      const canvas = component.chartCanvas!.nativeElement;
+      canvas.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 120 }));
+      fixture.detectChanges();
+      expect(q('[data-ctx-menu]')).toBeTruthy();
+      for (const k of ['reset', 'hline', 'settings', 'clear']) expect(q(`[data-ctx="${k}"]`), k).toBeTruthy();
+      (q('[data-ctx="settings"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('[data-ctx-menu]')).toBeNull();
+      expect(q('app-chart-settings-dialog')).toBeTruthy();
+    });
+
+    it('the context menu closes on Escape and on a click elsewhere', async () => {
+      fresh();
+      await loaded();
+      const canvas = component.chartCanvas!.nativeElement;
+      canvas.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 120 }));
+      fixture.detectChanges();
+      key('Escape');
+      fixture.detectChanges();
+      expect(q('[data-ctx-menu]')).toBeNull();
+    });
+
+    it('arrow keys pan, + and - zoom, End jumps to the latest bar', async () => {
+      fresh();
+      await loaded();
+      const c = chartOf();
+      const pan = vi.spyOn(c, 'pan');
+      const zoom = vi.spyOn(c, 'zoom');
+      key('ArrowLeft');
+      key('ArrowRight');
+      expect(pan.mock.calls.map((a) => Math.sign((a[0] as any).x))).toEqual([1, -1]);
+      key('+');
+      key('-');
+      expect(zoom.mock.calls.map((a) => (a[0] as any).x)).toEqual([1.25, 0.8]);
+      const scrollTo = vi.spyOn(component, 'scrollToLatest');
+      key('End');
+      expect(scrollTo).toHaveBeenCalled();
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>
