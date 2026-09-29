@@ -428,6 +428,138 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('chart types + tools (10.5)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+
+    it('chart type switcher re-renders the price series: candles → ohlc → line → area', async () => {
+      const st = fresh();
+      await loaded();
+      expect(chartOf().data.datasets[0].type).toBe('candlestick');
+      st.setChartType('ohlc');
+      await fixture.whenStable();
+      expect(chartOf().data.datasets[0].type).toBe('ohlc');
+      expect(chartOf().data.datasets[0].data[0]).toMatchObject({ o: 100, h: 110, l: 95, c: 105 });
+      st.setChartType('line');
+      await fixture.whenStable();
+      let ds = chartOf().data.datasets[0];
+      expect(ds.type).toBe('line');
+      expect(ds.data.map((p: any) => p.y)).toEqual([105, 112, 118]); // closes
+      expect(ds.fill).toBeFalsy();
+      st.setChartType('area');
+      await fixture.whenStable();
+      ds = chartOf().data.datasets[0];
+      expect(ds.type).toBe('line');
+      expect(ds.fill).toBeTruthy();
+      // volume + panes untouched by the type
+      expect(chartOf().data.datasets.some((d: any) => d.label === 'Volume')).toBe(true);
+    });
+
+    it('the type select writes the state; y-axis still fits the line/ohlc data', async () => {
+      const st = fresh();
+      await loaded();
+      const sel = q('select[name="chartType"]') as HTMLSelectElement;
+      expect(Array.from(sel.options).map((o) => o.value)).toEqual(['candles', 'ohlc', 'line', 'area']);
+      sel.value = 'line';
+      sel.dispatchEvent(new Event('change'));
+      expect(st.snapshot().chartType).toBe('line');
+      await fixture.whenStable();
+      const y = chartOf().scales.y;
+      expect(y.min).toBeLessThanOrEqual(105);
+      expect(y.max).toBeGreaterThanOrEqual(118);
+    });
+
+    it('switching type keeps the current pan/zoom view', async () => {
+      const st = fresh();
+      await loaded();
+      chartOf().zoomScale('x', { min: 1, max: 2 });
+      st.setChartType('line');
+      await fixture.whenStable();
+      expect(chartOf().options.scales.x.min).toBe(1);
+    });
+
+    it('tooltip handles ohlc and line price series', async () => {
+      fresh();
+      await loaded();
+      const label = chartOf().options.plugins.tooltip.callbacks.label;
+      expect(label({ dataset: { type: 'ohlc' }, raw: { o: 1, h: 2, l: 0.5, c: 1.5 } })).toBe('O 1.00  H 2.00  L 0.50  C 1.50');
+      expect(label({ dataset: { type: 'line', label: 'Price' }, raw: { y: 3.333 } })).toBe('Price 3.33');
+    });
+
+    it('screenshot button downloads the chart as SYMBOL-interval.png', async () => {
+      fresh();
+      const chart = await loaded();
+      vi.spyOn(chart, 'toBase64Image').mockReturnValue('data:image/png;base64,AAAA');
+      const clicked: { download: string; href: string }[] = [];
+      const orig = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) { clicked.push({ download: this.download, href: this.href }); };
+      (q('[data-screenshot]') as HTMLButtonElement).click();
+      HTMLAnchorElement.prototype.click = orig;
+      expect(clicked).toEqual([{ download: 'msft-1d.png', href: 'data:image/png;base64,AAAA' }]);
+    });
+
+    it('fullscreen button toggles document fullscreen', async () => {
+      fresh();
+      await loaded();
+      const enter = vi.fn().mockResolvedValue(undefined);
+      const exit = vi.fn().mockResolvedValue(undefined);
+      (document.documentElement as any).requestFullscreen = enter;
+      (document as any).exitFullscreen = exit;
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+      (q('[data-fullscreen]') as HTMLButtonElement).click();
+      expect(enter).toHaveBeenCalled();
+      Object.defineProperty(document, 'fullscreenElement', { value: document.documentElement, configurable: true });
+      (q('[data-fullscreen]') as HTMLButtonElement).click();
+      expect(exit).toHaveBeenCalled();
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+    });
+
+    it('double-click on the chart resets the zoom', async () => {
+      fresh();
+      const chart = await loaded();
+      const spy = vi.spyOn(chart, 'resetZoom');
+      component.chartCanvas!.nativeElement.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('magnet button toggles the state and the crosshair mode', async () => {
+      const st = fresh();
+      const chart = await loaded();
+      const btn = q('[data-magnet]') as HTMLButtonElement;
+      expect(btn.getAttribute('aria-pressed')).toBe('false');
+      btn.click();
+      fixture.detectChanges();
+      expect(st.snapshot().magnet).toBe(true);
+      await fixture.whenStable();
+      expect(chartOf().$magnet).toBe(true);
+      expect(chart).toBeTruthy();
+    });
+
+    it('crosshair: horizontal line follows the mouse; magnet snaps it to the hovered close; price label on the axis', () => {
+      const p = Chart.registry.getPlugin('crosshair') as any;
+      const calls: [string, unknown[]][] = [];
+      const ctx = new Proxy({}, { get: (_t, prop) => (...a: unknown[]) => { calls.push([String(prop), a]); }, set: () => true });
+      const yScale = { top: 0, bottom: 100, getValueForPixel: (y: number) => 200 - y, getPixelForValue: (v: number) => 200 - v, right: 100, left: 90 };
+      const mk = (magnet: boolean): any => ({
+        ctx, chartArea: { left: 0, right: 90, top: 0, bottom: 100 }, $magnet: magnet,
+        tooltip: { getActiveElements: () => [{ index: 0, element: { x: 30 } }] },
+        data: { datasets: [{ data: [{ c: 150, y: 150 }] }] },
+        scales: { y: yScale },
+      });
+      const normal = mk(false); normal.$crosshairX = 30; normal.$crosshairY = 40;
+      p.afterDatasetsDraw(normal);
+      const lineYs = calls.filter(([k]) => k === 'lineTo').map(([, a]) => a as number[]);
+      expect(lineYs.some(([x, y]) => x === 90 && y === 40)).toBe(true); // horizontal at the mouse y
+      expect(calls.some(([k, a]) => k === 'fillText' && a[0] === '160.00')).toBe(true); // 200 - 40
+      calls.length = 0;
+      const mag = mk(true); mag.$crosshairX = 30; mag.$crosshairY = 40;
+      p.afterDatasetsDraw(mag);
+      const magYs = calls.filter(([k]) => k === 'lineTo').map(([, a]) => a as number[]);
+      expect(magYs.some(([x, y]) => x === 90 && y === 50)).toBe(true); // snapped to close 150 -> pixel 50
+    });
+  });
+
   describe('legend rows (10.2)', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
 

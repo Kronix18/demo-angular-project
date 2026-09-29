@@ -107,4 +107,30 @@ describe('ChartStateService (task 4.1)', () => {
     svc.toggleHidden(0);
     expect(svc.addIndicator({ type: 'sma', period: 20 })).toBe(false);
   });
+
+  it('chart type + magnet (10.5): defaults, validation, persistence', () => {
+    const svc = new ChartStateService();
+    expect(svc.snapshot().chartType).toBe('candles');
+    expect(svc.snapshot().magnet).toBe(false);
+    svc.setChartType('line');
+    svc.toggleMagnet();
+    expect(svc.snapshot().chartType).toBe('line');
+    expect(svc.snapshot().magnet).toBe(true);
+    svc.setChartType('bogus' as any); // ignored
+    expect(svc.snapshot().chartType).toBe('line');
+    const again = new ChartStateService();
+    expect(again.snapshot().chartType).toBe('line');
+    expect(again.snapshot().magnet).toBe(true);
+    again.toggleMagnet();
+    expect(again.snapshot().magnet).toBe(false);
+    again.reset();
+    expect(again.snapshot().chartType).toBe('candles');
+  });
+
+  it('rehydration ignores a corrupt chart type / magnet value', () => {
+    sessionStorage.setItem('chart-state', JSON.stringify({ symbol: 'msft', interval: '1d', range: '6M', indicators: [], chartType: 'wat', magnet: 'yes' }));
+    const svc = new ChartStateService();
+    expect(svc.snapshot().chartType).toBe('candles');
+    expect(svc.snapshot().magnet).toBe(false);
+  });
 });
