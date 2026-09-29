@@ -38,7 +38,8 @@ export interface LegendGroup {
       <div class="group" [attr.data-legend-group]="g.key" [style.top.px]="g.top">
         @if (g.header; as h) {
           <div class="header" data-legend-header>
-            <span class="symbol">{{ h.symbol }} · {{ h.interval }}</span>
+            <button type="button" class="symbol symbol-btn" data-symbol-btn aria-label="Search symbol" title="Search symbol (or just start typing)"
+              (click)="symbolClick.emit()">{{ h.symbol }} · {{ h.interval }}</button>
             @if (h.ohlc; as b) {
               <span class="ohlc" data-ohlc [class.up]="b.up" [class.down]="!b.up">
                 <span>O <b>{{ b.o }}</b></span>
@@ -81,6 +82,8 @@ export interface LegendGroup {
       .group { position: absolute; left: 8px; padding-top: 4px; display: flex; flex-direction: column; gap: 1px; }
       .header, .row { display: flex; align-items: center; gap: 0.5rem; color: var(--c-text-muted); white-space: nowrap; }
       .symbol { color: var(--c-text); font-weight: 600; }
+      .symbol-btn { padding: 0; border: none; background: transparent; font: inherit; font-weight: 600; cursor: pointer; pointer-events: auto; }
+      .symbol-btn:hover { color: var(--c-primary); }
       .ohlc { display: inline-flex; gap: 0.5rem; }
       .ohlc b { font-weight: 500; }
       .ohlc.up { color: var(--c-up); }
@@ -106,4 +109,5 @@ export class ChartLegendComponent {
   readonly toggle = output<number>();
   readonly remove = output<number>();
   readonly settings = output<number>();
+  readonly symbolClick = output<void>();
 }

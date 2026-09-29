@@ -272,4 +272,37 @@ test.describe('chart panel (2.x–5.x)', () => {
     await expect(page.locator('select[name="chartType"]')).toHaveValue('pnf');
     expect(errors).toEqual([]);
   });
+
+  test('type-to-search (11.3): typing anywhere opens symbol search; filter, pick, unknown symbol, Esc', async ({ page }) => {
+    const errors = collectErrors(page, /Failed to load|404/);
+    await openChart(page, 'msft');
+    // start typing with focus on the page (not in a field)
+    await page.keyboard.press('n');
+    const box = page.locator('input[type="search"]');
+    await expect(box).toBeVisible();
+    await expect(box).toHaveValue('n');
+    await expect(page.locator('[data-symbol-option]')).toHaveText([/NVDA/]);
+    // keep typing in the box, arrow/Enter picks
+    await page.keyboard.type('v');
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/charts\/nvda$/);
+    await expect(page.locator('app-symbol-search-dialog')).toHaveCount(0);
+    await page.waitForFunction(() => (window as any).__charts?.chart?.options.scales.y.paneLabel.startsWith('NVDA'));
+    // header symbol button opens it empty; Esc closes without switching
+    await page.click('[data-symbol-btn]');
+    await expect(page.locator('[data-symbol-option]')).toHaveCount(8);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('app-symbol-search-dialog')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/charts\/nvda$/);
+    // an unknown symbol can be entered: the chart shows the unknown-symbol card
+    await page.keyboard.press('a');
+    await page.keyboard.type('apl');
+    await expect(page.locator('[data-go]')).toContainText('AAPL');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.error-card')).toContainText('AAPL');
+    // typing in a normal field never opens the dialog
+    await page.fill('#symbol', 'q');
+    await expect(page.locator('app-symbol-search-dialog')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 });

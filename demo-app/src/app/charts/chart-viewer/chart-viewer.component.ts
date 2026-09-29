@@ -10,6 +10,7 @@ import { filterByRange, aggregateWeeklyWFri } from '../../core/services/data-agg
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
+import { SymbolSearchDialogComponent } from '../dialogs/symbol-search-dialog.component';
 import { IndicatorsDialogComponent } from '../dialogs/indicators-dialog.component';
 import { IndicatorSettingsDialogComponent } from '../dialogs/indicator-settings-dialog.component';
 import { ChartLegendComponent, LegendGroup, LegendRow } from '../chart-legend/chart-legend.component';
@@ -288,7 +289,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -314,6 +315,9 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       @if (indicatorsOpen()) {
         <app-indicators-dialog (add)="addIndicatorType($event)" (closed)="indicatorsOpen.set(false)" />
       }
+      @if (searchOpen()) {
+        <app-symbol-search-dialog [initial]="searchInitial()" [current]="currentSymbol" (pick)="pickFromSearch($event)" (closed)="searchOpen.set(false)" />
+      }
       @if (settingsFor(); as sf) {
         <app-indicator-settings-dialog [entry]="sf.entry" (save)="saveSettings(sf.index, $event)" (closed)="settingsIndex.set(null)" />
       }
@@ -330,7 +334,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             title="Delete all drawings on this symbol" (click)="clearDrawings()">⌫</button>
         </div>
         @if (!error) {
-          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" />
+          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" />
         }
         @if (loading) {
           <div class="loading-overlay skeleton" role="status" aria-live="polite">
@@ -517,6 +521,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private allData: OHLCV[] = [];
   /** Bars the chart indexes into (weekly-aggregated when interval = 1w). */
   private bars: OHLCV[] = [];
+  // ---- symbol search (type anywhere) ------------------------------------------------
+  readonly searchOpen = signal(false);
+  readonly searchInitial = signal('');
+  openSearch(initial: string): void { this.searchInitial.set(initial); this.searchOpen.set(true); }
+  pickFromSearch(symbol: string): void {
+    this.searchOpen.set(false);
+    this.chartState.setSymbol(symbol);
+  }
+
   // ---- indicator dialogs -----------------------------------------------------------
   readonly indicatorsOpen = signal(false);
   readonly settingsIndex = signal<number | null>(null);
@@ -574,7 +587,14 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   @HostListener('document:keydown', ['$event'])
   onKey(e: KeyboardEvent): void {
     const t = e.target as HTMLElement | null;
-    if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    if (t && (/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.isContentEditable)) return;
+    // TradingView: start typing anywhere on the chart -> symbol search opens with that character
+    const dialogOpen = this.searchOpen() || this.indicatorsOpen() || this.settingsIndex() !== null;
+    if (!dialogOpen && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
+      e.preventDefault();
+      this.openSearch(e.key);
+      return;
+    }
     this.drawings.key(e.key);
   }
 

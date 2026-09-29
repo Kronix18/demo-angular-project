@@ -15,7 +15,7 @@ Requests (with reference screenshots of TradingView):
 |---|------|--------|
 | 11.1 | OHLCV header, indicator rows, Indicators picker dialog, indicator settings (inputs/style/visibility) | DONE |
 | 11.2 | All chart types | DONE (except volume candles / volume footprint / TPO — need intraday or per-bar widths) |
-| 11.3 | Type-to-search symbol dialog | NOT STARTED |
+| 11.3 | Type-to-search symbol dialog | DONE |
 | 11.4 | Auto-scale toggle, vertical pan, log price + volume | NOT STARTED |
 | 11.5 | Drawing sidebar + tools | NOT STARTED |
 
@@ -33,3 +33,9 @@ Requests (with reference screenshots of TradingView):
 - **Bug fixed while here**: the candlestick colours were being set with the wrong option names (`color`/`borderColor` instead of the plugin's `backgroundColors`/`borderColors`), so candles rendered in the plugin's hardcoded colours and the theme tokens never applied — the old test passed because it asserted the wrong key. Candles now use `--c-up/--c-down` (solid), and the e2e checks the real option.
 - View handling: switching between index-aligned styles keeps your pan/zoom; switching to/from a brick style re-frames (bar indexes differ).
 - Tests: `bar-transforms.spec` (19), viewer "EVERY chart style renders" + hlc area + view handling + long-history brick styles, e2e "all 18 styles render real pixels + persist". Not done: Volume candles / footprint / TPO / session volume (need per-bar widths from volume or intraday data), Range/Renko box-size settings UI (fixed to ATR).
+
+## 11.3 results — type-to-search
+- Pressing any letter/digit while nothing is focused opens `SymbolSearchDialogComponent` with that character already in the box (caret after it); ignored in inputs/selects/contenteditable, with Ctrl/Meta/Alt, for navigation keys, and while another dialog is open. Clicking the symbol in the legend header opens it empty.
+- Live filter over the demo symbols (exact > prefix > contains, case-insensitive; `MSFT.US` style input is cleaned), ↑/↓ with wrap, Enter picks the highlighted (or the first match), click picks, Esc closes. An unknown query offers **Go to AAPL**, which opens the chart's unknown-symbol card. Enter on an empty box does nothing.
+- Picking calls the existing state path (`setSymbol` → URL sync, refetch); the toolbar input + datalist still work for mouse users.
+- Tests: dialog spec (7), legend (+1), viewer type-to-search (5), e2e "type-to-search".
