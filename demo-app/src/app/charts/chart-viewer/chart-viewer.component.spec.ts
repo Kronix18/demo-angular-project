@@ -692,10 +692,8 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       const { DrawingStore } = await import('../drawings/drawing-store.service');
       store = TestBed.inject(DrawingStore);
     });
-    async function ready() {
-      fresh();
-      await loaded();
-      const c = chartOf();
+    // chart.update() (e.g. from setTool -> syncPan) rebuilds the layout: re-apply the fake geometry
+    const mock = (c: any) => {
       c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
       c.scales.y.top = 0; c.scales.y.bottom = 300; c.scales.y.height = 300;
       // fake pixel mapping: x = index * 10, y = 300 - price (so prices 0..300 fit the pane)
@@ -703,6 +701,15 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       c.scales.x.getValueForPixel = (px: number) => px / 10;
       c.scales.y.getPixelForValue = (v: number) => 300 - v;
       c.scales.y.getValueForPixel = (px: number) => 300 - px;
+    };
+    const use = (t: string) => { component.setTool(t as any); mock(chartOf()); };
+    async function ready() {
+      fresh();
+      if (store.locked()) store.toggleLocked(); // the flags persist in localStorage across tests
+      store.setHidden(false);
+      await loaded();
+      const c = chartOf();
+      mock(c);
       return c;
     }
     const drawn = () => store.list('msft');
@@ -719,14 +726,14 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
     it('after finishing a drawing the tool returns to the cursor — unless "stay in drawing mode" is on', async () => {
       await ready();
-      component.setTool('hline');
+      use('hline');
       ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
       fixture.detectChanges();
       expect(component.tool()).toBe('cursor');
       (q('[data-keep]') as HTMLButtonElement).click();
       fixture.detectChanges();
       expect(q('[data-keep]')!.getAttribute('aria-pressed')).toBe('true');
-      component.setTool('hline');
+      use('hline');
       ctl().pointerDown(100, 120); ctl().pointerUp(100, 120);
       expect(component.tool()).toBe('hline');
       expect(drawn().length).toBe(2);
@@ -734,7 +741,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
     it('Escape leaves the drawing tool; lock / hide buttons toggle the store flags; picking a tool un-hides', async () => {
       await ready();
-      component.setTool('trend');
+      use('trend');
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       expect(component.tool()).toBe('cursor');
       (q('[data-lock]') as HTMLButtonElement).click();
@@ -751,7 +758,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     it('a selected drawing shows the style toolbar: colour, width, dash, delete', async () => {
       await ready();
       expect(q('[data-draw-style]')).toBeNull();
-      component.setTool('hline');
+      use('hline');
       ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
       fixture.detectChanges();
       expect(q('[data-draw-style]')).toBeTruthy();
@@ -770,7 +777,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
     it('text tool: click opens an inline editor; Enter saves the label, Esc / blank discards it', async () => {
       await ready();
-      component.setTool('text');
+      use('text');
       ctl().pointerDown(150, 100); ctl().pointerUp(150, 100);
       fixture.detectChanges();
       const input = q('[data-text-edit]') as HTMLInputElement;
@@ -781,7 +788,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       fixture.detectChanges();
       expect(drawn()[0].text).toBe('breakout');
       expect(q('[data-text-edit]')).toBeNull();
-      component.setTool('text');
+      use('text');
       ctl().pointerDown(250, 100); ctl().pointerUp(250, 100);
       fixture.detectChanges();
       (q('[data-text-edit]') as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -804,7 +811,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
     it('zoom tool: dragging a region zooms x to it and sets a manual price range (auto off), then returns to the cursor', async () => {
       const c = await ready();
-      component.setTool('zoom');
+      use('zoom');
       expect(c.data.datasets[0].data.length).toBeGreaterThan(0);
       component.zoomToRegion({ x0: 0, x1: 2, p0: 90, p1: 130 });
       fixture.detectChanges();
@@ -816,7 +823,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
     it('measure readout is transient and never persisted', async () => {
       await ready();
-      component.setTool('measure');
+      use('measure');
       ctl().pointerDown(100, 100); ctl().pointerMove(200, 60); ctl().pointerUp(200, 60);
       expect(ctl().view().measure).toBeTruthy();
       expect(() => chartOf().draw()).not.toThrow();

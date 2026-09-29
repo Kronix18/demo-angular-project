@@ -20,7 +20,7 @@ import { OutputSpec } from '../../core/indicators/indicator-definitions';
 import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
-import { DrawingController, Tool } from '../drawings/drawing-controller';
+import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
 import { DrawingStore } from '../drawings/drawing-store.service';
 import { Range, fitRangeLog, panRange, scaleRange } from '../y-scale-math';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
@@ -251,7 +251,6 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
               </optgroup>
             }
           </select>
-          <button type="button" class="tool-btn" data-magnet [attr.aria-pressed]="magnetOn" title="Magnet: snap the crosshair to the bar's close" (click)="toggleMagnet()">Magnet</button>
           <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
           <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
           <button type="button" class="reset-zoom-btn" (click)="resetZoom()">Reset zoom</button>
@@ -280,9 +279,34 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             <button type="button" class="draw-btn" [attr.data-tool]="t.id" [attr.aria-pressed]="tool() === t.id"
               [attr.aria-label]="t.title" [title]="t.title" (click)="setTool(t.id)">{{ t.icon }}</button>
           }
+          <span class="draw-sep" aria-hidden="true"></span>
+          <button type="button" class="draw-btn" data-magnet [attr.aria-pressed]="magnetOn" aria-label="Magnet: snap the crosshair and new drawings to the bar's OHLC"
+            title="Magnet: snap the crosshair and new drawings to the bar's OHLC" (click)="toggleMagnet()">🧲</button>
+          <button type="button" class="draw-btn" data-keep [attr.aria-pressed]="keepDrawing()" aria-label="Stay in drawing mode"
+            title="Stay in drawing mode after each drawing" (click)="keepDrawing.set(!keepDrawing())">⟳</button>
+          <button type="button" class="draw-btn" data-lock [attr.aria-pressed]="drawingStore.locked()" aria-label="Lock all drawings"
+            title="Lock all drawings (no selecting, moving or deleting)" (click)="drawingStore.toggleLocked()">🔒</button>
+          <button type="button" class="draw-btn" data-hide [attr.aria-pressed]="drawingStore.hidden()" aria-label="Hide all drawings"
+            title="Hide all drawings" (click)="drawingStore.toggleHidden(); redraw()">👁</button>
           <button type="button" class="draw-btn" data-tool-clear aria-label="Delete all drawings on this symbol"
             title="Delete all drawings on this symbol" (click)="clearDrawings()">⌫</button>
         </div>
+        @if (selectedDrawing(); as sd) {
+          <div class="draw-style" data-draw-style role="group" aria-label="Drawing style">
+            <input type="color" data-draw-color aria-label="Colour" [value]="styleColor(sd)" (input)="setDrawStyle(sd.id, { color: $any($event.target).value })" />
+            <select data-draw-width aria-label="Line width" (change)="setDrawStyle(sd.id, { width: +$any($event.target).value })">
+              @for (w of widths; track w) { <option [value]="w" [selected]="(sd.style?.width ?? 1) === w">{{ w }}px</option> }
+            </select>
+            <select data-draw-dash aria-label="Line style" (change)="setDrawStyle(sd.id, { dash: $any($event.target).value })">
+              @for (d of dashes; track d) { <option [value]="d" [selected]="(sd.style?.dash ?? 'solid') === d">{{ d }}</option> }
+            </select>
+            <button type="button" data-draw-delete aria-label="Delete drawing" title="Delete drawing" [disabled]="drawingStore.locked()" (click)="deleteSelected()">🗑</button>
+          </div>
+        }
+        @if (editingText(); as et) {
+          <input class="text-edit" data-text-edit aria-label="Label text" [style.left.px]="et.x" [style.top.px]="et.y" [value]="et.value"
+            (input)="et.value = $any($event.target).value" (keydown)="textKey($event, et)" (blur)="commitText(et)" />
+        }
         @if (!error) {
           <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" />
         }
@@ -420,6 +444,14 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         width: 28px; height: 28px; padding: 0; border: none; border-radius: var(--border-radius-sm);
         background: transparent; color: var(--c-text); cursor: pointer; font-size: 1rem; line-height: 1;
       }
+      .draw-sep { height: 1px; margin: 2px 4px; background: var(--c-border); }
+      .draw-style {
+        position: absolute; left: 50%; top: 4px; transform: translateX(-50%); z-index: 5; display: flex; gap: 4px; align-items: center;
+        padding: 3px 6px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius);
+      }
+      .draw-style input[type='color'] { width: 26px; height: 22px; padding: 0; border: none; background: none; cursor: pointer; }
+      .draw-style select, .draw-style button { font-size: 0.75rem; padding: 1px 4px; background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); }
+      .text-edit { position: absolute; z-index: 6; width: 160px; padding: 2px 4px; font-size: 0.8rem; background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-primary); border-radius: var(--border-radius-sm); }
       .draw-btn:hover { background: var(--c-primary-tint); color: var(--c-primary); }
       .draw-btn[aria-pressed='true'] { background: var(--c-primary); color: var(--c-on-primary); }
       .chart-tools { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
@@ -506,13 +538,34 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   saveSettings(index: number, patch: Partial<IndicatorEntry>): void { this.chartState.updateIndicator(index, patch); }
 
   // ---- drawings (10.3) ---------------------------------------------------------------
-  private drawingStore = inject(DrawingStore);
+  readonly drawingStore = inject(DrawingStore);
   readonly tool = signal<Tool>('cursor');
+  readonly keepDrawing = signal(false);
+  readonly selectedId = signal<string | null>(null);
+  readonly editingText = signal<{ id: string; x: number; y: number; value: string } | null>(null);
+  readonly widths = [1, 2, 3, 4];
+  readonly dashes = ['solid', 'dash', 'dot'];
+  readonly selectedDrawing = computed(() => {
+    this.drawingStore.revision();
+    const id = this.selectedId();
+    if (!id || this.drawingStore.hidden()) return null;
+    return this.drawingStore.list(this.currentSymbol).find((d) => d.id === id) ?? null;
+  });
   readonly drawTools: { id: Tool; icon: string; title: string }[] = [
     { id: 'cursor', icon: '↖', title: 'Cursor: select / move drawings, pan the chart' },
     { id: 'trend', icon: '⟋', title: 'Trend line: drag from point A to B' },
-    { id: 'ray', icon: '⟶', title: 'Horizontal ray: click a price level' },
+    { id: 'arrow', icon: '➚', title: 'Arrow: drag from point A to B' },
+    { id: 'ray', icon: '⟶', title: 'Ray: click a bar; extends to the right' },
+    { id: 'hline', icon: '―', title: 'Horizontal line: click a price level' },
+    { id: 'vline', icon: '¦', title: 'Vertical line: click a bar' },
     { id: 'channel', icon: '⫽', title: 'Parallel channel: drag the base line, then click the offset' },
+    { id: 'rect', icon: '▭', title: 'Rectangle: drag a corner to the opposite corner' },
+    { id: 'ellipse', icon: '◯', title: 'Ellipse: drag its bounding box' },
+    { id: 'fib', icon: 'Fib', title: 'Fib retracement: drag from the low to the high' },
+    { id: 'brush', icon: '✎', title: 'Brush: draw freehand' },
+    { id: 'text', icon: 'T', title: 'Text label: click, then type' },
+    { id: 'measure', icon: '⇔', title: 'Measure: drag to read price change, bars and time' },
+    { id: 'zoom', icon: '⌕', title: 'Zoom: drag a region to zoom into it' },
   ];
   private drawings = new DrawingController({
     chart: () => this.chart,
@@ -520,13 +573,63 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     store: this.drawingStore,
     symbol: () => this.currentSymbol,
     tool: () => this.tool(),
-    changed: () => this.chart?.draw(),
+    changed: () => { this.selectedId.set(this.drawings.view().selectedId); this.chart?.draw(); },
+    magnet: () => this.magnetOn,
+    zoomTo: (r) => this.zoomToRegion(r),
+    editText: (id) => this.openTextEditor(id),
+    committed: () => { if (!this.keepDrawing()) { this.tool.set('cursor'); this.drawings.syncPan(); } },
   });
 
   setTool(t: Tool): void {
     this.tool.set(t);
     this.drawings.cancel();
+    this.selectedId.set(null);
+    this.editingText.set(null);
+    if (t !== 'cursor' && this.drawingStore.hidden()) this.drawingStore.setHidden(false);
     this.drawings.syncPan();
+    this.chart?.draw();
+  }
+
+  redraw(): void { this.chart?.draw(); }
+  styleColor(d: { style?: { color?: string } }): string {
+    const c = resolveColor(d.style?.color ?? 'var(--c-primary)');
+    return /^#[0-9a-f]{6}$/i.test(c) ? c : cssVar('--c-text');
+  }
+  setDrawStyle(id: string, patch: { color?: string; width?: number; dash?: string }): void {
+    this.drawings.setStyle(id, patch as any);
+  }
+  deleteSelected(): void { this.drawings.key('Delete'); }
+
+  private openTextEditor(id: string): void {
+    const d = this.drawingStore.list(this.currentSymbol).find((x) => x.id === id);
+    const p = d && this.drawings.pixel(d.a);
+    if (!d || !p) return;
+    this.editingText.set({ id, x: p.x, y: p.y - 10, value: d.text ?? '' });
+    setTimeout(() => this.chartCanvas?.nativeElement.parentElement?.querySelector<HTMLInputElement>('[data-text-edit]')?.focus());
+  }
+  textKey(e: KeyboardEvent, et: { id: string; value: string }): void {
+    e.stopPropagation();
+    if (e.key === 'Enter') this.commitText(et);
+    else if (e.key === 'Escape') { this.editingText.set(null); this.drawings.setText(et.id, this.textOf(et.id)); }
+  }
+  commitText(et: { id: string; value: string }): void {
+    if (this.editingText()?.id !== et.id) return;
+    this.editingText.set(null);
+    this.drawings.setText(et.id, et.value);
+  }
+  private textOf(id: string): string { return this.drawingStore.list(this.currentSymbol).find((d) => d.id === id)?.text ?? ''; }
+
+  /** Zoom tool: x to the region's bars, y to its price range (manual scale, auto off). */
+  zoomToRegion(r: ZoomRegion): void {
+    this.tool.set('cursor');
+    this.drawings.syncPan();
+    const c = this.chart as any;
+    if (!c) return;
+    const pad = Math.max(1, (r.x1 - r.x0) * 0.02);
+    try { c.zoomScale?.('x', { min: r.x0 - pad, max: r.x1 + pad }, 'none'); } catch { /* keep going */ }
+    this.manualY = { min: r.p0, max: r.p1 };
+    this.autoScale.set(false);
+    c.update('none');
   }
 
   clearDrawings(): void {
@@ -554,6 +657,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       this.openSearch(e.key);
       return;
     }
+    if (e.key === 'Escape') { this.tool.set('cursor'); this.drawings.syncPan(); this.editingText.set(null); }
     this.drawings.key(e.key);
   }
 
@@ -634,6 +738,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   onDblClick(e: MouseEvent): void {
+    const tid = this.drawings.textAt(e.offsetX, e.offsetY);
+    if (tid) { this.openTextEditor(tid); return; }
     const c = this.chart as any;
     if (c?.chartArea && e.offsetX > c.chartArea.right) this.setAuto(); // double-click the price axis: back to auto
     else this.resetZoom();
