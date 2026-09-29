@@ -156,7 +156,7 @@ Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-
 
 **Owner answers (2026-09-29):**
 1. *No API is serving.* → The contract in `docs/api/` describes what the backend **should serve**; there is nothing to reconcile with (v1 spec and the front end's current calls are equally hypothetical). The backend is planned as Flask + SQLAlchemy + Pydantic (`TECHNICAL_ARCHITECTURE.md`); an OpenAPI export should replace `docs/api` as source of truth when it exists.
-2. *Index prices should exist* (NDX, SPX, …). → Contract assumes `index_prices` with `SPX`, `NDX`, `COMP` (+ optional `NYA`, `RUT`, `DJI`); RS line benchmark = S&P 500; market engine = S&P 500 + Nasdaq.
+2. *Index prices should exist.* → Owner supplied the Stooq index list (60 tickers). Codes follow Stooq (`NDQ` = Nasdaq Composite, not `COMP`). **The list has no S&P 500 (`^SPX`), Dow, Russell or NYSE**: `SPX` must be added (RS-line benchmark, market engine) or `SPY.US` used as proxy; catalogue and region mapping are in `docs/api/02-prices.md`.
 3. *Split-adjusted everything, probably the whole universe.* → Contract assumes `technical_daily`, RS and patterns are on split-adjusted prices (`meta.price_basis`); task 14.12 verifies by fixture and falls back per symbol if not.
 4. *Fundamentals are SEC tables.* → Confirmed and mapped in `04-fundamentals.md` (`sec_filing`, `fundamental_period/metric`, `fundamental_quarter_period/metric`, PIT resolver, growth semantics).
 5. *Ratings recomputed daily or at least on earnings ingestion.* → Contract reports `effective_dates` and `/ratings/dates`, so it works for daily and for event-driven recomputation.
@@ -169,8 +169,11 @@ Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-
 - *13F:* from SEC (`07` §1). *News:* undecided, "try to recreate TradingView news" → full design in `07` §2, source ranking, tasks 22.9–22.17, decision L9.
 - *Security-master columns (`is_active`, `country`, `cik`, eligibility flags):* "yes, otherwise they will be once integration is required" → the names in `01` are the contract.
 
+**Round 3 (2026-09-29):** index list = Stooq (above); extra security-master columns will be exposed when integration requires it; news provider and licence terms TBD.
+
 **Still open (small; none blocks front-end work):**
-- Exact names of the index table and codes; whether `market_calendar` will exist.
+- **`^SPX` (S&P 500) is missing from the supplied index list** — confirm it can be loaded (or the SPY proxy is used) and that index volume exists for `NDQ`/`SPX`.
+- Index table name (`index_master` / `index_prices` proposed); whether `market_calendar` will exist.
 - Whether `sec_filing` will gain period end and 8-K item numbers (needed for the earnings-8-K news category).
 - News: which provider(s) the backend picks (recommendation: SEC 8-K + Alpha Vantage) and the redistribution terms of the chosen plan.
 - Business Quant / Alpha Vantage / Yahoo plan terms for displaying derived data to paying users.

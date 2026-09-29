@@ -22,17 +22,19 @@ Phase-1 (DB only) fields have `rs`-dependent ones `null`.
 
 ## 2. Market state (M)
 
+Indices used: `SPX` (S&P 500; proxy `SPY` until it exists) and `NDQ` (Nasdaq Composite). Volume-based signals (distribution, follow-through, stalling) need index volume: **if an index has no volume the affected signals are `null` with `meta.notes`**, never guessed.
+
 ### `GET /api/market/state?as_of=`
 ```json
 { "as_of": "2026-09-22",
   "market_state": "confirmed_uptrend",
   "state_since": "2026-08-12", "exposure_pct": 80,
-  "follow_through": { "date": "2026-08-12", "index": "COMP", "gain_pct": 1.9, "volume_ratio": 1.2, "rally_day": 5 },
+  "follow_through": { "date": "2026-08-12", "index": "NDQ", "gain_pct": 1.9, "volume_ratio": 1.2, "rally_day": 5 },
   "distribution": { "SPX": { "count_25d": 3, "days": ["2026-09-04","2026-09-10","2026-09-18"] },
-                    "COMP": { "count_25d": 4, "days": [ … ] } },
-  "stalling_days": { "SPX": 0, "COMP": 1 },
+                    "NDQ": { "count_25d": 4, "days": [ … ] } },
+  "stalling_days": { "SPX": 0, "NDQ": 1 },
   "power_trend": { "active": true, "since": "2026-08-30" },
-  "index_position": { "COMP": { "above_ema_21": true, "above_sma_50": true, "above_sma_200": true },
+  "index_position": { "NDQ": { "above_ema_21": true, "above_sma_50": true, "above_sma_200": true },
                      "SPX":  { "above_ema_21": true, "above_sma_50": true, "above_sma_200": true } },
   "breadth": { "pct_above_sma_50": 64.2, "pct_above_sma_200": 71.0, "new_highs": 210, "new_lows": 34, "advancers": 2100, "decliners": 1400 } }
 ```
@@ -40,7 +42,7 @@ Phase-1 (DB only) fields have `rs`-dependent ones `null`.
 
 ### `GET /api/market/state/history?from=&to=` — daily columnar `date, market_state, exposure_pct, power_trend, dist_count_spx, dist_count_comp`
 Used for chart background shading ("market regime" overlay) and the time machine.
-### `GET /api/market/distribution?index=COMP&from=&to=` — list of `{date, index, loss_pct, volume_ratio, expires_on}`.
+### `GET /api/market/distribution?index=NDQ&from=&to=` — list of `{date, index, loss_pct, volume_ratio, expires_on}`.
 ### `GET /api/market/follow-through?from=&to=` — list of `{date, index, gain_pct, volume_ratio, rally_day_number, attempt_start}`.
 ### `GET /api/market/breadth?from=&to=` — daily columnar breadth series.
 
