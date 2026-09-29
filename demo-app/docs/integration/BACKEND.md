@@ -32,6 +32,7 @@ Libraries already planned: Flask, flask-cors, SQLAlchemy, psycopg, Pydantic, Gun
 | Nulls | `null` for missing, never 0/""; empty dataset for a valid symbol = `200` + `data: []` | §2, §5 |
 | Units | whole USD, `_pct` percent units, ratings ints/letters, ISO dates, epoch-ms for series | §2 |
 | `as_of` | every derived endpoint; resolve `effective_date <= as_of` / `disclosed_at <= as_of`; echo `meta.as_of` and per-rating `effective_dates` | §4 |
+| CORS for caching | allow request headers `Authorization, Content-Type, If-None-Match`; expose response headers `ETag, X-RateLimit-*, Retry-After, X-Request-Id, X-API-Version` (the front end's ETag interceptor needs them) | §6 |
 | ETag / Cache | strong ETag = hash(dataset_status.calculated_at + params); `304`; `max-age` tiers; user endpoints `private, no-store` | §6 |
 | Pagination | `limit` + opaque `cursor`, `sort=field:dir`, `fields=` | §7 |
 | Columnar | `format=columnar` on every series endpoint | §8 |

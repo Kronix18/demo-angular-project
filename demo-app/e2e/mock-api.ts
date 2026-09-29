@@ -1,6 +1,7 @@
 import { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 /**
  * Contract mock backend (task 12.2): fulfils `/api/**` from docs/api/fixtures so every front-end task can be
@@ -25,6 +26,8 @@ export interface MockOptions {
   overrides?: Record<string, unknown>;
   /** Access tokens the mock treats as expired: non-auth requests carrying them get 401 token_expired. */
   expiredTokens?: string[];
+  /** Send ETag on GET 200s and honour If-None-Match with 304. */
+  etag?: boolean;
   /** Called for each mocked request (path incl. query). */
   onRequest?: (path: string) => void;
 }
@@ -64,8 +67,22 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<void>
     if (bearer && opts.expiredTokens?.includes(bearer)) return json(401, { error: 'token_expired', message: 'Token expired' });
     const err = opts.errors?.[path];
     if (err) return json(err.status, err.body, err.headers);
-    if (opts.overrides && path in opts.overrides) return json(200, opts.overrides[path]);
+    if (opts.overrides && path in opts.overrides) {
+      const ov = opts.overrides[path];
+      if (opts.etag && route.request().method() === 'GET') {
+        const tag = `"${createHash('md5').update(JSON.stringify(ov)).digest('hex')}"`;
+        if (route.request().headers()['if-none-match'] === tag) return route.fulfill({ status: 304, headers: { ETag: tag, 'access-control-allow-origin': '*' } });
+        return json(200, ov, { ETag: tag, 'access-control-expose-headers': 'ETag' });
+      }
+      return json(200, ov);
+    }
     const hit = routes.find(([re]) => re.test(path));
+    const body = hit ? hit[1] : undefined;
+    if (hit && opts.etag && route.request().method() === 'GET') {
+      const tag = `"${createHash('md5').update(JSON.stringify(body)).digest('hex')}"`;
+      if (route.request().headers()['if-none-match'] === tag) return route.fulfill({ status: 304, headers: { ETag: tag, 'access-control-allow-origin': '*' } });
+      return json(200, body, { ETag: tag, 'access-control-expose-headers': 'ETag' });
+    }
     if (hit) return json(200, hit[1]);
     return json(404, { error: 'not_found', message: `No mock for ${path}` });
   });
