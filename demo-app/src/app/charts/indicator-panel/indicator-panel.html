@@ -1,1 +1,28 @@
-<p>indicator-panel works!</p>
+<div class="indicator-panel">
+  <form class="add-form" (submit)="$event.preventDefault(); add()">
+    <label for="indicatorType">Indicator</label>
+    <select id="indicatorType" name="indicatorType" [ngModel]="type" (ngModelChange)="onTypeChange($event)">
+      @for (c of catalog; track c.type) {
+        <option [value]="c.type">{{ c.label }}</option>
+      }
+    </select>
+    <input
+      type="number" id="indicatorPeriod" name="indicatorPeriod" min="1" step="1"
+      aria-label="Period" [(ngModel)]="period" [disabled]="!periodEnabled"
+    />
+    <button type="button" class="add-btn" data-add (click)="add()">Add</button>
+  </form>
+
+  <ul class="rows" aria-label="Active indicators">
+    @for (row of rows(); track row.index + row.resolved.label) {
+      <li class="row" data-indicator-row [attr.data-kind]="row.resolved.kind">
+        <span class="label">{{ row.resolved.label }}</span>
+        <span class="kind">{{ row.resolved.kind === 'overlay' ? 'overlay' : 'own pane' }}</span>
+        <button type="button" class="remove-btn" data-remove
+          [attr.aria-label]="'Remove ' + row.resolved.label" (click)="remove(row.index)">×</button>
+      </li>
+    } @empty {
+      <li class="empty" data-empty>No indicators — add one above.</li>
+    }
+  </ul>
+</div>

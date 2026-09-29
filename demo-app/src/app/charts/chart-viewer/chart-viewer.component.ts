@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ViewChildren, QueryList, ElementRef, ChangeDetectorRef, inject, DestroyRef } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService } from '../../core/services/chart-data.service';
@@ -7,6 +7,10 @@ import { filterByRange, aggregateWeeklyWFri } from '../../core/services/data-agg
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
+import { IndicatorPanel } from '../indicator-panel/indicator-panel';
+import { IndicatorCalculationService } from '../../core/services/indicator-calculation.service';
+import { ResolvedIndicator, resolveEntry } from '../../core/indicators/indicator-catalog';
+import { OutputSpec } from '../../core/indicators/indicator-definitions';
 import { map, distinctUntilChanged } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
@@ -94,6 +98,11 @@ const priceTooltipCallbacks = {
     return String(items?.[0]?.label ?? '');
   },
   label(item: any): string {
+    // indicator overlays (line datasets) share the price pane's index tooltip
+    if (item?.dataset?.type === 'line') {
+      const y = item?.raw?.y;
+      return `${item.dataset.label} ${typeof y === 'number' ? y.toFixed(2) : '-'}`;
+    }
     const raw = item?.raw ?? {};
     const fmt = (v: unknown) => typeof v === 'number' ? v.toFixed(2) : String(v ?? '-');
     return `O ${fmt(raw.o)}  H ${fmt(raw.h)}  L ${fmt(raw.l)}  C ${fmt(raw.c)}`;
@@ -139,11 +148,12 @@ Chart.register(alignWidthsPlugin);
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent],
+  imports: [CommonModule, ChartToolbarComponent, IndicatorPanel],
   template: `
-    <div class="chart-container">
+    <div class="chart-container" [class.has-panes]="oscPanes.length > 0">
       <app-chart-toolbar>
       </app-chart-toolbar>
+      <app-indicator-panel />
 
       @if (loading) {
         <div class="loading-overlay">Loading chart...</div>
@@ -158,6 +168,14 @@ Chart.register(alignWidthsPlugin);
       <div class="pane volume-pane" data-pane="volume">
         <canvas #volumeCanvas></canvas>
       </div>
+
+      <!-- Oscillator panes (5.2): one pane per pane-kind indicator, below volume -->
+      @for (p of oscPanes; track p.key) {
+        <div class="pane indicator-pane" [attr.data-pane]="'indicator-' + p.key">
+          <span class="pane-label">{{ p.label }}</span>
+          <canvas #paneCanvas></canvas>
+        </div>
+      }
 
       @if (error) {
         <div class="error-message">
@@ -205,6 +223,24 @@ Chart.register(alignWidthsPlugin);
         /* no visible separation: the dashed crosshair runs continuously through
            both panes (Kevin) — no border divider */
       }
+      /* 5.2: with oscillator panes the container grows (page scrolls) instead of
+         squeezing price/volume — every pane keeps a definite height. */
+      .chart-container.has-panes { height: auto; }
+      .has-panes .price-pane, .has-panes .volume-pane { flex: none; }
+      .indicator-pane {
+        flex: none;
+        height: 22vh;
+        min-height: 140px;
+      }
+      .pane-label {
+        position: absolute;
+        top: 4px;
+        left: 8px;
+        z-index: 2;
+        font-size: 0.75rem;
+        color: var(--c-text-muted, #6b7280);
+        pointer-events: none;
+      }
       canvas {
         width: 100% !important;
         height: 100% !important;
@@ -247,8 +283,12 @@ Chart.register(alignWidthsPlugin);
 export class ChartViewerComponent implements OnInit, OnDestroy {
   @ViewChild('priceCanvas') priceCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('volumeCanvas') volumeCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChildren('paneCanvas') paneCanvases?: QueryList<ElementRef<HTMLCanvasElement>>;
   private priceChart: Chart | null = null;
   private volumeChart: Chart | null = null;
+  private indicatorCharts: Chart[] = [];
+  /** Oscillator panes currently rendered (5.2) — drives the @for above. */
+  oscPanes: { key: string; label: string; resolved: ResolvedIndicator }[] = [];
   loading = true;
   error: string | null = null;
   currentSymbol: string = '';
@@ -263,6 +303,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   // the @if(loading)/@if(error) blocks re-render (2.2 fix, verified live).
   private cdr: ChangeDetectorRef;
   private chartState: ChartStateService;
+  private indicatorCalc = inject(IndicatorCalculationService);
   private destroyRef = inject(DestroyRef);
 
   constructor(
@@ -295,6 +336,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       .subscribe((s) => {
         const symbolChanged = s.symbol !== this.currentSymbol;
         const intervalChanged = s.interval !== this.currentInterval;
+        const rangeChanged = s.range !== this.currentRange;
         this.currentSymbol = s.symbol;
         this.currentInterval = s.interval;
         this.currentRange = s.range;
@@ -305,8 +347,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         if (symbolChanged || intervalChanged) {
           this.loadChartData(s.symbol, s.interval);
         } else if (this.allData.length) {
-          // range change (or anything else): re-render from cached data
-          this.createCharts(this.allData);
+          // range/indicator change: re-render from cached data. An
+          // indicator-only change keeps the user's current pan/zoom view.
+          this.createCharts(this.allData, rangeChanged ? undefined : this.currentView());
         }
       });
   }
@@ -361,7 +404,21 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** The price chart's current x view (bar-index units), if a chart exists. */
+  private currentView(): { min: number; max: number } | undefined {
+    const x = this.priceChart?.scales?.['x'] as any;
+    return x && typeof x.min === 'number' && typeof x.max === 'number'
+      ? { min: x.min, max: x.max }
+      : undefined;
+  }
+
+  private allCharts(): Chart[] {
+    return [this.priceChart, this.volumeChart, ...this.indicatorCharts].filter((c): c is Chart => !!c);
+  }
+
   private destroyCharts(): void {
+    for (const c of this.indicatorCharts) c.destroy();
+    this.indicatorCharts = [];
     if (this.priceChart) {
       this.priceChart.destroy();
       this.priceChart = null;
@@ -372,7 +429,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     }
   }
 
-  private createCharts(data: OHLCV[]): void {
+  private createCharts(data: OHLCV[], preserveView?: { min: number; max: number }): void {
     // Belt-and-braces guard: never crash on missing canvas references.
     const priceEl = this.priceCanvas?.nativeElement;
     const volEl = this.volumeCanvas?.nativeElement;
@@ -431,8 +488,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     for (let i = sliceStart; i < chartBars.length; i++) {
       if (chartBars[i].timestamp <= sliceEndTs) sliceEnd = i; else break;
     }
-    const viewMin = Math.max(0, sliceStart - 1);
-    const viewMax = Math.min(chartBars.length - 1, sliceEnd + 1);
+    const viewMin = preserveView ? preserveView.min : Math.max(0, sliceStart - 1);
+    const viewMax = preserveView ? preserveView.max : Math.min(chartBars.length - 1, sliceEnd + 1);
     const fullMin = 0;
     const fullMax = chartBars.length - 1;
 
@@ -479,6 +536,12 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       },
     });
 
+    // 5.2 indicators: resolve state entries, compute on the SAME bars (indices
+    // line up with the candle x = bar index), split overlay vs oscillator pane.
+    const computed = this.computeIndicators(chartBars);
+    const overlayDatasets = this.buildOverlayDatasets(computed.overlays);
+    this.syncOscPanes(computed.panes);
+
     // PRICE pane: candlestick only (volume lives in its own pane now).
     // 4.3 layout: price y-axis on the RIGHT (aligned with volume y); NO x labels
     // (the dates render below the VOLUME pane).
@@ -489,7 +552,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const fixedAxisAfterFit = (scale: any) => { scale.width = FIXED_AXIS_WIDTH; };
     this.priceChart = new Chart(priceEl, {
       type: 'candlestick',
-      data: { datasets: [{ type: 'candlestick', label: 'Price', data: priceData }] } as any,
+      data: { datasets: [{ type: 'candlestick', label: 'Price', data: priceData }, ...overlayDatasets] } as any,
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -540,12 +603,129 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         },
       } as any,
     });
+    this.indicatorCharts = this.buildPaneCharts(
+      computed.panes, chartBars, { min: viewMin, max: viewMax }, xScale, zoomOptions({ min: fullMin, max: fullMax }),
+      fixedAxisAfterFit, dateForIndex,
+    );
     // Dev-only test handle: expose the chart instances for the Playwright
     // verification scripts (window.Chart is module-scoped in this app).
     // ngDevMode is stripped in production builds — no production pollution.
     if (typeof ngDevMode !== 'undefined' && ngDevMode) {
-      (window as any).__charts = { price: this.priceChart, volume: this.volumeChart };
+      (window as any).__charts = { price: this.priceChart, volume: this.volumeChart, indicators: this.indicatorCharts };
     }
+  }
+
+  /** Resolve + calculate every state indicator; bad entries are skipped, not fatal. */
+  private computeIndicators(bars: OHLCV[]): {
+    overlays: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[];
+    panes: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[];
+  } {
+    const overlays: any[] = [];
+    const panes: any[] = [];
+    for (const entry of this.chartState.snapshot().indicators) {
+      try {
+        const resolved = resolveEntry(entry);
+        const outputs = this.indicatorCalc.calculate(resolved.definitionId, resolved.params, bars);
+        (resolved.kind === 'overlay' ? overlays : panes).push({ resolved, outputs });
+      } catch (e) {
+        console.warn('indicator skipped:', entry, (e as Error).message);
+      }
+    }
+    return { overlays, panes };
+  }
+
+  /** Theme colour from a CSS custom property (6.2 token rule), with fallback. */
+  private cssVar(name: string, fallback: string): string {
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  private static readonly DASHES: Record<OutputSpec['defaultLineStyle'], number[]> = {
+    solid: [], dash: [6, 4], dot: [2, 3], dash_dot: [6, 3, 2, 3],
+  };
+
+  private lineDataset(label: string, values: (number | null)[], color: string, width: number, dash: number[]) {
+    return {
+      type: 'line' as const,
+      label,
+      data: values.map((y, x) => ({ x, y })),
+      borderColor: color,
+      backgroundColor: color,
+      borderWidth: width,
+      borderDash: dash,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      tension: 0,
+      spanGaps: false,
+    };
+  }
+
+  private buildOverlayDatasets(overlays: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[]) {
+    return overlays.flatMap(({ resolved, outputs }, i) => {
+      const color = this.cssVar(`--c-indicator-${(i % 4) + 1}`, ['#4c9aff', '#f59e0b', '#a78bfa', '#22c55e'][i % 4]);
+      return Object.values(outputs).slice(0, 1).map((vals) => this.lineDataset(resolved.label, vals, color, 1.5, []));
+    });
+  }
+
+  /** Publish the pane list to the template and render it NOW so the canvases exist. */
+  private syncOscPanes(panes: { resolved: ResolvedIndicator }[]): void {
+    this.oscPanes = panes.map((p, i) => ({ key: `${i}-${p.resolved.entry.type}`, label: p.resolved.label, resolved: p.resolved }));
+    this.cdr.detectChanges();
+  }
+
+  private buildPaneCharts(
+    panes: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[],
+    _bars: OHLCV[],
+    view: { min: number; max: number },
+    xScale: any,
+    zoom: any,
+    axisAfterFit: (scale: any) => void,
+    dateForIndex: (i: number) => string,
+  ): Chart[] {
+    const canvases = this.paneCanvases?.toArray() ?? [];
+    const charts: Chart[] = [];
+    panes.forEach((p, i) => {
+      const el = canvases[i]?.nativeElement;
+      if (!el) return;
+      const def = this.indicatorCalc.definition(p.resolved.definitionId);
+      const datasets = def.outputs
+        .filter((o) => p.outputs[o.key])
+        .map((o) => this.lineDataset(o.label, p.outputs[o.key], o.defaultColor, o.defaultWidth,
+          ChartViewerComponent.DASHES[o.defaultLineStyle]));
+      const y: any = { type: 'linear', position: 'right', afterFit: axisAfterFit, grid: { drawOnChartArea: false } };
+      if (def.defaultYRange) { y.min = def.defaultYRange[0]; y.max = def.defaultYRange[1]; }
+      charts.push(new Chart(el, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: true, mode: 'index', intersect: false,
+              callbacks: {
+                title: (items: any[]) => dateForIndex(Number(items?.[0]?.parsed?.x ?? 0)),
+                label: (item: any) => {
+                  const v = item?.raw?.y;
+                  return `${item.dataset.label} ${typeof v === 'number' ? v.toFixed(2) : '-'}`;
+                },
+              },
+            },
+            zoom,
+            crosshair: true,
+          },
+          scales: { x: { ...xScale, min: view.min, max: view.max, display: false }, y },
+        } as any,
+      }));
+    });
+    return charts;
   }
 
   /** Minimum visible x-range: ~10 bars (Python range_controller port) — prevents
@@ -565,22 +745,23 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
    *  LINEAR x-scale: numeric min/max — plugin-native, no label conversion. */
   private syncXRange(sourceChart: Chart): void {
     queueMicrotask(() => {
-      const target = sourceChart === this.priceChart ? this.volumeChart : this.priceChart;
-      if (!target) return;
       const scale = sourceChart.scales['x'] as any;
       if (scale?.min == null || scale?.max == null) return;
-      const tScale = target.scales['x'] as any;
-      // loop guard: already in sync → nothing to do (breaks the echo)
-      if (tScale?.min === scale.min && tScale?.max === scale.max) return;
-      (target.options.scales as any).x = {
-        ...(target.options.scales as any).x,
-        min: scale.min,
-        max: scale.max,
-      };
-      try {
-        target.update('none'); // no animation — instant sync
-      } catch (e) {
-        console.error('syncXRange update threw:', (e as Error).message?.slice(0, 120));
+      for (const target of this.allCharts()) {
+        if (target === sourceChart) continue;
+        const tScale = target.scales['x'] as any;
+        // loop guard: already in sync → nothing to do (breaks the echo)
+        if (tScale?.min === scale.min && tScale?.max === scale.max) continue;
+        (target.options.scales as any).x = {
+          ...(target.options.scales as any).x,
+          min: scale.min,
+          max: scale.max,
+        };
+        try {
+          target.update('none'); // no animation — instant sync
+        } catch (e) {
+          console.error('syncXRange update threw:', (e as Error).message?.slice(0, 120));
+        }
       }
     });
   }
@@ -588,17 +769,13 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   /** Reset-zoom button (3.2): restores the full data extent on BOTH panes. */
   resetZoom(): void {
     try {
-      this.priceChart?.resetZoom();
-      console.log('resetZoom: price done');
-      this.volumeChart?.resetZoom();
-      console.log('resetZoom: volume done');
+      for (const c of this.allCharts()) c.resetZoom();
     } catch (e) {
       console.error('resetZoom THREW:', (e as Error).message?.slice(0, 120));
     }
-    const price = this.priceChart as any;
-    const vol = this.volumeChart as any;
-    if (price?.options?.scales?.x) price.update('none');
-    if (vol?.options?.scales?.x) vol.update('none');
+    for (const c of this.allCharts()) {
+      if ((c as any).options?.scales?.x) c.update('none');
+    }
   }
 
   ngOnDestroy(): void {

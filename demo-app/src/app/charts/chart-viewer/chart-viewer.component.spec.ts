@@ -395,6 +395,14 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     };
     let state: ChartStateService;
 
+    // oscillator canvases are created DURING the data load — stub every canvas
+    beforeEach(() => {
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
+        return fakeCtx(this);
+      } as any);
+    });
+    afterEach(() => vi.restoreAllMocks());
+
     async function load(indicators: { type: string; period: number }[]) {
       sessionStorage.clear();
       state = TestBed.inject(ChartStateService);
