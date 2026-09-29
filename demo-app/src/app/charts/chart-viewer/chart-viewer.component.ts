@@ -248,12 +248,28 @@ const DASHES: Record<OutputSpec['defaultLineStyle'], number[]> = {
   solid: [], dash: [6, 4], dot: [2, 3], dash_dot: [6, 3, 2, 3],
 };
 
+/** A compared symbol's closes aligned to our bars (last close at or before each bar), scaled so it equals the price at `base`. */
+export function alignCompare(bars: OHLCV[], other: OHLCV[], base: number): (number | null)[] {
+  const raw: (number | null)[] = [];
+  let j = -1;
+  for (const b of bars) {
+    while (j + 1 < other.length && other[j + 1].timestamp <= b.timestamp) j++;
+    raw.push(j >= 0 ? other[j].close : null);
+  }
+  let k = base;
+  while (k < raw.length && raw[k] === null) k++;
+  const c0 = raw[k];
+  if (c0 === null || c0 === undefined || !c0 || k >= bars.length) return raw.map(() => null);
+  const p0 = bars[k].close;
+  return raw.map((v) => (v === null ? null : (v / c0) * p0));
+}
+
 const ALT_TOOLS: Record<string, Tool> = { KeyT: 'trend', KeyH: 'hline', KeyV: 'vline', KeyC: 'cross', KeyF: 'fib' };
 
 type Computed = { index: number; resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> };
 
 /** What the legend needs to show an indicator's value at any bar. */
-interface LegendSeries { index: number; label: string; color: string; hidden: boolean; values: (number | null)[]; pane: boolean; }
+interface LegendSeries { index: number; label: string; color: string; hidden: boolean; values: (number | null)[]; pane: boolean; compare?: string; }
 
 /**
  * Chart viewer: price candles, volume and indicator panes in ONE Chart.js
@@ -285,6 +301,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           </select>
           <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
           <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
+          <button type="button" class="tool-btn" data-compare title="Compare or add symbol" aria-label="Compare symbol" (click)="openSearch('', 'compare')">＋ Compare</button>
           <button type="button" class="tool-btn" data-panel [attr.aria-pressed]="panelOpen()" title="Object tree, data window, watchlist, alerts" aria-label="Side panel" (click)="togglePanel()">☰</button>
           <button type="button" class="tool-btn" data-chart-settings title="Chart settings" aria-label="Chart settings" (click)="settingsOpen.set(true)">⚙</button>
           <button type="button" class="tool-btn" data-undo title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!drawingStore.canUndo(currentSymbol)" (click)="undo()">↶</button>
@@ -297,7 +314,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         <app-indicators-dialog (add)="addIndicatorType($event)" (closed)="indicatorsOpen.set(false)" />
       }
       @if (searchOpen()) {
-        <app-symbol-search-dialog [initial]="searchInitial()" [current]="currentSymbol" (pick)="pickFromSearch($event)" (closed)="searchOpen.set(false)" />
+        <app-symbol-search-dialog [heading]="searchMode() === 'compare' ? 'Compare symbol' : 'Symbol search'" [initial]="searchInitial()" [current]="currentSymbol" (pick)="pickFromSearch($event)" (closed)="searchOpen.set(false)" />
       }
       @if (gotoOpen() && bars.length) {
         <app-goto-date-dialog [min]="bars[0].timestamp" [max]="bars[bars.length - 1].timestamp" (pick)="goToDate($event)" (closed)="gotoOpen.set(false)" />
@@ -355,7 +372,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             (input)="et.value = $any($event.target).value" (keydown)="textKey($event, et)" (blur)="commitText(et)" />
         }
         @if (!error) {
-          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" (seriesToggle)="toggleSeries($event)" (seriesSettings)="seriesDialog.set($event)" />
+          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" (seriesToggle)="toggleSeries($event)" (seriesSettings)="seriesDialog.set($event)" (compareRemove)="chartState.removeCompare($event)" />
         }
         <app-chart-status [loading]="loading" [error]="error" [title]="errorTitle" [kind]="errorKind" [symbols]="availableSymbols" (pick)="pickSymbol($event)" (retry)="retry()" />
       </div>
@@ -502,9 +519,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   // ---- symbol search (type anywhere) ------------------------------------------------
   readonly searchOpen = signal(false);
   readonly searchInitial = signal('');
-  openSearch(initial: string): void { this.searchInitial.set(initial); this.searchOpen.set(true); }
+  readonly searchMode = signal<'symbol' | 'compare'>('symbol');
+  openSearch(initial: string, mode: 'symbol' | 'compare' = 'symbol'): void { this.searchMode.set(mode); this.searchInitial.set(initial); this.searchOpen.set(true); }
   pickFromSearch(symbol: string): void {
     this.searchOpen.set(false);
+    if (this.searchMode() === 'compare') { this.chartState.addCompare(symbol); return; }
     this.chartState.setSymbol(symbol);
   }
 
@@ -836,7 +855,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   togglePanel(): void { this.panelOpen.update((v) => !v); this.savePanel(); }
   setPanelTab(t: PanelTab): void { this.panelTab.set(t); this.savePanel(); }
 
-  readonly panelIndicators = computed(() => (this.legendSource()?.series ?? []).map((s) => ({ index: s.index, label: s.label, color: s.color, hidden: s.hidden })));
+  readonly panelIndicators = computed(() => (this.legendSource()?.series ?? []).filter((s) => !s.compare).map((s) => ({ index: s.index, label: s.label, color: s.color, hidden: s.hidden })));
   readonly panelDrawings = computed(() => {
     this.drawingStore.revision();
     this.legendSource(); // a symbol switch rebuilds the chart
@@ -979,6 +998,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     };
     const row = (s: LegendSeries): LegendRow => {
       const v = s.values[Math.min(Math.max(0, i), s.values.length - 1)];
+      if (s.compare) {
+        const base = s.values.find((x) => typeof x === 'number') as number | undefined;
+        const pct = base && typeof v === 'number' ? ((v / base - 1) * 100) : null;
+        return { key: `cmp:${s.compare}`, label: s.label, value: pct === null ? '–' : `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`, color: s.color, hidden: false, compare: s.compare };
+      }
       return { key: `ind${s.index}`, label: s.label, value: typeof v === 'number' ? f2(v) : '–', color: s.color, hidden: s.hidden, index: s.index };
     };
     const groups: LegendGroup[] = [
@@ -1043,6 +1067,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         const logChanged = s.logScale !== this.logOn;
         this.logOn = s.logScale;
         this.percentOn = s.percentScale;
+        for (const c of s.compare) this.ensureCompare(c);
         this.invertOn = s.invertScale;
         this.clockText.set(formatClock(new Date(), s.view.timezone));
         if (symbolChanged || intervalChanged || rangeChanged || logChanged) this.resetPriceScale();
@@ -1173,6 +1198,18 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   private lineDataset = lineDataset;
 
+  // ---- compared symbols (11.16) ---------------------------------------------------------
+  private compareData: Record<string, OHLCV[]> = {};
+  private compareRequested = new Set<string>();
+  private ensureCompare(sym: string): void {
+    if (this.compareRequested.has(sym)) return;
+    this.compareRequested.add(sym);
+    this.chartDataService.getOHLCV(sym, '1d', 100000).subscribe((data) => {
+      this.compareData[sym] = data;
+      if (this.allData.length && this.chartState.snapshot().compare.includes(sym)) this.createChart(this.allData, this.currentView());
+    });
+  }
+
   /** Value of a per-bar series sampled at the LAST bar of each bucket. */
   private lineBuilder(values: (number | null)[]): DataBuilder {
     return (pts) => pts.map((p) => {
@@ -1258,6 +1295,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       const axis = resolved.params['source'] === 'volume' ? 'yVol' : 'y';
       add(this.lineDataset(resolved.label, axis, color, st.width ?? 1.5, st.dash ? DASHES[st.dash] : [], hidden), this.lineBuilder(values));
       legendSeries.push({ index, label: resolved.label, color, hidden: resolved.hidden || !resolved.visibleOn(interval), values, pane: false });
+    });
+    // compared symbols: lines on the price scale, normalised so they start where the price does
+    this.chartState.snapshot().compare.forEach((sym, k) => {
+      const cd = this.compareData[sym];
+      if (!cd?.length) return;
+      const values = alignCompare(bars, cd, Math.max(0, sliceStart));
+      const color = cssVar(`--c-indicator-${((overlays.length + k) % 4) + 1}`);
+      add(this.lineDataset(sym.toUpperCase(), 'y', color, 1.5, [], false), this.lineBuilder(values));
+      legendSeries.push({ index: -1, label: sym.toUpperCase(), color, hidden: false, values, pane: false, compare: sym });
     });
     add({
       type: 'bar', label: 'Volume', yAxisID: 'yVol', data: [], parsing: false, normalized: true, hidden: !!vs.hidden,

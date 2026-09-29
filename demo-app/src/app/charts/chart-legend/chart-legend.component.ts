@@ -11,6 +11,8 @@ export interface LegendRow {
   index?: number;
   /** The built-in Volume row (eye + settings, no remove). */
   builtin?: 'volume';
+  /** A compared symbol (remove only). */
+  compare?: string;
 }
 
 export interface LegendGroup {
@@ -73,6 +75,13 @@ export interface LegendGroup {
               <button type="button" class="ctl" data-remove [attr.aria-label]="'Remove ' + r.label"
                 title="Remove" (click)="remove.emit(r.index!)">×</button>
             </div>
+          } @else if (r.compare) {
+            <div class="row" data-compare-row>
+              <span class="chip" data-chip [style.background]="r.color"></span>
+              <span class="label">{{ r.label }}</span>
+              <span class="value">{{ r.value }}</span>
+              <button type="button" class="ctl" data-compare-remove [attr.aria-label]="'Remove ' + r.label" title="Remove" (click)="compareRemove.emit(r.compare!)">×</button>
+            </div>
           } @else if (r.builtin) {
             <div class="row" data-volume-row [class.hidden]="r.hidden">
               <span class="chip" [style.background]="r.color"></span>
@@ -129,6 +138,7 @@ export class ChartLegendComponent {
   readonly remove = output<number>();
   readonly settings = output<number>();
   readonly symbolClick = output<void>();
+  readonly compareRemove = output<string>();
   readonly seriesToggle = output<'price' | 'volume'>();
   readonly seriesSettings = output<'price' | 'volume'>();
 }

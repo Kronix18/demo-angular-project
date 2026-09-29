@@ -17,7 +17,7 @@ export const cleanSymbol = (q: string): string => q.trim().toLowerCase().replace
   imports: [ModalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <app-modal title="Symbol search" (closed)="closed.emit()">
+    <app-modal [title]="heading()" (closed)="closed.emit()">
       <input type="search" class="search" placeholder="Search symbol…" aria-label="Search symbol" autocomplete="off" spellcheck="false"
         [value]="query()" (input)="onInput($any($event.target).value)" (keydown)="onKey($event)" />
       <div class="list" role="listbox">
@@ -49,6 +49,7 @@ export const cleanSymbol = (q: string): string => q.trim().toLowerCase().replace
   ],
 })
 export class SymbolSearchDialogComponent implements OnInit, AfterViewInit {
+  readonly heading = input('Symbol search');
   readonly initial = input('');
   readonly current = input('');
   readonly pick = output<string>();

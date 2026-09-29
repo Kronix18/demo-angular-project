@@ -24,6 +24,8 @@ export interface ChartState {
   /** price axis as % change from the first visible bar, and flipped (11.8) */
   percentScale: boolean;
   invertScale: boolean;
+  /** symbols overlaid on the price pane, normalised to the price (11.16) */
+  compare: string[];
   /** grid / crosshair / last price / status line options (11.11) */
   view: ViewSettings;
   /** symbol + volume settings from the legend (11.6) */
@@ -32,6 +34,12 @@ export interface ChartState {
 }
 
 const STORAGE_KEY = 'chart-state';
+
+function cleanCompare(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim().toLowerCase().replace(/\.us$/, '');
+  return /^[a-z0-9.\-]{1,10}$/.test(s) ? s : null;
+}
 const DASHES = ['solid', 'dash', 'dot', 'dash_dot'];
 
 /** Validates one persisted indicator entry; anything malformed is dropped, never trusted. */
@@ -74,6 +82,7 @@ const DEFAULTS: ChartState = {
   price: {},
   volume: {},
   view: defaultView(),
+  compare: [],
 };
 
 /**
@@ -174,6 +183,14 @@ export class ChartStateService {
     this.update({ indicators: next });
   }
 
+  addCompare(symbol: string): void {
+    const s = cleanCompare(symbol);
+    const cur = this.subject.value.compare;
+    if (s && !cur.includes(s) && cur.length < 5) this.update({ compare: [...cur, s] });
+  }
+
+  removeCompare(symbol: string): void { this.update({ compare: this.subject.value.compare.filter((s) => s !== symbol) }); }
+
   clearIndicators(): void { this.update({ indicators: [] }); }
 
   removeIndicator(index: number): void {
@@ -184,7 +201,7 @@ export class ChartStateService {
   /** Restore defaults and clear the persisted state. */
   reset(): void {
     sessionStorage.removeItem(STORAGE_KEY);
-    this.subject.next({ ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView() });
+    this.subject.next({ ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView(), compare: [] });
   }
 
   private update(partial: Partial<ChartState>): void {
@@ -205,7 +222,7 @@ export class ChartStateService {
   private readPersisted(): ChartState {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView() };
+      if (!raw) return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView(), compare: [] };
       const parsed = JSON.parse(raw);
       return {
         symbol: typeof parsed.symbol === 'string' ? parsed.symbol : DEFAULTS.symbol,
@@ -217,6 +234,7 @@ export class ChartStateService {
         percentScale: parsed.percentScale === true,
         invertScale: parsed.invertScale === true,
         view: sanitizeView(parsed.view),
+        compare: Array.isArray(parsed.compare) ? [...new Set<string>(parsed.compare.map(cleanCompare).filter((s: string | null): s is string => !!s))].slice(0, 5) : [],
         price: sanitizePrice(parsed.price),
         volume: sanitizeVolume(parsed.volume),
         indicators: Array.isArray(parsed.indicators)
@@ -224,7 +242,7 @@ export class ChartStateService {
           : [],
       };
     } catch {
-      return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView() };
+      return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView(), compare: [] };
     }
   }
 }
