@@ -39,7 +39,7 @@ the server only replaces the ones in the catalogue. The client asks the server f
 when the requested period equals a stored period (10/21/50/100/200/14/20/30…); other periods are calculated locally.
 
 Parity contract: the client keeps its Python-golden tests; backend series must match those fixtures to `1e-6` relative
-(state the SMA/EMA seeding rule in `meta`; **the backend computes on raw or split-adjusted closes? — must be split-adjusted to match the chart**, see questions in `../DATA-PLAN.md` §9). See tasks 14.x.
+(state the SMA/EMA seeding rule in `meta`; series are computed on split-adjusted closes, `meta.price_basis = "split_adjusted"`). See tasks 14.x.
 
 ### `GET /api/stocks/{symbol}/technicals/latest` — the newest row of everything (checkup technical block, screener drawer).
 

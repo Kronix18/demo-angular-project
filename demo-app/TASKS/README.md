@@ -116,8 +116,8 @@ Replaces the static `*.us.txt` files with `/api/chart/...` when the backend can 
 |---|---|---|---|
 | 13.1 | phase-13-prices-from-backend/13.1-ohlcvapiclient-params-columnar-decode.md | NOT STARTED | OhlcvApiClient (params, columnar decode) — needs: `prices` |
 | 13.2 | phase-13-prices-from-backend/13.2-backend-first-data-source-with-static-fallback.md | NOT STARTED | Backend-first data source with static fallback — needs: `prices` |
-| 13.3 | phase-13-prices-from-backend/13.3-split-adjusted-price-toggle.md | NOT STARTED | Split-adjusted price toggle — needs: `prices` + `splits` (DB) |
-| 13.11 | phase-13-prices-from-backend/13.11-volume-policy-unadjusted-volume-notice.md | NOT STARTED | Volume policy: unadjusted volume notice — needs: `prices` |
+| 13.3 | phase-13-prices-from-backend/13.3-split-adjusted-label-no-toggle.md | NOT STARTED | Split-adjusted label (no toggle) — needs: `prices` |
+| 13.11 | phase-13-prices-from-backend/13.11-volume-basis-label.md | NOT STARTED | Volume basis label — needs: `prices` |
 | 13.4 | phase-13-prices-from-backend/13.4-server-weekly-monthly-bars.md | NOT STARTED | Server weekly/monthly bars — needs: `prices` (weekly) |
 | 13.5 | phase-13-prices-from-backend/13.5-tier-truncation-notice.md | NOT STARTED | Tier truncation notice — needs: `prices` |
 | 13.6 | phase-13-prices-from-backend/13.6-batch-ohlcv-for-compare-overlay.md | NOT STARTED | Batch OHLCV for compare overlay — needs: `prices` (batch) |
@@ -141,7 +141,7 @@ Uses the backend `technical_daily` series instead of calculating in the browser,
 | 14.8 | phase-14-server-technicals/14.8-weekly-10w-40w-ma-deferred-to-server.md | NOT STARTED | Weekly 10w/40w MA (deferred to server) — needs: `technical_weekly` (PLAN, low priority) |
 | 14.9 | phase-14-server-technicals/14.9-rs-line-pane-from-rs-line.md | NOT STARTED | RS-line pane from `/rs-line` — needs: `index_prices` (expected to exist; endpoint to be exposed) — RS *ratings* exist, the RS *line* is computed from stock + S&P 500 |
 | 14.10 | phase-14-server-technicals/14.10-rs-line-new-high-marker.md | NOT STARTED | RS-line new-high marker — needs: `relative_strength_history` |
-| 14.12 | phase-14-server-technicals/14.12-raw-vs-adjusted-basis-check.md | NOT STARTED | Raw vs adjusted basis check — needs: `technicals` |
+| 14.12 | phase-14-server-technicals/14.12-price-basis-assertion.md | NOT STARTED | Price-basis assertion — needs: `technicals` |
 | 14.11 | phase-14-server-technicals/14.11-drop-redundant-client-compute.md | NOT STARTED | Drop redundant client compute — needs: `technicals` |
 
 ### Phase 15 — Screener v2
@@ -196,7 +196,7 @@ Filings can ship first (already in the DB); financials follow the XBRL pipeline.
 | 17.4 | phase-17-fundamentals-markers/17.4-earnings-markers.md | NOT STARTED | Earnings markers — needs: `fundamental_quarter_*` (DB) |
 | 17.5 | phase-17-fundamentals-markers/17.5-quarterly-fundamentals-table.md | NOT STARTED | Quarterly fundamentals table — needs: `fundamental_quarter_*` (DB) |
 | 17.6 | phase-17-fundamentals-markers/17.6-annual-table-and-cagr.md | NOT STARTED | Annual table and CAGR — needs: `ANNUAL_EPS_V1` (DB) |
-| 17.7 | phase-17-fundamentals-markers/17.7-earnings-mini-charts.md | NOT STARTED | Earnings mini-charts — needs: `fundamental_quarter_*` (DB) |
+| 17.7 | phase-17-fundamentals-markers/17.7-earnings-mini-charts.md | NOT STARTED | Earnings mini-charts — needs: `financial_quarters` |
 | 17.8 | phase-17-fundamentals-markers/17.8-fundamental-metrics-block.md | NOT STARTED | Fundamental metrics block — needs: `fundamental_metrics` (view over SEC tables) |
 | 17.9 | phase-17-fundamentals-markers/17.9-screener-fundamentals-filters.md | NOT STARTED | Screener fundamentals filters — needs: `fundamental_metrics` |
 | 17.10 | phase-17-fundamentals-markers/17.10-restated-point-in-time-indicators.md | NOT STARTED | Restated/point-in-time indicators — needs: `fundamental_quarter_*` (DB) |
@@ -272,7 +272,16 @@ Later-stage datasets and the point-in-time features that depend on them.
 |---|---|---|---|
 | 22.1 | phase-22-institutional-events-timemachine/22.1-institutional-client-and-block.md | NOT STARTED | Institutional client and block — needs: `institutional_metrics` |
 | 22.2 | phase-22-institutional-events-timemachine/22.2-holders-table.md | NOT STARTED | Holders table — needs: `form13f_holdings` |
-| 22.3 | phase-22-institutional-events-timemachine/22.3-events-client-and-chart-markers.md | NOT STARTED | Events client and chart markers — needs: `company_events` |
+| 22.3 | phase-22-institutional-events-timemachine/22.3-catalyst-events-client-and-chart-markers.md | NOT STARTED | Catalyst events client and chart markers — needs: `company_events` |
+| 22.9 | phase-22-institutional-events-timemachine/22.9-newsapiclient-and-types.md | NOT STARTED | NewsApiClient and types — needs: `news_articles` |
+| 22.10 | phase-22-institutional-events-timemachine/22.10-news-list-component.md | NOT STARTED | News list component — needs: `news_articles` |
+| 22.11 | phase-22-institutional-events-timemachine/22.11-news-tab-in-the-chart-side-panel.md | NOT STARTED | News tab in the chart side panel — needs: `news_articles` |
+| 22.12 | phase-22-institutional-events-timemachine/22.12-news-page-with-filters.md | NOT STARTED | News page with filters — needs: `news_articles` |
+| 22.13 | phase-22-institutional-events-timemachine/22.13-watchlist-news-feed.md | NOT STARTED | Watchlist news feed — needs: `news_articles` |
+| 22.14 | phase-22-institutional-events-timemachine/22.14-sentiment-and-category-chips.md | NOT STARTED | Sentiment and category chips — needs: `event_classifications` |
+| 22.15 | phase-22-institutional-events-timemachine/22.15-news-reader-dialog.md | NOT STARTED | News reader dialog — needs: `news_articles` |
+| 22.16 | phase-22-institutional-events-timemachine/22.16-news-tier-gating.md | NOT STARTED | News tier gating — needs: `entitlements` |
+| 22.17 | phase-22-institutional-events-timemachine/22.17-news-alerts-later.md | NOT STARTED | News alerts (later) — needs: `news_articles`, `application` |
 | 22.4 | phase-22-institutional-events-timemachine/22.4-catalyst-and-institutional-screener-filters.md | NOT STARTED | Catalyst and institutional screener filters — needs: `company_events`, `institutional_metrics` |
 | 22.5 | phase-22-institutional-events-timemachine/22.5-asofservice-time-machine.md | NOT STARTED | AsOfService (time machine) — needs: any dated dataset |
 | 22.6 | phase-22-institutional-events-timemachine/22.6-screener-as-of.md | NOT STARTED | Screener as_of — needs: `screener_snapshot` |

@@ -2,7 +2,7 @@
 
 Date: 2026-09-29. Scope: **front end only**. The backend / data-fetcher are separate projects and are not programmed here.
 Inputs: `SECURITY_MASTER.md`, `PRICE_DATA.md`, `DAILY_INGESTION_GUIDE.md`, `EPS_STATUS.md`, `EPS_COVERAGE_TRACKING.md`, `SMR_STATUS.md`, `FUNDAMENTALS.md`, `SEC_INGESTION.md`, `TECHNICAL_ARCHITECTURE.md`, `PROJECT_DESIGN.md`, `MODEL_CHANGELOG.md` (what the DB holds and how the backend is meant to be built; revision 3, 2026-09-29, after the owner's answers) and `IMPLEMENTATION_PLAN.md` (roadmap, §1–§59; its checkboxes are stale).
-Outputs: this plan, the API contract for the backend (`docs/api/`), and small tasks (`TASKS/phase-12` … `phase-22`, 122 tasks).
+Outputs: this plan, the API contract for the backend (`docs/api/`), and small tasks (`TASKS/phase-12` … `phase-22`, 131 tasks).
 
 ## 1. Audit — what is implemented, what is not, what is planned
 
@@ -45,7 +45,8 @@ Consequences after the second batch:
 | B10 | Market engine (needs B7) | market banner, regime shading, M filters | 19.5–19.9 |
 | B11 | Pattern / trade engine | overlays, breakout screens | 18.3–18.14 |
 | B12 | CAN SLIM scoring (needs B8–B10) | gauge and reasons | 18.1–18.2 |
-| B13 | Symbol/name history filled; 13F; news events | as-of ticker resolution; institutional and catalyst blocks | 22.x |
+| B13 | 13F (SEC), symbol/name history filled | institutional block, as-of ticker resolution | 22.1, 22.2 |
+| B13b | News ingestion + classifier (`07` §2) | news feed, symbol news tab, chart markers, catalyst filter | 22.3, 22.4, 22.9–22.17 |
 | B14 | Application schema + auth + billing | accounts, tiers, sync | 20.x, 21.x |
 
 The front-end can begin B14-independent work immediately; auth (task 9.1) is blocked until B14's auth part exists.
@@ -106,6 +107,8 @@ Existing tiers and prices (`subscription.types.ts`): Free 0 · Plus 9.99 · Pro 
 | L5 | Anonymous visitors: **charts for 10 demo symbols** (`MSFT, AAPL, NVDA, AMZN, GOOGL, META, TSLA, AMD, SPY, QQQ`), 1 year daily, no ratings; everything else needs a free account. | Marketing pages need a working demo without exposing the whole dataset. |
 | L6 | Payment provider: **Stripe Checkout + customer portal** (hosted; no card data in the app). | Least front-end scope, standard. |
 | L7 | Auth: **JWT access + rotating refresh tokens**, Flask side; CORS limited to the app origin. | Matches the current `AuthService` design. |
+| L9 | **News:** headline + ≤300-char snippet (only where the source licence allows) + link-out + our own classification; no article bodies, no scraping of publishers. Recommended sources in order: SEC 8-K, Alpha Vantage `NEWS_SENTIMENT`, company press-release RSS, GDELT (discovery), Yahoo headlines as link-out only. Design in `docs/api/07`. | Recreates the TradingView news experience (feed, symbol tab, chart markers, filters) without licensing risk. |
+| L10 | **Vendor switch (Yahoo / Business Quant / Alpha Vantage):** all vendors' adjusted figures are acceptable, but the API serves **split-adjusted only** (never Yahoo's dividend-adjusted `adjclose`), declares `meta.source`, `meta.price_basis`, `meta.volume_basis`, and shapes never change with the vendor. Yahoo's terms restrict commercial redistribution and Alpha Vantage / Business Quant have plan-specific display rights → confirm terms before public launch; until then display-only (L1). | Keeps the front end vendor-independent. |
 | L8 | Default screener universe: the 3 508-name gate set; the price / dollar-volume gates should be added now that `avg_dollar_volume_50` exists. | Cleaner results; matches the architecture's "rating-eligible" idea. |
 
 **Tier matrix** (numbers delivered by `/api/plans` and `/api/user/entitlements`, changeable without a release):
@@ -127,12 +130,13 @@ Existing tiers and prices (`subscription.types.ts`): Free 0 · Plus 9.99 · Pro 
 | Watchlists / items | 1 / 10 | 3 / 25 | 10 / 100 | unlimited |
 | Alerts | – | 5 (price) | 50 (+ rating, breakout) | unlimited |
 | Export (derived results only) | – | – | CSV 500 rows | CSV / JSON unlimited |
-| Institutional holders, news events | – | – | summary | full |
+| Institutional holders | – | – | summary | full |
+| News | market headlines, 24 h, 20 items | + per-symbol (7 days) | + filters, sentiment, 90 days, chart markers | full history, watchlist feed, news alerts |
 | Time machine (`as_of`), backtest | – | – | – | yes |
 | Data API | – | – | coming soon | coming soon |
 | Ads | yes | no | no | no |
 
-Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-controlled display names), 16.12 (model-rating labelling).
+Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-controlled display names), 16.12 (model-rating labelling), 22.3 and 22.9–22.17 (news).
 
 ## 8. Phases and dependencies
 
@@ -146,7 +150,7 @@ Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-
                     ├─► 20 Accounts/Tiers ◄─ B14 (+ existing 9.1)
                     └─► 21 User data sync ◄─ B14      22 Institutional/Events/Time machine ◄─ B13, all
 ```
-122 tasks (index: `TASKS/README.md`, Phases 12–22). Phase 12 can start immediately; each later task lists the backend dataset it needs.
+131 tasks (index: `TASKS/README.md`, Phases 12–22). Phase 12 can start immediately; each later task lists the backend dataset it needs.
 
 ## 9. Answers received and what is still open
 
@@ -158,13 +162,19 @@ Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-
 5. *Ratings recomputed daily or at least on earnings ingestion.* → Contract reports `effective_dates` and `/ratings/dates`, so it works for daily and for event-driven recomputation.
 6. *Licensing: I decide.* → Decisions in §7.
 
+**Owner answers, round 2 (2026-09-29):**
+- *Split adjustment:* everything served is split-adjusted, act as if it already is → contract has no raw mode, `price_basis` always `split_adjusted`; tasks 13.3 / 13.11 / 14.12 simplified.
+- *Whole-universe split coverage:* believed yes → assumed.
+- *Vendors:* data fetching mostly moves to Yahoo / Business Quant / Alpha Vantage (they carry adjusted figures) → contract is source-agnostic (L10).
+- *13F:* from SEC (`07` §1). *News:* undecided, "try to recreate TradingView news" → full design in `07` §2, source ranking, tasks 22.9–22.17, decision L9.
+- *Security-master columns (`is_active`, `country`, `cik`, eligibility flags):* "yes, otherwise they will be once integration is required" → the names in `01` are the contract.
+
 **Still open (small; none blocks front-end work):**
 - Exact names of the index table and codes; whether `market_calendar` will exist.
-- Confirmation that the 592 verified splits (or the later full set) cover the whole universe, and that volume policy stays "as stored".
-- Whether `is_active`, `country`, `cik` and the eligibility flags are exposed as columns under those names (contract assumes yes).
-- Whether `sec_filing` will get `period_end`/8-K item columns (contract does not require them).
-- Where 13F and news will come from (GDELT, SEC 8-K, press releases per the architecture doc) — needed before 22.x is specified beyond the current contract.
-- Payment provider account and auth service configuration (see §7 decisions).
+- Whether `sec_filing` will gain period end and 8-K item numbers (needed for the earnings-8-K news category).
+- News: which provider(s) the backend picks (recommendation: SEC 8-K + Alpha Vantage) and the redistribution terms of the chosen plan.
+- Business Quant / Alpha Vantage / Yahoo plan terms for displaying derived data to paying users.
+- Stripe account and auth service configuration.
 
 ## 10. Risks
 

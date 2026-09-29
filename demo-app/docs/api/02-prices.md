@@ -11,8 +11,7 @@ This extends the v1 OHLCV contract in `../../API-BACKEND-SPEC.md` (`/api/chart/.
 
 Still needed (**PLAN**): `weekly_prices` (derived from daily, so the client never aggregates when it exists) and `market_calendar` (sessions/holidays; lets the front end draw gaps correctly). **`index_prices(index_code, trade_date, open, high, low, close, volume)`** is expected to exist (Stooq): codes `SPX` (S&P 500, RS-line benchmark), `NDX`/`COMP` (Nasdaq 100 / Composite), and optional `NYA`, `RUT`, `DJI`; validated like stocks (calendar, duplicates, absurd returns). Volume for cash indices may be null.
 
-**Adjustment policy (frozen by the backend):** split-only back-adjustment derived on demand (`adjust_for_splits`, each bar before an ex-date divided by the product of later forward-split factors);
-total-return (dividend) adjustment is **rejected** for chart/pattern use; raw stored rows are never mutated; **volume is returned as stored** unless `adjust_volume=true`.
+**Adjustment policy (owner decision, supersedes the earlier raw/adjusted toggle):** every price the API returns is **split-adjusted** (whether adjusted at ingestion by the vendor or on demand by `adjust_for_splits`). Total-return (dividend) adjustment is **never served** — pattern geometry needs split-only. There is no raw mode. **Volume basis** is declared in `meta.volume_basis`: `as_reported` (Stooq, not divided by splits) or `split_adjusted` (vendors such as Yahoo); the chart labels it and the optional `adjust_volume=true` only applies when the basis is `as_reported`.
 
 ## `GET /api/chart/{symbol}/ohlcv`   (v1 path kept; v2 params)
 
@@ -20,7 +19,7 @@ total-return (dividend) adjustment is **rejected** for chart/pattern use; raw st
 |---|---|---|
 | `interval` | `1d`, `1w`, `1mo` (`1m…4h` = intraday, **not planned**, return `400 bad_interval`) | `1d` |
 | `from`, `to` | epoch-ms **or** `YYYY-MM-DD` | full history |
-| `adjust` | `none`, `split` (`all`/total-return → `400 bad_request`, not offered) | `split` |
+| `adjust` | only `split` is accepted (default); `none` and `all` → `400 bad_request` | `split` |
 | `adjust_volume` | `true` divides volume by the split factor (only for volume-dry-up analysis) | `false` |
 | `limit` | max bars (newest first cut) | tier depth |
 | `format` | `json`, `columnar` | `json` |
@@ -30,8 +29,7 @@ v1 array item (unchanged):
 ```json
 { "timestamp": 1758499200000, "open": 425.1, "high": 429.3, "low": 424.2, "close": 427.31, "volume": 21500000 }
 ```
-v2 optional extras (`include=raw_close,split_factor`): `raw_close`, `split_factor` (cumulative, 1 = none) — lets the front end toggle adjusted/unadjusted
-without a second request. `adjust=split` returns prices already adjusted; **volume is untouched** (frozen policy).
+Optional extra `include=split_factor` (cumulative factor, 1 = none) only for tooltips such as "prices adjusted for 3 splits". Volume follows `meta.volume_basis`.
 
 Headers: `X-Data-As-Of`, `ETag`. Empty history → `200 []` (not 404) when the symbol exists.
 
@@ -47,7 +45,7 @@ Max 25 symbols per call; free tier 5, plus 10.
 ### `GET /api/chart/{symbol}/meta`  (the v1 metadata endpoint, extended)
 ```json
 { "security_id": 4821, "first_bar": "1986-03-13", "last_bar": "2026-09-22", "bar_count": 10200,
-  "intervals": ["1d","1w","1mo"], "adjusted": { "split": true }, "split_count": 3,
+  "intervals": ["1d","1w","1mo"], "price_basis": "split_adjusted", "volume_basis": "as_reported", "split_count": 3, "source": "yahoo",
   "price_scale": 2, "currency": "USD", "delisted": false,
   "datasets": { "technicals": true, "rs_line": false, "patterns": false, "fundamental_markers": false } }
 ```

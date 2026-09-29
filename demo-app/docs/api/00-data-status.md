@@ -49,12 +49,13 @@ Source: the two backend-project documents `SECURITY_MASTER.md` (state of the DB)
 
 ## 3. Facts the API design now relies on
 
-1. **Prices are provider (Stooq) prices; the API serves split-adjusted ones** (`SPLIT_ONLY`, derived from `splits`; owner: "split adjusted everything"). `technical_daily`, RS and patterns are assumed to be computed on the split-adjusted series (`meta.price_basis = "split_adjusted"`, to be confirmed by the backend). `adjust=all` (total return) is **not offered**. **Volume is returned as stored** (no split division) unless the caller asks `adjust_volume=true`.
+1. **Everything the API serves is split-adjusted** (owner decision, 2026-09-29: if it is not yet, it will be; the contract acts as if it is). Prices, `technical_daily`, RS, patterns all use the split-adjusted series; responses carry `meta.price_basis = "split_adjusted"`. There is no raw-price mode and no dividend-adjusted (total-return) series in the API, even when a vendor supplies one (Yahoo `adjclose`). Volume basis is declared in `meta.volume_basis` (`"as_reported"` today, `"split_adjusted"` if the vendor supplies adjusted volume). `adjust=all` (total return) is **not offered**. **Volume is returned as stored** (no split division) unless the caller asks `adjust_volume=true`.
 2. **Ratings exist only on 19 stored dates today; the plan is a recompute daily or at least at each earnings ingestion.** The contract is written for both: it never assumes daily, it reports the `effective_date` used. `/ratings` therefore answers "latest stored date not after `as_of`" and reports the actual `effective_date`; history is sparse (see `03`). RS ratings are daily.
 3. **Ratings are model estimates** of the IBD-style concept (versioned: `EPS_V5_3`, `SMR_V4`, `RS_*_V1`). The UI labels them "model rating", shows `model_version`, and never claims they equal IBD's.
 4. Coverage is partial by design: only the rated universe (~3 000–3 500 names per date), foreign 20-F filers mostly unrated. Every rating field can be `null` with an `unrated_reason` (`no_quarterly_data`, `stale_quarter`, `not_eligible`, `too_new`, `no_cik`).
-5. **Data freshness is human-driven today** (manual Stooq download → import → technicals → RS). `data_as_of` may lag several days; `next_refresh_after` may be `null`. The front end must show the date, never imply "live".
-6. IBD changed its own method on 2026-04-27 (SMR / EPS). Backend models track IBD's behaviour at each date; front end just shows `model_version`.
+5. **Data sources are moving to Yahoo Finance / Business Quant / Alpha Vantage** (they also provide adjusted figures) for prices and fundamentals. The contract is source-agnostic: every series/row may carry `source`, and `meta.source` names the provider; switching vendor must not change shapes.
+6. **Data freshness is human-driven today** (manual Stooq download → import → technicals → RS). `data_as_of` may lag several days; `next_refresh_after` may be `null`. The front end must show the date, never imply "live".
+7. IBD changed its own method on 2026-04-27 (SMR / EPS). Backend models track IBD's behaviour at each date; front end just shows `model_version`.
 
 ## 4. What the front end does until each dataset exists
 
