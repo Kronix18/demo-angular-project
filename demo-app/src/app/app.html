@@ -12,6 +12,13 @@
       </div>
 
       <div class="nav-actions">
+        <button
+          type="button"
+          class="theme-toggle"
+          (click)="theme.cycle()"
+          [attr.aria-label]="'Theme: ' + theme.mode() + ' (click to change)'"
+          [title]="'Theme: ' + theme.mode()"
+        >{{ themeIcon[theme.mode()] }}</button>
         <a
           *ngIf="isAuthenticated"
           routerLink="/profile"

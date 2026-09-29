@@ -10,24 +10,24 @@
 
   h1 {
     font-size: 42px;
-    color: #333;
+    color: var(--c-text-1);
     margin-bottom: 16px;
     font-weight: 700;
   }
 
   p {
     font-size: 18px;
-    color: #666;
+    color: var(--c-text-3);
   }
 }
 
 .error-message {
-  background: #fee;
-  border-left: 4px solid #f66;
+  background: var(--c-danger-bg-2);
+  border-left: 4px solid var(--c-danger-soft);
   padding: 16px;
   margin-bottom: 30px;
   border-radius: 4px;
-  color: #c33;
+  color: var(--c-danger-text-2);
   text-align: center;
 }
 
@@ -39,8 +39,8 @@
 }
 
 .plan-card {
-  background: white;
-  border: 2px solid #e0e0e0;
+  background: var(--c-surface);
+  border: 2px solid var(--c-line-1);
   border-radius: 12px;
   padding: 30px;
   position: relative;
@@ -50,12 +50,12 @@
 
   &:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 10px 30px var(--c-shadow-a15);
   }
 
   &.popular {
-    border-color: #667eea;
-    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+    border-color: var(--c-brand);
+    box-shadow: 0 5px 20px var(--c-brand-a20);
     transform: scale(1.05);
 
     &:hover {
@@ -64,8 +64,8 @@
   }
 
   &.current {
-    border-color: #28a745;
-    background: #f8fff9;
+    border-color: var(--c-success);
+    background: var(--c-success-bg);
   }
 }
 
@@ -74,8 +74,8 @@
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--c-brand) 0%, var(--c-brand-2) 100%);
+  color: var(--c-on-brand);
   padding: 6px 20px;
   border-radius: 20px;
   font-size: 12px;
@@ -90,13 +90,13 @@
 
   h2 {
     font-size: 28px;
-    color: #333;
+    color: var(--c-text-1);
     margin-bottom: 8px;
     font-weight: 700;
   }
 
   .plan-description {
-    color: #666;
+    color: var(--c-text-3);
     font-size: 14px;
     margin-bottom: 20px;
   }
@@ -107,11 +107,11 @@
     .price-amount {
       font-size: 48px;
       font-weight: 700;
-      color: #667eea;
+      color: var(--c-brand);
     }
 
     .price-period {
-      color: #999;
+      color: var(--c-text-4);
       font-size: 16px;
     }
   }
@@ -123,7 +123,7 @@
 
   h3 {
     font-size: 16px;
-    color: #555;
+    color: var(--c-text-2);
     margin-bottom: 20px;
     font-weight: 600;
     text-transform: uppercase;
@@ -140,7 +140,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 10px 0;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 1px solid var(--c-line-2);
       font-size: 14px;
 
       &:last-child {
@@ -149,17 +149,17 @@
 
       &.included {
         .feature-value {
-          color: #28a745;
+          color: var(--c-success);
           font-weight: 600;
         }
       }
 
       .feature-label {
-        color: #555;
+        color: var(--c-text-2);
       }
 
       .feature-value {
-        color: #666;
+        color: var(--c-text-3);
         font-weight: 500;
       }
     }
@@ -179,18 +179,18 @@
   letter-spacing: 0.5px;
 
   &.btn-upgrade {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--c-brand) 0%, var(--c-brand-2) 100%);
+    color: var(--c-on-brand);
 
     &:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 5px 15px var(--c-brand-a40);
     }
   }
 
   &.btn-current {
-    background: #28a745;
-    color: white;
+    background: var(--c-success);
+    color: var(--c-on-brand);
     cursor: default;
   }
 
@@ -202,7 +202,7 @@
 
 .pricing-footer {
   text-align: center;
-  color: #666;
+  color: var(--c-text-3);
   font-size: 14px;
 
   p {
@@ -210,7 +210,7 @@
   }
 
   a {
-    color: #667eea;
+    color: var(--c-brand);
     text-decoration: none;
     font-weight: 600;
 

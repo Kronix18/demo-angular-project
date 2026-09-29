@@ -184,4 +184,22 @@ describe('App — navbar composition', () => {
       expect(route?.data?.['fullscreen']).toBe(true);
     });
   });
+
+  describe('theme toggle (dark mode)', () => {
+    it('navbar has a theme button that cycles system → light → dark and sets data-theme', async () => {
+      localStorage.clear();
+      await createFixture();
+      const btn = navbar.querySelector('.theme-toggle') as HTMLButtonElement;
+      expect(btn).toBeTruthy();
+      expect(btn.getAttribute('aria-label')).toContain('system');
+      btn.click();
+      fixture.detectChanges();
+      expect(btn.getAttribute('aria-label')).toContain('light');
+      btn.click();
+      fixture.detectChanges();
+      expect(btn.getAttribute('aria-label')).toContain('dark');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      localStorage.clear();
+    });
+  });
 });

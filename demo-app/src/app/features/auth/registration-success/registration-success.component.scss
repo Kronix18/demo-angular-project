@@ -3,15 +3,15 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--c-brand) 0%, var(--c-brand-2) 100%);
   padding: 20px;
 }
 
 .success-card {
-  background: white;
+  background: var(--c-surface);
   padding: 50px 40px;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 40px var(--c-shadow-a20);
   max-width: 500px;
   width: 100%;
   text-align: center;
@@ -21,7 +21,7 @@
   width: 80px;
   height: 80px;
   margin: 0 auto 30px;
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  background: linear-gradient(135deg, var(--c-success) 0%, var(--c-teal) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -30,19 +30,19 @@
   svg {
     width: 50px;
     height: 50px;
-    color: white;
+    color: var(--c-on-brand);
   }
 }
 
 h1 {
   margin: 0 0 30px;
-  color: #333;
+  color: var(--c-text-1);
   font-size: 28px;
 }
 
 .message-box {
-  background: #e7f7ef;
-  border-left: 4px solid #28a745;
+  background: var(--c-success-bg);
+  border-left: 4px solid var(--c-success);
   border-radius: 6px;
   padding: 20px;
   margin-bottom: 30px;
@@ -50,14 +50,14 @@ h1 {
 }
 
 .main-message {
-  color: #155724;
+  color: var(--c-success-text);
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 15px;
 }
 
 .email-info {
-  color: #155724;
+  color: var(--c-success-text);
   font-size: 14px;
   margin: 0 0 8px;
 }
@@ -65,7 +65,7 @@ h1 {
 .masked-email {
   font-family: 'Courier New', monospace;
   font-size: 16px;
-  color: #155724;
+  color: var(--c-success-text);
   font-weight: bold;
   margin: 0;
   word-break: break-all;
@@ -73,21 +73,21 @@ h1 {
 
 .instructions {
   text-align: left;
-  background: #f8f9fa;
+  background: var(--c-fill-1);
   border-radius: 6px;
   padding: 20px;
   margin-bottom: 30px;
 
   h3 {
     margin: 0 0 15px;
-    color: #333;
+    color: var(--c-text-1);
     font-size: 16px;
   }
 
   ol {
     margin: 0;
     padding-left: 20px;
-    color: #555;
+    color: var(--c-text-2);
 
     li {
       margin-bottom: 8px;
@@ -104,8 +104,8 @@ h1 {
   .login-button {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--c-brand) 0%, var(--c-brand-2) 100%);
+    color: var(--c-on-brand);
     border: none;
     border-radius: 6px;
     font-weight: bold;
@@ -116,17 +116,17 @@ h1 {
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 5px 20px var(--c-brand-a30);
     }
   }
 
   .resend-text {
     font-size: 14px;
-    color: #666;
+    color: var(--c-text-3);
     margin: 0;
 
     .resend-link {
-      color: #667eea;
+      color: var(--c-brand);
       text-decoration: none;
       font-weight: 600;
 

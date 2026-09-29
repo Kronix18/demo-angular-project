@@ -60,25 +60,153 @@
   --c-ind-orange: #f97316;
   --c-ind-yellow: #eab308;
   --c-ind-guide: #6b7280;
+
+  /* ---- semantic palette used by the feature pages (light values = the original literals) ---- */
+  --c-brand: #667eea;
+  --c-brand-2: #764ba2;
+  --c-brand-hover: #5568d3;
+  --c-on-brand: #ffffff;
+  --ac: #4c8dff;
+  --ac2: #6ee7ff;
+  --grad: linear-gradient(135deg, var(--ac), var(--ac2));
+  --grad-ultimate: linear-gradient(135deg, var(--tr-purple-a20), var(--tr-pink-a20));
+  --grad-admin: linear-gradient(135deg, var(--tr-gold-a20), var(--tr-orange-a20));
+  --c-shadow: #000000;
+  --c-neutral: #969696;
+  --c-text-1: #333333;
+  --c-text-2: #555555;
+  --c-text-3: #666666;
+  --c-text-4: #999999;
+  --c-text-5: #aaaaaa;
+  --c-fill-1: #f8f9fa;
+  --c-fill-2: #f5f5f5;
+  --c-fill-3: #e9ecef;
+  --c-line-1: #dddddd;
+  --c-line-2: #eeeeee;
+  --c-success: #28a745;
+  --c-success-text: #155724;
+  --c-success-text-2: #0f4220;
+  --c-success-bg: #d4edda;
+  --c-teal: #20c997;
+  --c-danger: #dc3545;
+  --c-danger-hover: #c82333;
+  --c-danger-text: #721c24;
+  --c-danger-text-2: #cc3333;
+  --c-danger-bg: #f8d7da;
+  --c-danger-bg-2: #ffeeee;
+  --c-danger-soft: #ff6666;
+  --c-secondary: #6c757d;
+  --c-secondary-hover: #5a6268;
+  --tr-purple: #9333ea;
+  --tr-pink: #ec4899;
+  --tr-gold: #ffd700;
+  --tr-orange: #ffa500;
+  /* fixed-dark "panel" family (profile page): identical in both themes by design */
+  --pn: #0b1220;
+  --pn-2: #0f1829;
+  --pn-ln: #1f2a3d;
+  --pn-ln2: #1b2435;
+  --on-ac: #0b1220;
+  --pn-t1: #e6edf7;
+  --pn-t2: #d7e3f5;
+  --pn-t3: #b8c7dd;
+  --pn-t4: #9fb1cc;
+  --pn-t5: #7a8fa8;
+  --pn-l: #6ea8ff;
+  --pn-l2: #b4cdff;
+
+  /* alpha variants of base colours (follow the base token in every theme) */
+  --ac-a14: color-mix(in srgb, var(--ac) 14%, transparent);
+  --ac-a20: color-mix(in srgb, var(--ac) 20%, transparent);
+  --ac-a28: color-mix(in srgb, var(--ac) 28%, transparent);
+  --ac-a35: color-mix(in srgb, var(--ac) 35%, transparent);
+  --ac-a40: color-mix(in srgb, var(--ac) 40%, transparent);
+  --ac2-a16: color-mix(in srgb, var(--ac2) 16%, transparent);
+  --ac2-a20: color-mix(in srgb, var(--ac2) 20%, transparent);
+  --ac2-a35: color-mix(in srgb, var(--ac2) 35%, transparent);
+  --ac2-a40: color-mix(in srgb, var(--ac2) 40%, transparent);
+  --c-brand-a10: color-mix(in srgb, var(--c-brand) 10%, transparent);
+  --c-brand-a20: color-mix(in srgb, var(--c-brand) 20%, transparent);
+  --c-brand-a30: color-mix(in srgb, var(--c-brand) 30%, transparent);
+  --c-brand-a40: color-mix(in srgb, var(--c-brand) 40%, transparent);
+  --nu-a20: color-mix(in srgb, var(--c-neutral) 20%, transparent);
+  --nu-a30: color-mix(in srgb, var(--c-neutral) 30%, transparent);
+  --c-shadow-a10: color-mix(in srgb, var(--c-shadow) 10%, transparent);
+  --c-shadow-a15: color-mix(in srgb, var(--c-shadow) 15%, transparent);
+  --c-shadow-a20: color-mix(in srgb, var(--c-shadow) 20%, transparent);
+  --c-shadow-a35: color-mix(in srgb, var(--c-shadow) 35%, transparent);
+  --tr-gold-a20: color-mix(in srgb, var(--tr-gold) 20%, transparent);
+  --tr-orange-a20: color-mix(in srgb, var(--tr-orange) 20%, transparent);
+  --tr-orange-a40: color-mix(in srgb, var(--tr-orange) 40%, transparent);
+  --tr-pink-a20: color-mix(in srgb, var(--tr-pink) 20%, transparent);
+  --tr-pink-a40: color-mix(in srgb, var(--tr-pink) 40%, transparent);
+  --tr-purple-a20: color-mix(in srgb, var(--tr-purple) 20%, transparent);
+  /* chart canvas (Chart.js cannot use color-mix/var) */
+  --c-up-fill: rgba(38, 166, 154, 0.1);
+  --c-up-strong: rgba(38, 166, 154, 0.8);
+  --c-down-strong: rgba(239, 83, 80, 0.8);
+  --c-chart-bg: #ffffff;
+  --c-chart-grid-faint: rgba(0, 0, 0, 0.05);
 }
 
 :root[data-theme='dark'] {
-  --c-bg: #0f172a;
-  --c-surface: #111827;
-  --c-text: #e5e7eb;
-  --c-text-muted: #9ca3af;
-  --c-border: #374151;
-  --c-primary: #3b82f6;
-  --c-primary-dark: #2563eb;
-  --c-nav-gradient-a: #312e81;
-  --c-nav-gradient-b: #4c1d95;
-  --c-footer-bg: #020617;
-  --c-grid: rgba(255, 255, 255, 0.07);
-  --c-pane-border: #374151;
-  --c-crosshair: #9ca3af;
-  --c-tooltip-bg: rgba(243, 244, 246, 0.95);
-  --c-tooltip-text: #111827;
-  --c-ind-guide: #9ca3af;
+  color-scheme: dark;
+
+  /* TradingView-style dark palette */
+  --c-bg: #131722;
+  --c-surface: #1e222d;
+  --c-text: #d1d4dc;
+  --c-text-muted: #787b86;
+  --c-border: #363a45;
+  --c-primary: #2962ff;
+  --c-primary-dark: #1e53e5;
+  --auth-error-color: #f85149;
+
+  --navbar-brand-color: #2b2f6b;
+  --c-nav-gradient-a: #2b2f6b;
+  --c-nav-gradient-b: #4a2a72;
+  --c-nav-surface: #d1d4dc;
+  --c-footer-bg: #0b0e14;
+  --c-footer-text: #787b86;
+  --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-elevation-low: 0 1px 4px rgba(0, 0, 0, 0.5);
+
+  --c-brand: #8b9cf5;
+  --c-brand-2: #a07cd6;
+  --c-brand-hover: #a3b0f8;
+  --c-text-1: #e0e3eb;
+  --c-text-2: #b2b5be;
+  --c-text-3: #9598a1;
+  --c-text-4: #787b86;
+  --c-text-5: #5d606b;
+  --c-fill-1: #1e222d;
+  --c-fill-2: #232733;
+  --c-fill-3: #2a2e39;
+  --c-line-1: #363a45;
+  --c-line-2: #2a2e39;
+  --c-success: #3ec46d;
+  --c-success-text: #7fdc9a;
+  --c-success-text-2: #a0e8b5;
+  --c-success-bg: #12351f;
+  --c-danger: #f85149;
+  --c-danger-hover: #da3633;
+  --c-danger-text: #ff8a85;
+  --c-danger-text-2: #ff7b72;
+  --c-danger-bg: #3d1a1a;
+  --c-danger-bg-2: #2d1717;
+  --c-danger-soft: #f85149;
+  --c-secondary: #5d606b;
+  --c-secondary-hover: #787b86;
+
+  /* chart */
+  --c-chart-bg: #131722;
+  --c-chart-grid-faint: rgba(255, 255, 255, 0.05);
+  --c-grid: #2a2e39;
+  --c-pane-border: #2a2e39;
+  --c-crosshair: #758696;
+  --c-tooltip-bg: #2a2e39;
+  --c-tooltip-text: #d1d4dc;
+  --c-ind-guide: #787b86;
 }
 
 html,

@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { AuthService } from './core/auth/auth.service';
+import { ThemeService } from './core/theme/theme.service';
 import { ChartStateService } from './core/services/chart-state.service';
 import { Subject } from 'rxjs';
 import { filter, startWith, takeUntil } from 'rxjs/operators';
@@ -18,6 +19,8 @@ export class App implements OnInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private chartState = inject(ChartStateService);
+  readonly theme = inject(ThemeService);
+  readonly themeIcon: Record<string, string> = { system: '◐', light: '☀', dark: '☾' };
   private destroy$ = new Subject<void>();
 
   isAuthenticated = false;

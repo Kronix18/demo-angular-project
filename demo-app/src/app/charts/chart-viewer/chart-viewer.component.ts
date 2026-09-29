@@ -207,7 +207,7 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         flex: 1 1 auto;
         min-height: 0;
         overflow: hidden;
-        background: var(--c-surface);
+        background: var(--c-chart-bg);
       }
       canvas {
         position: absolute;

@@ -23,7 +23,7 @@
         <h2>{{ plan.name }}</h2>
         <p class="plan-description">{{ plan.description }}</p>
         <div class="plan-price">
-          <span class="price-amount">\${{ plan.price }}</span>
+          <span class="price-amount">${{ plan.price }}</span>
           <span class="price-period" *ngIf="plan.price > 0">/month</span>
         </div>
       </div>

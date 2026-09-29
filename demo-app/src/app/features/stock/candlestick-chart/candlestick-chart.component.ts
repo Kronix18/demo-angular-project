@@ -1,3 +1,4 @@
+import { cssVar } from '../../../charts/chart-theme';
 import { Component, Input, OnInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, registerables } from 'chart.js';
@@ -68,8 +69,8 @@ export class CandlestickChartComponent implements OnInit, OnChanges, OnDestroy {
       datasetConfig = {
         label: this.title,
         data: chartData,
-        borderColor: '#26a69a',
-        backgroundColor: 'rgba(38, 166, 154, 0.1)',
+        borderColor: cssVar('--c-up'),
+        backgroundColor: cssVar('--c-up-fill'),
         fill: true,
         tension: 0.1
       };
@@ -83,8 +84,8 @@ export class CandlestickChartComponent implements OnInit, OnChanges, OnDestroy {
         label: this.title,
         data: chartData,
         backgroundColor: filteredPrices.map((p, i) => {
-          if (i === 0) return '#999';
-          return p.close >= filteredPrices[i-1].close ? 'rgba(38, 166, 154, 0.8)' : 'rgba(239, 83, 80, 0.8)';
+          if (i === 0) return cssVar('--c-text-4');
+          return p.close >= filteredPrices[i-1].close ? cssVar('--c-up-strong') : cssVar('--c-down-strong');
         })
       };
     } else {
@@ -99,11 +100,11 @@ export class CandlestickChartComponent implements OnInit, OnChanges, OnDestroy {
       datasetConfig = {
         label: this.title,
         data: chartData,
-        borderColor: '#26a69a',
+        borderColor: cssVar('--c-up'),
         color: {
-          up: '#26a69a',
-          down: '#ef5350',
-          unchanged: '#999'
+          up: cssVar('--c-up'),
+          down: cssVar('--c-down'),
+          unchanged: cssVar('--c-text-4')
         }
       };
     }
@@ -180,7 +181,7 @@ export class CandlestickChartComponent implements OnInit, OnChanges, OnDestroy {
           y: {
             type: this.scaleType,
             grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
+              color: cssVar('--c-chart-grid-faint')
             }
           }
         }

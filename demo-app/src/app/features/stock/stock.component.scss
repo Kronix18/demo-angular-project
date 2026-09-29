@@ -1,18 +1,18 @@
 .loading {
-  background: #f5f5f5;
+  background: var(--c-fill-2);
   border-radius: 8px;
   padding: 40px;
   text-align: center;
-  color: #666;
+  color: var(--c-text-3);
   font-size: 16px;
 }
 
 .error-box {
-  background: #fee;
-  border-left: 4px solid #f66;
+  background: var(--c-danger-bg-2);
+  border-left: 4px solid var(--c-danger-soft);
   border-radius: 6px;
   padding: 15px;
-  color: #c33;
+  color: var(--c-danger-text-2);
   margin-bottom: 20px;
 }
 
@@ -31,21 +31,21 @@
 }
 
 .back-link a {
-  color: #667eea;
+  color: var(--c-brand);
   text-decoration: none;
   font-weight: 600;
   transition: color 0.3s;
 }
 
 .back-link a:hover {
-  color: #5568d3;
+  color: var(--c-brand-hover);
 }
 
 .stock-detail {
-  background: white;
+  background: var(--c-surface);
   border-radius: 8px;
   padding: 30px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--c-shadow-a10);
 }
 
 .header {
@@ -53,25 +53,25 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 30px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--c-line-2);
   padding-bottom: 20px;
 }
 
 .header-left h1 {
   font-size: 36px;
-  color: #333;
+  color: var(--c-text-1);
   margin: 0 0 8px 0;
 }
 
 .company-name {
   font-size: 16px;
-  color: #666;
+  color: var(--c-text-3);
   margin: 0 0 8px 0;
 }
 
 .sector-badge {
   font-size: 13px;
-  color: #999;
+  color: var(--c-text-4);
   margin: 0;
 }
 
@@ -80,7 +80,7 @@
 }
 
 .price-display {
-  background: #f8f9fa;
+  background: var(--c-fill-1);
   padding: 15px 20px;
   border-radius: 6px;
 }
@@ -88,7 +88,7 @@
 .current-price {
   font-size: 32px;
   font-weight: 700;
-  color: #333;
+  color: var(--c-text-1);
   margin-bottom: 8px;
 }
 
@@ -99,11 +99,11 @@
   font-weight: 600;
 
   &.positive {
-    color: #28a745;
+    color: var(--c-success);
   }
 
   &.negative {
-    color: #dc3545;
+    color: var(--c-danger);
   }
 }
 
@@ -124,14 +124,14 @@
 }
 
 .metric-card {
-  background: #f8f9fa;
+  background: var(--c-fill-1);
   padding: 20px;
   border-radius: 6px;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid var(--c-brand);
 
   h3 {
     font-size: 12px;
-    color: #666;
+    color: var(--c-text-3);
     margin: 0 0 12px 0;
     font-weight: 600;
     text-transform: uppercase;
@@ -142,13 +142,13 @@
 .metric-value {
   font-size: 20px;
   font-weight: 700;
-  color: #333;
+  color: var(--c-text-1);
   margin: 0;
 }
 
 .range-bar {
   height: 4px;
-  background: #ddd;
+  background: var(--c-line-1);
   border-radius: 2px;
   margin: 8px 0;
   overflow: hidden;
@@ -156,13 +156,13 @@
 
 .range-fill {
   height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(90deg, var(--c-brand), var(--c-brand-2));
   transition: width 0.3s ease;
 }
 
 .range-text {
   font-size: 12px;
-  color: #999;
+  color: var(--c-text-4);
   margin: 8px 0 0 0;
 }
 
@@ -184,30 +184,30 @@
 }
 
 .buy-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--c-brand) 0%, var(--c-brand-2) 100%);
+  color: var(--c-on-brand);
   flex: 1;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 5px 15px var(--c-brand-a30);
   }
 }
 
 .watchlist-btn {
-  background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
+  background: var(--c-surface);
+  color: var(--c-brand);
+  border: 2px solid var(--c-brand);
 
   &:hover {
-    background: #f8f9fa;
+    background: var(--c-fill-1);
   }
 }
 
 .loading {
   text-align: center;
   padding: 40px;
-  color: #999;
+  color: var(--c-text-4);
 }
 
 @media (max-width: 600px) {

@@ -5,6 +5,16 @@
   <title>StockVerse - Stock Screener</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // apply the saved/OS theme before first paint (ThemeService keeps it in sync afterwards)
+    (function () {
+      try {
+        var m = localStorage.getItem('theme');
+        var dark = m === 'dark' || ((m !== 'light') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 <body>

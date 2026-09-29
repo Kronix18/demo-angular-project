@@ -22,7 +22,7 @@ Kevin's approval moves those INTO scope as Phase 10 tasks.
 
 ## Tasks
 
-### 10.1 — TradingView Dark Theme (token-based)
+### 10.1 — TradingView Dark Theme (token-based) — DONE 2026-09-29
 **Files:** theme SCSS, all chart components' CSS var consumption, chart.js runtime
 colors (cssVar helper — crosshair/grid/candles/volume/tooltip colors from tokens).
 **Spec:** TradingView dark palette: bg #131722, grid #2a2e39, text #d1d4dc,
@@ -66,3 +66,11 @@ chart-type switcher (candles/HLC/OHLC/line), fullscreen, camera (screenshot).
 Crosshair magnet mode; double-click reset zoom.
 **Verify:** every control works (screenshot each); chart-type switch changes the
 render (pixel-verified different signature per type).
+
+
+## 10.1 results (DONE)
+- `src/styles/theme.scss`: light palette (original values) + `:root[data-theme='dark']` TradingView-style palette (bg `#131722`, panels `#1e222d`, text `#d1d4dc`, grid/pane borders `#2a2e39`, muted `#787b86`, up/down unchanged, crosshair `#758696`). The `prefers-color-scheme` emulation swap is handled by `ThemeService` (mode `system` | `light` | `dark`, persisted in localStorage, live OS follow, navbar toggle ◐/☀/☾, pre-paint script in index.html avoids a flash).
+- ALL hardcoded colours removed from the app (10 feature stylesheets, pricing/profile/screener/stock/auth pages, legacy candlestick chart, chart runtime). Guard: `src/styles.spec.ts` (7 specs, no allowlist). Chart canvas reads tokens at draw time incl. candle colours, tooltip, axis text.
+- Tests: `theme.service.spec` (5), app.spec toggle, styles.spec, e2e `states-and-theme.spec` (light/dark token checks, OS emulation incl. live change, toggle persistence across pages). Screenshots: `docs/screenshots/10.1-dark-pricing.png`, `10.1-dark-profile.png`, `6.2-dark.png`.
+- Deviation: no side-by-side against a live TradingView screenshot (no access from this environment); palette values follow the spec above.
+- Also fixed: pricing page rendered a literal backslash before prices (`\$0`).

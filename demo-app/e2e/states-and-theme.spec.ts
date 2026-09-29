@@ -40,27 +40,61 @@ test.describe('navigation + loading/error states (6.1, 6.3)', () => {
   });
 });
 
-test.describe('theme tokens (6.2)', () => {
+test.describe('theme tokens + dark mode', () => {
+  const tokens = (page: import('@playwright/test').Page) => page.evaluate(() => {
+    const c = (window as any).__charts.chart;
+    const css = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    return {
+      up: c.data.datasets[0].color.up, cssUp: css('--c-up'), grid: c.options.scales.x.grid.color, cssGrid: css('--c-grid'),
+      rsi: c.data.datasets.find((d: any) => d.label === 'RSI').borderColor, cssViolet: css('--c-ind-violet'),
+      bg: getComputedStyle(document.body).backgroundColor, panel: getComputedStyle(document.querySelector('.chart-panel')!).backgroundColor,
+      theme: document.documentElement.getAttribute('data-theme'),
+    };
+  });
+
   for (const theme of ['light', 'dark'] as const) {
     test(`${theme}: chart colours come from the theme tokens`, async ({ page }) => {
-      if (theme === 'dark') await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.documentElement.setAttribute('data-theme', 'dark')));
+      await page.addInitScript((t) => localStorage.setItem('theme', t), theme);
       await openChart(page);
       await addIndicator(page, 'rsi', 14);
       await page.waitForTimeout(300);
-      const m = await page.evaluate(() => {
-        const c = (window as any).__charts.chart;
-        const css = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-        return {
-          up: c.data.datasets[0].color.up, cssUp: css('--c-up'), grid: c.options.scales.x.grid.color, cssGrid: css('--c-grid'),
-          rsi: c.data.datasets.find((d: any) => d.label === 'RSI').borderColor, cssViolet: css('--c-ind-violet'),
-          bg: getComputedStyle(document.body).backgroundColor,
-        };
-      });
+      const m = await tokens(page);
+      expect(m.theme).toBe(theme);
       expect(m.up).toBe(m.cssUp);
       expect(m.up).not.toBe('');
       expect(m.grid).toBe(m.cssGrid);
       expect(m.rsi).toBe(m.cssViolet);
-      expect(m.bg).toBe(theme === 'dark' ? 'rgb(15, 23, 42)' : 'rgb(248, 249, 250)');
+      expect(m.bg).toBe(theme === 'dark' ? 'rgb(19, 23, 34)' : 'rgb(248, 249, 250)');
+      expect(m.panel).toBe(theme === 'dark' ? 'rgb(19, 23, 34)' : 'rgb(255, 255, 255)'); // TradingView #131722
     });
   }
+
+  test('system mode follows the OS colour scheme (emulated) and live changes', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('/home');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  });
+
+  test('navbar toggle cycles system → light → dark, persists across reload, and re-themes every page', async ({ page }) => {
+    await page.goto('/pricing');
+    const toggle = page.locator('.theme-toggle');
+    await expect(toggle).toHaveAttribute('aria-label', /system/);
+    await toggle.click();
+    await toggle.click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    for (const url of ['/pricing', '/auth/login', '/home']) {
+      await page.goto(url);
+      expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(19, 23, 34)');
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark'); // persisted, no flash back to light
+    }
+    // the pricing cards actually use dark surfaces (not hardcoded white)
+    await page.goto('/pricing');
+    const card = await page.evaluate(() => {
+      const el = document.querySelector('[class*="plan"], [class*="card"]') as HTMLElement;
+      return getComputedStyle(el).backgroundColor;
+    });
+    expect(card).not.toBe('rgb(255, 255, 255)');
+  });
 });
