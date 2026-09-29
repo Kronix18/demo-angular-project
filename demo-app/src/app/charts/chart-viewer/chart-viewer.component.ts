@@ -1135,6 +1135,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         // y-fit must run once the scales exist but before they're laid out
         // (beforeUpdate is too early: the resolved scale options are stale then)
         beforeLayout: (c: Chart) => this.fitYAxes(c),
+        // Every loaded point is drawn (the LOD window is already small); Chart.js's "visible points
+        // only" shortcut works from stale pixel positions while panning and clips the lines short.
+        beforeDatasetUpdate: (_c: Chart, args: any) => { args.meta._sorted = false; },
       }, {
         // legend feed (10.2): hovered bar index + each pane's top edge
         id: 'legendFeed',

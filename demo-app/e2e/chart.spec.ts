@@ -385,4 +385,31 @@ test.describe('chart panel (2.x–5.x)', () => {
     expect(all.max / all.min).toBeGreaterThan(20);
     expect(errors).toEqual([]);
   });
+
+  test('indicator lines run edge to edge while panning (no cut-off at either side)', async ({ page }) => {
+    await openChart(page);
+    await addIndicator(page, 'sma', 10);
+    await addIndicator(page, 'sma', 50);
+    const box = (await page.locator('canvas').boundingBox())!;
+    for (const dx of [300, -500, 200]) {
+      await page.mouse.move(box.x + box.width / 2, box.y + 200);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + dx, box.y + 200, { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+      const r = await page.evaluate(() => {
+        const c = (window as any).__charts.chart;
+        return c.data.datasets.map((d: any, i: number) => ({ label: d.label, m: c.getDatasetMeta(i) })).filter((x: any) => /^SMA/.test(x.label)).map((x: any) => {
+          const pts = x.m.dataset.points;
+          const bars = c.getDatasetMeta(0).data;
+          return { first: pts[0].x, last: pts[pts.length - 1].x, left: bars[0].x, right: bars[bars.length - 1].x, all: pts.every((p: any) => !p.skip) };
+        });
+      });
+      for (const l of r) {
+        expect(l.all).toBe(true);
+        expect(l.first).toBeLessThanOrEqual(l.left + 1);
+        expect(l.last).toBeGreaterThanOrEqual(l.right - 1);
+      }
+    }
+  });
 });
