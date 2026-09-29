@@ -6,7 +6,7 @@
      min-height left the container at content size (253px dead gap below the
      volume pane — measured live). */
   min-height: 100vh;
-  background: #f8f9fa;
+  background: var(--c-bg);
 
   /* Chart pages: the shell is EXACTLY the viewport — compact navbar, no footer,
      no padding; the routed component fills the rest and nothing scrolls. */
@@ -33,10 +33,10 @@
 }
 
 .navbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--c-nav-gradient-a) 0%, var(--c-nav-gradient-b) 100%);
+  color: var(--c-nav-text);
   padding: 16px 32px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-nav);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -65,7 +65,7 @@
 }
 
 .nav-link {
-  color: white;
+  color: var(--c-nav-text);
   text-decoration: none;
   font-weight: 500;
   transition: all 0.3s ease;
@@ -74,7 +74,7 @@
 
   &:hover:not(.disabled),
   &.active {
-    border-bottom-color: white;
+    border-bottom-color: var(--c-nav-text);
   }
 
   &.active {
@@ -102,40 +102,40 @@
   font-weight: 500;
   transition: all 0.3s ease;
   text-decoration: none;
-  border: 1px solid white;
+  border: 1px solid var(--c-nav-text);
   display: inline-block;
 }
 
 .logout-btn {
   background: transparent;
-  color: white;
+  color: var(--c-nav-text);
   cursor: pointer;
-  border: 1px solid white;
+  border: 1px solid var(--c-nav-text);
 
   &:hover {
-    background: white;
-    color: var(--navbar-brand-color, #667eea);
+    background: var(--c-nav-surface);
+    color: var(--navbar-brand-color);
   }
 }
 
 .login-link,
 .account-link {
-  background: white;
-  color: var(--navbar-brand-color, #667eea);
+  background: var(--c-nav-surface);
+  color: var(--navbar-brand-color);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--c-nav-surface-hover);
   }
 }
 
 .register-link {
   background: transparent;
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: var(--c-nav-text);
+  border: 1px solid var(--c-nav-outline);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: white;
+    background: var(--c-nav-hover-bg);
+    border-color: var(--c-nav-text);
   }
 }
 
@@ -158,8 +158,8 @@
 }
 
 .footer {
-  background: #333;
-  color: #ccc;
+  background: var(--c-footer-bg);
+  color: var(--c-footer-text);
   text-align: center;
   padding: 24px;
   font-size: 14px;

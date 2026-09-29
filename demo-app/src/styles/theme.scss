@@ -1,0 +1,89 @@
+/*
+ * THEME — the single home of every colour / shadow / radius literal.
+ * Components (SCSS, templates, inline styles, TS) must reference these custom
+ * properties only; `src/styles.spec.ts` enforces it. Chart.js draws on canvas
+ * and cannot use var(), so chart code reads them at runtime (charts/chart-theme.ts).
+ * Dark palette: opt-in via <html data-theme="dark">.
+ */
+:root {
+  /* surfaces + text */
+  --c-bg: #f8f9fa;
+  --c-surface: #ffffff;
+  --c-text: #1f2937;
+  --c-text-muted: #6b7280;
+  --c-border: #d1d5db;
+  --c-primary: #2563eb;
+  --c-primary-dark: #1d4ed8;
+  --c-on-primary: #ffffff;
+  --c-primary-tint: color-mix(in srgb, var(--c-primary) 8%, transparent);
+  --c-focus-ring: color-mix(in srgb, var(--c-primary) 25%, transparent);
+  --auth-error-color: #dc3545;
+
+  /* navbar + footer */
+  --navbar-brand-color: #667eea;
+  --c-nav-gradient-a: #667eea;
+  --c-nav-gradient-b: #764ba2;
+  --c-nav-text: #ffffff;
+  --c-nav-surface: #ffffff;
+  --c-nav-hover-bg: color-mix(in srgb, var(--c-nav-text) 10%, transparent);
+  --c-nav-surface-hover: color-mix(in srgb, var(--c-nav-surface) 90%, transparent);
+  --c-nav-outline: color-mix(in srgb, var(--c-nav-text) 50%, transparent);
+  --c-footer-bg: #333333;
+  --c-footer-text: #cccccc;
+
+  /* shape */
+  --border-radius: 8px;
+  --border-radius-sm: 4px;
+  --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-elevation-low: 0 1px 4px rgba(0, 0, 0, 0.12);
+
+  /* chart panel */
+  --c-up: #26a69a;
+  --c-down: #ef5350;
+  --c-grid: rgba(0, 0, 0, 0.06);
+  --c-pane-border: #d1d5db;
+  --c-crosshair: #758696;
+  --c-tooltip-bg: rgba(33, 37, 41, 0.92);
+  --c-tooltip-text: #ffffff;
+
+  /* indicator palette (overlays rotate 1..4; oscillator outputs use the named ones) */
+  --c-indicator-1: #4c9aff;
+  --c-indicator-2: #f59e0b;
+  --c-indicator-3: #a78bfa;
+  --c-indicator-4: #22c55e;
+  --c-ind-blue: #4c9aff;
+  --c-ind-violet: #a78bfa;
+  --c-ind-amber: #f59e0b;
+  --c-ind-sky: #38bdf8;
+  --c-ind-green: #22c55e;
+  --c-ind-red: #ef4444;
+  --c-ind-orange: #f97316;
+  --c-ind-yellow: #eab308;
+  --c-ind-guide: #6b7280;
+}
+
+:root[data-theme='dark'] {
+  --c-bg: #0f172a;
+  --c-surface: #111827;
+  --c-text: #e5e7eb;
+  --c-text-muted: #9ca3af;
+  --c-border: #374151;
+  --c-primary: #3b82f6;
+  --c-primary-dark: #2563eb;
+  --c-nav-gradient-a: #312e81;
+  --c-nav-gradient-b: #4c1d95;
+  --c-footer-bg: #020617;
+  --c-grid: rgba(255, 255, 255, 0.07);
+  --c-pane-border: #374151;
+  --c-crosshair: #9ca3af;
+  --c-tooltip-bg: rgba(243, 244, 246, 0.95);
+  --c-tooltip-text: #111827;
+  --c-ind-guide: #9ca3af;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+}

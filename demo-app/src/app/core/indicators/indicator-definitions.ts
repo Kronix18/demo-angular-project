@@ -18,6 +18,7 @@ export interface OutputSpec {
   key: string;
   label: string;
   renderType: 'line' | 'histogram';
+  /** CSS colour or a `var(--name)` reference (resolved at draw time). */
   defaultColor: string;
   defaultWidth: number;
   defaultLineStyle: 'solid' | 'dash' | 'dot' | 'dash_dot';
@@ -50,7 +51,7 @@ export const MOVING_AVERAGE: IndicatorDefinition = {
     { key: 'length', label: 'Length', type: 'integer', default: 50, minimum: 1, maximum: 10000, step: 1 },
     { key: 'offset', label: 'Offset', type: 'integer', default: 0, minimum: -5000, maximum: 5000, step: 1 },
   ],
-  outputs: [out('ma', 'MA', '#4c9aff')],
+  outputs: [out('ma', 'MA', 'var(--c-ind-blue)')],
   panePolicy: 'source_aware', labelTemplate: '{method} {length} {source}',
   defaultPanelHeight: 180, defaultYRange: null,
 };
@@ -64,9 +65,9 @@ export const RSI: IndicatorDefinition = {
     { key: 'oversold', label: 'Oversold', type: 'float', default: 30, minimum: 0, maximum: 100, step: 1 },
   ],
   outputs: [
-    out('rsi', 'RSI', '#a78bfa'),
-    out('overbought', 'Overbought', '#6b7280', 'dash'),
-    out('oversold', 'Oversold', '#6b7280', 'dash'),
+    out('rsi', 'RSI', 'var(--c-ind-violet)'),
+    out('overbought', 'Overbought', 'var(--c-ind-guide)', 'dash'),
+    out('oversold', 'Oversold', 'var(--c-ind-guide)', 'dash'),
   ],
   panePolicy: 'own', labelTemplate: 'RSI {length}', defaultPanelHeight: 180, defaultYRange: [0, 100],
 };
@@ -77,7 +78,7 @@ export const ATR: IndicatorDefinition = {
     { key: 'length', label: 'Length', type: 'integer', default: 14, minimum: 1, maximum: 10000, step: 1 },
     { key: 'smoothing', label: 'Smoothing', type: 'choice', default: 'RMA', choices: choices('RMA', 'SMA', 'EMA', 'WMA') },
   ],
-  outputs: [out('atr', 'ATR', '#f59e0b')],
+  outputs: [out('atr', 'ATR', 'var(--c-ind-amber)')],
   panePolicy: 'own', labelTemplate: 'ATR {length}', defaultPanelHeight: 180, defaultYRange: null,
 };
 
@@ -93,12 +94,12 @@ export const WEBBY_RSI: IndicatorDefinition = {
     { key: 'positive_only', label: 'Positive only', type: 'boolean', default: true },
   ],
   outputs: [
-    out('webby', 'Webby', '#38bdf8'), out('signal', 'Signal', '#a78bfa'),
-    out('level_0', '0', '#6b7280', 'dash'), out('level_05', '0.5', '#6b7280', 'dash'),
-    out('level_2', '2', '#6b7280', 'dash'), out('level_4', '4', '#6b7280', 'dash'),
-    out('level_6', '6', '#6b7280', 'dash'),
-    out('above_21', 'Above 21', '#22c55e'), out('below_21', 'Below 21', '#ef4444'),
-    out('sma_extension', 'SMA extension', '#f97316'), out('stretched', 'Stretched', '#f97316', 'dash'),
+    out('webby', 'Webby', 'var(--c-ind-sky)'), out('signal', 'Signal', 'var(--c-ind-violet)'),
+    out('level_0', '0', 'var(--c-ind-guide)', 'dash'), out('level_05', '0.5', 'var(--c-ind-guide)', 'dash'),
+    out('level_2', '2', 'var(--c-ind-guide)', 'dash'), out('level_4', '4', 'var(--c-ind-guide)', 'dash'),
+    out('level_6', '6', 'var(--c-ind-guide)', 'dash'),
+    out('above_21', 'Above 21', 'var(--c-ind-green)'), out('below_21', 'Below 21', 'var(--c-ind-red)'),
+    out('sma_extension', 'SMA extension', 'var(--c-ind-orange)'), out('stretched', 'Stretched', 'var(--c-ind-orange)', 'dash'),
   ],
   panePolicy: 'own', labelTemplate: 'Webby RSI {mode}', defaultPanelHeight: 180, defaultYRange: null,
 };
@@ -114,8 +115,8 @@ export const BOB_MARLEY: IndicatorDefinition = {
     { key: 'invert_axis', label: 'Invert axis', type: 'boolean', default: false },
   ],
   outputs: [
-    out('green', 'Green', '#22c55e'), out('yellow', 'Yellow', '#eab308'), out('red', 'Red', '#ef4444'),
-    out('green_boundary', 'Green boundary', '#22c55e', 'dash'), out('red_boundary', 'Red boundary', '#ef4444', 'dash'),
+    out('green', 'Green', 'var(--c-ind-green)'), out('yellow', 'Yellow', 'var(--c-ind-yellow)'), out('red', 'Red', 'var(--c-ind-red)'),
+    out('green_boundary', 'Green boundary', 'var(--c-ind-green)', 'dash'), out('red_boundary', 'Red boundary', 'var(--c-ind-red)', 'dash'),
   ],
   panePolicy: 'own', labelTemplate: 'Bob Marley {high_reference}', defaultPanelHeight: 180, defaultYRange: null,
 };

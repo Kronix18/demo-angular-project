@@ -97,29 +97,29 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
       .range-btn {
         padding: 0.1875rem 0.5rem;
         border: 1px solid transparent;
-        border-radius: var(--border-radius-sm, 4px);
+        border-radius: var(--border-radius-sm);
         background: transparent;
-        color: var(--c-text, #1f2937);
+        color: var(--c-text);
         cursor: pointer;
         font-size: 0.8125rem;
         font-weight: 500;
       }
       .range-btn:hover {
-        background: rgba(37, 99, 235, 0.08);
-        color: var(--c-primary, #2563eb);
+        background: var(--c-primary-tint);
+        color: var(--c-primary);
       }
       .range-btn.active {
-        background: var(--c-primary, #2563eb);
-        color: #fff;
+        background: var(--c-primary);
+        color: var(--c-on-primary);
       }
 
       input,
       select {
         padding: 0.1875rem 0.5rem;
-        border: 1px solid var(--c-border, #d1d5db);
-        border-radius: var(--border-radius-sm, 4px);
-        background-color: var(--c-surface, #ffffff);
-        color: var(--c-text, #1f2937);
+        border: 1px solid var(--c-border);
+        border-radius: var(--border-radius-sm);
+        background-color: var(--c-surface);
+        color: var(--c-text);
         font-size: 0.8125rem;
       }
       input#symbol { width: 6.5rem; }
@@ -127,23 +127,23 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
       input:focus,
       select:focus {
         outline: none;
-        border-color: var(--c-primary, #2563eb);
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+        border-color: var(--c-primary);
+        box-shadow: 0 0 0 2px var(--c-focus-ring);
       }
 
       button:not(.range-btn) {
         padding: 0.1875rem 0.75rem;
-        background-color: var(--c-primary, #2563eb);
-        color: #fff;
+        background-color: var(--c-primary);
+        color: var(--c-on-primary);
         border: none;
-        border-radius: var(--border-radius-sm, 4px);
+        border-radius: var(--border-radius-sm);
         cursor: pointer;
         font-size: 0.8125rem;
         font-weight: 500;
       }
 
       button:not(.range-btn):hover {
-        background-color: var(--c-primary-dark, #1d4ed8);
+        background-color: var(--c-primary-dark);
       }
     `,
   ],

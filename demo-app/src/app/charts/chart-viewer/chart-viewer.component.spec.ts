@@ -248,13 +248,19 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     for (let i = 1; i < ts.length; i++) expect(ts[i]).toBeGreaterThan(ts[i - 1]);
   });
 
-  it('VOLUME COLORS: up bars green, down bars red (per-bar scriptable colour)', async () => {
+  it('VOLUME COLORS: up bars green, down bars red (per-bar scriptable colour, from theme tokens)', async () => {
+    // jsdom loads no stylesheet: provide the theme tokens the chart reads at draw time
+    document.documentElement.style.setProperty('--c-up', 'rgb(0, 200, 0)');
+    document.documentElement.style.setProperty('--c-down', 'rgb(200, 0, 0)');
     const chart = await loaded();
     const ds = chart.data.datasets[1];
     expect(typeof ds.backgroundColor).toBe('function');
     const upC = ds.backgroundColor({ raw: { up: true } });
     const downC = ds.backgroundColor({ raw: { up: false } });
-    expect(upC).not.toBe(downC);
+    expect(upC).toBe('rgb(0, 200, 0)');
+    expect(downC).toBe('rgb(200, 0, 0)');
+    document.documentElement.style.removeProperty('--c-up');
+    document.documentElement.style.removeProperty('--c-down');
     // MSFT_ROWS bar 0: open 100 close 105 -> up
     expect(ds.data[0].up).toBe(true);
   });

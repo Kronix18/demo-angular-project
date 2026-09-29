@@ -13,6 +13,7 @@ import { ResolvedIndicator, resolveEntry } from '../../core/indicators/indicator
 import { OutputSpec } from '../../core/indicators/indicator-definitions';
 import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { cssVar, resolveColor } from '../chart-theme';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
 // anywhere — it registers registerables + adapter + zoom + the financial
@@ -20,16 +21,6 @@ import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../c
 // dual-package hazard, verified empirically 2026-09-24).
 import '../chart-setup';
 import 'chartjs-chart-financial';
-
-/** Theme colour from a CSS custom property (token rule), with a fallback. */
-function cssVar(name: string, fallback: string): string {
-  try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return v || fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 /**
  * Crosshair (3.3): a dashed vertical line through the WHOLE panel (price,
@@ -53,7 +44,7 @@ const crosshairPlugin = {
     ctx.beginPath();
     ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1;
-    ctx.strokeStyle = cssVar('--c-crosshair', '#758696');
+    ctx.strokeStyle = cssVar('--c-crosshair');
     ctx.moveTo(x, chartArea.top);
     ctx.lineTo(x, chartArea.bottom);
     ctx.stroke();
@@ -72,8 +63,8 @@ const paneDecorPlugin = {
   afterDraw(chart: any): void {
     const { ctx, chartArea } = chart;
     if (!ctx || !chartArea) return;
-    const border = cssVar('--c-pane-border', '#d1d5db');
-    const text = cssVar('--c-text-muted', '#6b7280');
+    const border = cssVar('--c-pane-border');
+    const text = cssVar('--c-text-muted');
     const ids = Object.keys(chart.scales).filter((k) => k.startsWith('y'));
     ctx.save();
     ctx.font = '12px sans-serif';
@@ -208,15 +199,15 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         align-items: center;
         gap: 0.25rem 0.75rem;
         padding: 0.25rem 0.5rem;
-        background: var(--c-surface, #fff);
-        border-bottom: 1px solid var(--c-pane-border, #d1d5db);
+        background: var(--c-surface);
+        border-bottom: 1px solid var(--c-pane-border);
       }
       .chart-panel {
         position: relative;
         flex: 1 1 auto;
         min-height: 0;
         overflow: hidden;
-        background: var(--c-surface, #fff);
+        background: var(--c-surface);
       }
       canvas {
         position: absolute;
@@ -229,7 +220,7 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--c-surface, rgba(255, 255, 255, 0.7));
+        background: var(--c-surface);
         z-index: 5;
       }
       canvas[hidden] { display: none; }
@@ -237,14 +228,14 @@ type DataBuilder = (pts: LodPoint[]) => any[];
       .skeleton {
         background: linear-gradient(
           100deg,
-          var(--c-surface, #fff) 30%,
-          var(--c-grid, rgba(0, 0, 0, 0.06)) 50%,
-          var(--c-surface, #fff) 70%
+          var(--c-surface) 30%,
+          var(--c-grid) 50%,
+          var(--c-surface) 70%
         );
         background-size: 200% 100%;
         animation: shimmer 1.4s linear infinite;
       }
-      .skeleton-label { color: var(--c-text-muted, #6b7280); font-size: 0.875rem; }
+      .skeleton-label { color: var(--c-text-muted); font-size: 0.875rem; }
       @keyframes shimmer { to { background-position: -200% 0; } }
       .error-message {
         position: absolute;
@@ -258,39 +249,39 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         max-width: 32rem;
         padding: 1.25rem 1.5rem;
         text-align: center;
-        border: 1px solid var(--c-pane-border, #d1d5db);
-        border-radius: var(--border-radius, 8px);
-        background: var(--c-surface, #fff);
-        color: var(--c-text, #1f2937);
+        border: 1px solid var(--c-pane-border);
+        border-radius: var(--border-radius);
+        background: var(--c-surface);
+        color: var(--c-text);
       }
-      .error-card h2 { margin: 0 0 0.5rem; font-size: 1.125rem; color: var(--auth-error-color, #dc3545); }
+      .error-card h2 { margin: 0 0 0.5rem; font-size: 1.125rem; color: var(--auth-error-color); }
       .error-card p { margin: 0.25rem 0; }
-      .hint { color: var(--c-text-muted, #6b7280); font-size: 0.8125rem; }
+      .hint { color: var(--c-text-muted); font-size: 0.8125rem; }
       .symbol-list { display: flex; flex-wrap: wrap; gap: 0.375rem; justify-content: center; margin: 0.5rem 0 0.75rem; }
       .symbol-btn, .retry-btn {
         padding: 0.25rem 0.75rem;
-        border: 1px solid var(--c-border, #d1d5db);
-        border-radius: var(--border-radius-sm, 4px);
-        background: var(--c-surface, #fff);
-        color: var(--c-text, #1f2937);
+        border: 1px solid var(--c-border);
+        border-radius: var(--border-radius-sm);
+        background: var(--c-surface);
+        color: var(--c-text);
         cursor: pointer;
         font-size: 0.8125rem;
       }
-      .retry-btn { background: var(--c-primary, #2563eb); border-color: var(--c-primary, #2563eb); color: #fff; }
-      .symbol-btn:hover { border-color: var(--c-primary, #2563eb); color: var(--c-primary, #2563eb); }
+      .retry-btn { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
+      .symbol-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
       .reset-zoom-btn {
         margin-left: auto;
         padding: 0.25rem 0.625rem;
-        border: 1px solid var(--c-border, #d1d5db);
-        border-radius: var(--border-radius-sm, 4px);
-        background: var(--c-surface, #fff);
-        color: var(--c-text, #1f2937);
+        border: 1px solid var(--c-border);
+        border-radius: var(--border-radius-sm);
+        background: var(--c-surface);
+        color: var(--c-text);
         cursor: pointer;
         font-size: 0.8125rem;
       }
       .reset-zoom-btn:hover {
-        border-color: var(--c-primary, #2563eb);
-        color: var(--c-primary, #2563eb);
+        border-color: var(--c-primary);
+        color: var(--c-primary);
       }
     `,
   ],
@@ -530,16 +521,21 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const { overlays, panes } = this.computeIndicators(bars);
 
     // ---- datasets + their data builders (order = builders order) -------------
-    const up = cssVar('--c-up', '#26a69a');
-    const down = cssVar('--c-down', '#ef5350');
+    const up = cssVar('--c-up');
+    const down = cssVar('--c-down');
     const datasets: any[] = [];
     this.builders = [];
     const add = (ds: any, b: DataBuilder) => { datasets.push(ds); this.builders.push(b); };
 
-    add({ type: 'candlestick', label: 'Price', yAxisID: 'y', data: [] },
+    add({
+      type: 'candlestick', label: 'Price', yAxisID: 'y', data: [],
+      // token colours (the plugin's defaults are hardcoded rgba)
+      color: { up, down, unchanged: cssVar('--c-text-muted') },
+      borderColor: { up, down, unchanged: cssVar('--c-text-muted') },
+    },
       (pts) => pts.map((p) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t })));
     overlays.forEach(({ resolved, outputs }, i) => {
-      const color = cssVar(`--c-indicator-${(i % 4) + 1}`, ['#4c9aff', '#f59e0b', '#a78bfa', '#22c55e'][i % 4]);
+      const color = cssVar(`--c-indicator-${(i % 4) + 1}`);
       const first = Object.values(outputs)[0];
       if (first) add(this.lineDataset(resolved.label, 'y', color, 1.5, []), this.lineBuilder(first));
     });
@@ -555,13 +551,13 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       const def = this.indicatorCalc.definition(resolved.definitionId);
       for (const o of def.outputs) {
         if (!outputs[o.key]) continue;
-        add(this.lineDataset(o.label, id, o.defaultColor, o.defaultWidth, DASHES[o.defaultLineStyle]),
+        add(this.lineDataset(o.label, id, resolveColor(o.defaultColor), o.defaultWidth, DASHES[o.defaultLineStyle]),
           this.lineBuilder(outputs[o.key]));
       }
       paneScales[id] = {
         type: 'linear', position: 'right', stack: 'panel', stackWeight: PANE_WEIGHT,
         afterFit: (s: any) => { s.width = Y_WIDTH; },
-        grid: { color: cssVar('--c-grid', 'rgba(0,0,0,0.06)') },
+        grid: { color: cssVar('--c-grid') },
         ticks: { includeBounds: false },
         paneLabel: resolved.label,
         ...(def.defaultYRange
@@ -579,7 +575,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     });
 
     // ---- scales: one x, stacked y's ------------------------------------------
-    const grid = { color: cssVar('--c-grid', 'rgba(0,0,0,0.06)') };
+    const grid = { color: cssVar('--c-grid') };
     const scales: Record<string, any> = {
       x: {
         type: 'linear', position: 'bottom', min: viewMin, max: viewMax, grid,
@@ -619,11 +615,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         responsive: true,
         maintainAspectRatio: false,
         animation: false, // animations are the main source of jank on pan/zoom
+        color: cssVar('--c-text-muted'), // axis labels
         interaction: { mode: 'index', axis: 'x', intersect: false },
         plugins: {
           legend: { display: false }, // TradingView hides the legend; 10.2 adds rows
           tooltip: {
             enabled: true, mode: 'index', axis: 'x', intersect: false,
+            backgroundColor: cssVar('--c-tooltip-bg'),
+            titleColor: cssVar('--c-tooltip-text'),
+            bodyColor: cssVar('--c-tooltip-text'),
             // guide lines (overbought/stretched/...) are noise in the readout
             filter: (item: any) => !(item.dataset?.borderDash?.length),
             callbacks: {
