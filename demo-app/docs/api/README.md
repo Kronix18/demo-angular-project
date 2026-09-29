@@ -18,6 +18,8 @@ shape the app will consume it. This is a *contract*, not an implementation: the 
 | [`08-screener.md`](08-screener.md) | Field catalogue, query model, run / export, presets, saved screens |
 | [`09-user-tiers.md`](09-user-tiers.md) | Auth, profile, entitlements, plans, watchlists, alerts, layouts, drawings |
 | [`10-capabilities-and-fallbacks.md`](10-capabilities-and-fallbacks.md) | How the front end decides between "backend has it" and "calculate it here" |
+| [`CHANGELOG.md`](CHANGELOG.md) | Contract changes and the change process |
+| [`../integration/`](../integration/README.md) | Integration papers for the backend and the data fetcher |
 
 Older, still-valid chart endpoints are in [`../../API-BACKEND-SPEC.md`](../../API-BACKEND-SPEC.md) (v1); v2 extends them
 and never breaks them.
@@ -140,6 +142,8 @@ GET /api/meta
   "api_version": 2,
   "data_as_of": { "prices": "2026-09-22", "technicals": "2026-09-22", "rs": "2026-09-22", "eps": "2026-09-15", "smr": "2026-09-15",
                   "fundamentals": "2026-09-19", "institutional": "2026-06-30", "market": "2026-09-22" },
+  "benchmarks": { "default": "TSX", "market_indices": ["NDQ","TSX"], "is_interim": true },   // TSX stands in for the S&P 500 until SPX exists
+  "display_names": { "smr_rating": "Quality (Sales·Margins·ROE)", "canslim_score": "O'Neil-style growth score" },
   "next_refresh_after": "2026-09-23T02:00:00Z",   // may be null: the daily import is manual today
   "model_versions": { "technicals": "TECHNICAL_DAILY_V1", "rs": ["RS_3M_V1","RS_6M_V1","RS_12M_V1","RS_ER3_V1"], "eps": "EPS_V5_3", "smr": "SMR_V4" },
   "datasets": ["security_master","prices","splits","technicals","rs_ratings","eps_rating","smr_rating","filings"]   // later: weekly, index_prices, fundamentals, composite, patterns, market, institutional, events

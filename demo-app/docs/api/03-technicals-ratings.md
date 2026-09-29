@@ -45,11 +45,12 @@ Parity contract: the client keeps its Python-golden tests; backend series must m
 
 ## 2. Relative strength
 
-### `GET /api/stocks/{symbol}/rs-line?benchmark=SPX&interval=1d&format=columnar`
+### `GET /api/stocks/{symbol}/rs-line?benchmark=&interval=1d&format=columnar`
+`benchmark` is optional; the default is `GET /api/meta` → `benchmarks.default` (**currently `TSX`, the S&P/TSX Composite, an interim stand-in for the S&P 500 which Stooq's list does not provide** — owner decision 2026-09-29; it switches to `SPX` when that index is added, with no front-end change). The UI shows the benchmark name next to the pane and marks it "interim" when `benchmark_is_interim` is true.
 `rs_line = close / benchmark_close` (scaled so the first point is 100, or as the backend defines — **state it in `meta.scale`**).
 ```json
 { "data": { "timestamp":[…], "rs_line":[…], "rs_line_new_high":[false,…] },
-  "meta": { "benchmark": "SPX", "scale": "first=100", "model_version": { "rs": "RS_LEGACY_V1" } } }
+  "meta": { "benchmark": "TSX", "benchmark_is_interim": true, "scale": "first=100", "model_version": { "rs": "RS_LEGACY_V1" } } }
 ```
 Tables: `relative_strength_history(security_id, trade_date, rs_line, rs_line_high_52w, rs_new_high bool, model_version)`.
 Needs `index_prices` (see `02`).

@@ -22,7 +22,7 @@ Phase-1 (DB only) fields have `rs`-dependent ones `null`.
 
 ## 2. Market state (M)
 
-Indices used: `SPX` (S&P 500; proxy `SPY` until it exists) and `NDQ` (Nasdaq Composite). Volume-based signals (distribution, follow-through, stalling) need index volume: **if an index has no volume the affected signals are `null` with `meta.notes`**, never guessed.
+Indices used come from `GET /api/meta` → `benchmarks.market_indices`: **currently `NDQ` (Nasdaq Composite) and `TSX` (S&P/TSX Composite, interim stand-in for the S&P 500, owner decision 2026-09-29; Stooq lists volume for it; if a volume turns out to be missing the backend adds it later as an index)**. Responses set `"indices_interim": true` while `TSX` stands in for `SPX`; the UI shows a small note. Thresholds are the backend's. Volume-based signals (distribution, follow-through, stalling) need index volume: **if an index has no volume the affected signals are `null` with `meta.notes`**, never guessed.
 
 ### `GET /api/market/state?as_of=`
 ```json
@@ -30,12 +30,12 @@ Indices used: `SPX` (S&P 500; proxy `SPY` until it exists) and `NDQ` (Nasdaq Com
   "market_state": "confirmed_uptrend",
   "state_since": "2026-08-12", "exposure_pct": 80,
   "follow_through": { "date": "2026-08-12", "index": "NDQ", "gain_pct": 1.9, "volume_ratio": 1.2, "rally_day": 5 },
-  "distribution": { "SPX": { "count_25d": 3, "days": ["2026-09-04","2026-09-10","2026-09-18"] },
+  "distribution": { "TSX": { "count_25d": 3, "days": ["2026-09-04","2026-09-10","2026-09-18"] },
                     "NDQ": { "count_25d": 4, "days": [ … ] } },
-  "stalling_days": { "SPX": 0, "NDQ": 1 },
+  "stalling_days": { "TSX": 0, "NDQ": 1 },
   "power_trend": { "active": true, "since": "2026-08-30" },
   "index_position": { "NDQ": { "above_ema_21": true, "above_sma_50": true, "above_sma_200": true },
-                     "SPX":  { "above_ema_21": true, "above_sma_50": true, "above_sma_200": true } },
+                     "TSX":  { "above_ema_21": true, "above_sma_50": true, "above_sma_200": true } },
   "breadth": { "pct_above_sma_50": 64.2, "pct_above_sma_200": 71.0, "new_highs": 210, "new_lows": 34, "advancers": 2100, "decliners": 1400 } }
 ```
 `market_state`: `market_correction | rally_attempt | follow_through | confirmed_uptrend | uptrend_under_pressure`. `exposure_pct`: 0,20,40,60,80,100.

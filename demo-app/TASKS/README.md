@@ -83,7 +83,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 10.4 | phase-10-tradingview/README.md#104 | DONE (delivered in 5.4; drag-to-resize panes deferred) | true stacked panes, per-pane y, shared x, separators |
 | 10.5 | phase-10-tradingview/README.md#105 | DONE (browser-verified; symbol search dialog deferred) | chart types candles/OHLC/line/area, magnet crosshair + price label, snapshot PNG, fullscreen, dblclick reset |
 
-## Data & backend integration plan (Phases 12–22) — added 2026-09-29
+## Data & backend integration plan (Phases 12–23) — added 2026-09-29
 
 Plan: `docs/DATA-PLAN.md`. Contract the backend implements: `docs/api/README.md` (+ files 00–10).
 Rules specific to these phases:
@@ -125,6 +125,7 @@ Replaces the static `*.us.txt` files with `/api/chart/...` when the backend can 
 | 13.8 | phase-13-prices-from-backend/13.8-index-benchmark-data.md | NOT STARTED | Index benchmark data — needs: `index_prices` (expected) |
 | 13.9 | phase-13-prices-from-backend/13.9-corporate-action-markers-split-dividend.md | NOT STARTED | Corporate-action markers (split/dividend) — needs: `splits`, `dividends` (DB) |
 | 13.10 | phase-13-prices-from-backend/13.10-range-clamp-by-first-last-bar-and-delisting.md | NOT STARTED | Range clamp by first/last bar and delisting — needs: `prices` |
+| 13.12 | phase-13-prices-from-backend/13.12-benchmark-from-api-meta-interim-note.md | NOT STARTED | Benchmark from `/api/meta` (interim note) — needs: `meta.benchmarks` |
 
 ### Phase 14 — Server-side technicals and RS line
 Uses the backend `technical_daily` series instead of calculating in the browser, without losing indicators the backend does not store.
@@ -235,6 +236,7 @@ Industry list can ship on facets alone; market state needs index data and the M 
 | 19.7 | phase-19-industries-market/19.7-distribution-and-follow-through-markers.md | NOT STARTED | Distribution and follow-through markers — needs: `distribution_days`, `follow_through_days` |
 | 19.8 | phase-19-industries-market/19.8-breadth-panel.md | NOT STARTED | Breadth panel — needs: `market_state_history` |
 | 19.9 | phase-19-industries-market/19.9-m-gating-hint-in-screener.md | NOT STARTED | M-gating hint in screener — needs: `market_state_history` |
+| 19.10 | phase-19-industries-market/19.10-world-markets-page.md | NOT STARTED | World markets page — needs: `index_prices` (60 Stooq indices) |
 
 ### Phase 20 — Accounts, tiers and pricing
 Ties into task 9.1. The pricing page and paywalls come from the backend, so plans can change without a release.
@@ -287,6 +289,20 @@ Later-stage datasets and the point-in-time features that depend on them.
 | 22.6 | phase-22-institutional-events-timemachine/22.6-screener-as-of.md | NOT STARTED | Screener as_of — needs: `screener_snapshot` |
 | 22.7 | phase-22-institutional-events-timemachine/22.7-chart-as-of-and-replay-integration.md | NOT STARTED | Chart as_of and replay integration — needs: `prices` |
 | 22.8 | phase-22-institutional-events-timemachine/22.8-backtest-ui-later.md | NOT STARTED | Backtest UI (later) — needs: `backtest` |
+
+### Phase 23 — Quality, contract testing and rollout
+Cross-cutting hardening so each backend dataset can be switched on safely; runs in parallel with phases 13–22 and closes the plan.
+
+| # | File | Status | Backend dataset needed / summary |
+|---|---|---|---|
+| 23.1 | phase-23-quality-rollout/23.1-generated-api-types-from-openapi.md | NOT STARTED | Generated API types from OpenAPI — needs: OpenAPI file from backend |
+| 23.2 | phase-23-quality-rollout/23.2-contract-test-suite-against-a-live-backend.md | NOT STARTED | Contract test suite against a live backend — needs: a running backend (staging) |
+| 23.3 | phase-23-quality-rollout/23.3-datasets-on-off-e2e-matrix.md | NOT STARTED | Datasets on/off e2e matrix — needs: none (mock) |
+| 23.4 | phase-23-quality-rollout/23.4-empty-error-state-audit.md | NOT STARTED | Empty/error state audit — needs: none |
+| 23.5 | phase-23-quality-rollout/23.5-performance-budget-for-server-data.md | NOT STARTED | Performance budget for server data — needs: `prices`, `technicals` |
+| 23.6 | phase-23-quality-rollout/23.6-accessibility-and-keyboard-pass-for-new-ui.md | NOT STARTED | Accessibility and keyboard pass for new UI — needs: none |
+| 23.7 | phase-23-quality-rollout/23.7-cut-over-checklist-mock-real-backend.md | NOT STARTED | Cut-over checklist (mock → real backend) — needs: a running backend |
+| 23.8 | phase-23-quality-rollout/23.8-documentation-and-contract-changelog.md | NOT STARTED | Documentation and contract changelog — needs: none |
 
 ## Re-audit of previously "completed" work (old Phase 1-2 claims)
 

@@ -2,7 +2,7 @@
 
 Date: 2026-09-29. Scope: **front end only**. The backend / data-fetcher are separate projects and are not programmed here.
 Inputs: `SECURITY_MASTER.md`, `PRICE_DATA.md`, `DAILY_INGESTION_GUIDE.md`, `EPS_STATUS.md`, `EPS_COVERAGE_TRACKING.md`, `SMR_STATUS.md`, `FUNDAMENTALS.md`, `SEC_INGESTION.md`, `TECHNICAL_ARCHITECTURE.md`, `PROJECT_DESIGN.md`, `MODEL_CHANGELOG.md` (what the DB holds and how the backend is meant to be built; revision 3, 2026-09-29, after the owner's answers) and `IMPLEMENTATION_PLAN.md` (roadmap, §1–§59; its checkboxes are stale).
-Outputs: this plan, the API contract for the backend (`docs/api/`), and small tasks (`TASKS/phase-12` … `phase-22`, 131 tasks).
+Outputs: this plan, the API contract for the backend (`docs/api/`), and small tasks (`TASKS/phase-12` … `phase-23`, 141 tasks).
 
 ## 1. Audit — what is implemented, what is not, what is planned
 
@@ -149,14 +149,15 @@ Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-
                     ├─► 19 Industries/Market ◄─ B9/B10 (needs 13.8 index data)
                     ├─► 20 Accounts/Tiers ◄─ B14 (+ existing 9.1)
                     └─► 21 User data sync ◄─ B14      22 Institutional/Events/Time machine ◄─ B13, all
+   23 Quality/contract tests/cut-over runs in parallel from phase 12 on and closes the plan
 ```
-131 tasks (index: `TASKS/README.md`, Phases 12–22). Phase 12 can start immediately; each later task lists the backend dataset it needs.
+141 tasks (index: `TASKS/README.md`, Phases 12–23). Phase 12 can start immediately; each later task lists the backend dataset it needs.
 
 ## 9. Answers received and what is still open
 
 **Owner answers (2026-09-29):**
 1. *No API is serving.* → The contract in `docs/api/` describes what the backend **should serve**; there is nothing to reconcile with (v1 spec and the front end's current calls are equally hypothetical). The backend is planned as Flask + SQLAlchemy + Pydantic (`TECHNICAL_ARCHITECTURE.md`); an OpenAPI export should replace `docs/api` as source of truth when it exists.
-2. *Index prices should exist.* → Owner supplied the Stooq index list (60 tickers). Codes follow Stooq (`NDQ` = Nasdaq Composite, not `COMP`). **The list has no S&P 500 (`^SPX`), Dow, Russell or NYSE**: `SPX` must be added (RS-line benchmark, market engine) or `SPY.US` used as proxy; catalogue and region mapping are in `docs/api/02-prices.md`.
+2. *Index prices should exist.* → Owner supplied the Stooq index list (60 tickers). Codes follow Stooq (`NDQ` = Nasdaq Composite, not `COMP`). **The list has no S&P 500, Dow, Russell or NYSE.** Owner decision: **`TSX` is the interim S&P 500 replacement** (RS-line benchmark; market engine = `NDQ` + `TSX`); Stooq lists index volume, missing volume would be added later as an index. Exposed via `/api/meta.benchmarks` (`is_interim`), so switching to `SPX` later needs no front-end change. Catalogue: `docs/api/02-prices.md`.
 3. *Split-adjusted everything, probably the whole universe.* → Contract assumes `technical_daily`, RS and patterns are on split-adjusted prices (`meta.price_basis`); task 14.12 verifies by fixture and falls back per symbol if not.
 4. *Fundamentals are SEC tables.* → Confirmed and mapped in `04-fundamentals.md` (`sec_filing`, `fundamental_period/metric`, `fundamental_quarter_period/metric`, PIT resolver, growth semantics).
 5. *Ratings recomputed daily or at least on earnings ingestion.* → Contract reports `effective_dates` and `/ratings/dates`, so it works for daily and for event-driven recomputation.
@@ -172,14 +173,41 @@ Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-
 **Round 3 (2026-09-29):** index list = Stooq (above); extra security-master columns will be exposed when integration requires it; news provider and licence terms TBD.
 
 **Still open (small; none blocks front-end work):**
-- **`^SPX` (S&P 500) is missing from the supplied index list** — confirm it can be loaded (or the SPY proxy is used) and that index volume exists for `NDQ`/`SPX`.
+- Index volume for `NDQ` and `TSX` (owner: Stooq lists it; if not, backend adds it as an index later).
 - Index table name (`index_master` / `index_prices` proposed); whether `market_calendar` will exist.
 - Whether `sec_filing` will gain period end and 8-K item numbers (needed for the earnings-8-K news category).
 - News: which provider(s) the backend picks (recommendation: SEC 8-K + Alpha Vantage) and the redistribution terms of the chosen plan.
 - Business Quant / Alpha Vantage / Yahoo plan terms for displaying derived data to paying users.
 - Stripe account and auth service configuration.
 
-## 10. Risks
+## 10. Cross-project integration
+
+Papers for the other two projects: [`integration/README.md`](integration/README.md) (data flow, ground rules, milestones M0–M11, hand-off artefacts), [`integration/BACKEND.md`](integration/BACKEND.md) (Flask API: endpoint checklist with data sources, cross-cutting rules, security, acceptance) and [`integration/DATA-FETCHER.md`](integration/DATA-FETCHER.md) (tables/views the API reads, `dataset_status` handshake, nightly order, `screener_snapshot`, news/13F ingestion, vendor independence, quality gates).
+
+## 11. Milestones and definition of done
+
+Milestones M0–M11 and their per-project deliverables are in `integration/README.md` §2. A milestone is done when (a) the fetcher's tables exist and pass their quality gates, (b) the backend endpoints pass the contract tests (task 23.2), (c) the front-end tasks pass browser verification against the real backend (23.7 cut-over checklist), and (d) `docs/api/CHANGELOG.md` records any deviation.
+
+**Plan-level definition of done**
+- Charts: all price/technical/RS data from the API when available, static fallback otherwise; overlays and markers from server data only.
+- Screener: schema-driven, every documented field available or shown "coming soon", presets, saved screens, export, `as_of` for Ultimate.
+- Ratings/checkup: every non-null rating shown with model label, date, reason for unrated; checkup blocks per dataset.
+- Accounts: entitlements and plans from the API; paywalls; user data synced; anonymous demo mode.
+- News: feed, symbol tab, filters, markers, reader dialog.
+- Quality: datasets on/off matrix green, contract tests green against staging, accessibility and performance budgets met, cut-over checklist executed.
+
+## 12. Testing strategy
+1. **Unit** (Vitest) per service/pipe/component, written first (task rules).
+2. **Fixture-driven e2e** (Playwright, task 12.2 helper) for every task; **datasets on/off × tier × auth matrix** (23.3).
+3. **Contract tests** against staging (23.2) and generated types (23.1) so drift fails CI.
+4. **Parity tests**: server vs client indicators against Python golden fixtures (14.1, 14.12).
+5. **Visual**: pixel checks for overlays (pivot, buy zone, markers), light and dark screenshots for new components.
+6. **Performance budgets** (23.5) and **accessibility** (23.6).
+
+## 13. Benchmark decision (interim)
+Stooq offers no S&P 500; the owner chose **`TSX` (S&P/TSX Composite) as the interim replacement**, with `NDQ` for the market engine. RS *ratings* (stock vs stock) are unaffected; only the RS line and the market state use it. Exposed as `meta.benchmarks` with `is_interim: true`; switching to `SPX` later needs no front-end change (task 13.12). Trade-off: a Canadian index is a weaker proxy for US market direction, so market-state output is shown with an "interim benchmark" note.
+
+## 14. Risks
 
 - **Contract drift** between this repo and the backend: mitigated by fixtures (12.2) and the parity/contract specs; when the backend publishes OpenAPI, generate types from it and diff against `docs/api`.
 - **Pixel/parity differences** between server and client indicators: 14.1 harness blocks regressions.
