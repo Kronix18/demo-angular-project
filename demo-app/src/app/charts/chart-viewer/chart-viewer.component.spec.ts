@@ -509,6 +509,78 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('type-to-search symbol dialog', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }));
+    const fresh = () => { sessionStorage.clear(); TestBed.inject(ChartStateService).reset(); };
+
+    it('typing a letter or digit anywhere opens symbol search with that character in the box', async () => {
+      fresh();
+      await loaded();
+      expect(q('app-symbol-search-dialog')).toBeNull();
+      press('n');
+      fixture.detectChanges();
+      expect(q('app-symbol-search-dialog')).toBeTruthy();
+      expect((q('input[type="search"]') as HTMLInputElement).value).toBe('n');
+      expect(Array.from(fixture.nativeElement.querySelectorAll('[data-symbol-option]')).map((r: any) => r.dataset.symbolOption)).toEqual(['nvda']);
+    });
+
+    it('does not hijack typing in form fields, shortcuts with modifiers, or navigation keys', async () => {
+      fresh();
+      await loaded();
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      press('a', {}, input);
+      press('c', { ctrlKey: true });
+      press('c', { metaKey: true });
+      press('Enter');
+      press('ArrowDown');
+      press('Delete');
+      fixture.detectChanges();
+      expect(q('app-symbol-search-dialog')).toBeNull();
+      input.remove();
+    });
+
+    it('picking a symbol switches the chart (state + URL) and closes the dialog; Esc closes without changing', async () => {
+      const st = TestBed.inject(ChartStateService);
+      fresh();
+      await loaded();
+      press('q');
+      fixture.detectChanges();
+      (q('[data-symbol-option="qqq"]') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(st.snapshot().symbol).toBe('qqq');
+      expect(q('app-symbol-search-dialog')).toBeNull();
+      httpMock.match((r) => r.url.includes('test-data/')).forEach((r) => r.flush(MSFT_ROWS));
+      press('z');
+      fixture.detectChanges();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+      expect(q('app-symbol-search-dialog')).toBeNull();
+      expect(st.snapshot().symbol).toBe('qqq');
+    });
+
+    it('clicking the symbol in the legend header opens the (empty) search too', async () => {
+      fresh();
+      await loaded();
+      (q('[data-symbol-btn]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-symbol-search-dialog')).toBeTruthy();
+      expect((q('input[type="search"]') as HTMLInputElement).value).toBe('');
+    });
+
+    it('while another dialog is open, typing goes to that dialog, not to a second one', async () => {
+      fresh();
+      await loaded();
+      (q('[data-indicators]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      press('r');
+      fixture.detectChanges();
+      expect(q('app-symbol-search-dialog')).toBeNull();
+    });
+  });
+
   describe('indicators dialog + settings', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const fresh = () => { sessionStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };

@@ -72,4 +72,12 @@ describe('ChartLegendComponent (10.2)', () => {
     expect(asked).toEqual([1, 0]);
     expect(el().querySelectorAll('[data-settings]')[0].getAttribute('aria-label')).toMatch(/Settings for SMA 20/);
   });
+
+  it('the symbol in the header is a button that asks for symbol search', () => {
+    let asked = 0;
+    fixture.componentInstance.symbolClick.subscribe(() => asked++);
+    (el().querySelector('[data-symbol-btn]') as HTMLButtonElement).click();
+    expect(asked).toBe(1);
+    expect(el().querySelector('[data-symbol-btn]')!.getAttribute('aria-label')).toMatch(/search.*symbol/i);
+  });
 });
