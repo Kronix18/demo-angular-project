@@ -16,32 +16,11 @@ describe('IndicatorPanel (5.2)', () => {
     fixture.detectChanges();
   });
 
-  it('shows an empty hint when no indicators are active', () => {
-    expect(el().querySelectorAll('[data-indicator-row]').length).toBe(0);
-    expect(el().querySelector('[data-empty]')).toBeTruthy();
-  });
-
-  it('renders one row per active indicator from state, labelled, tagged overlay/pane', async () => {
+  it('is only the add form now: the active-indicator rows live in the chart legend (10.2)', () => {
     state.addIndicator({ type: 'sma', period: 20 });
-    state.addIndicator({ type: 'rsi', period: 14 });
     fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    const rows = Array.from(el().querySelectorAll('[data-indicator-row]'));
-    expect(rows.map((r) => r.textContent)).toEqual([
-      expect.stringContaining('SMA 20'),
-      expect.stringContaining('RSI 14'),
-    ]);
-    expect(rows[0].getAttribute('data-kind')).toBe('overlay');
-    expect(rows[1].getAttribute('data-kind')).toBe('pane');
-  });
-
-  it('remove button deletes that indicator from state', async () => {
-    state.addIndicator({ type: 'sma', period: 20 });
-    state.addIndicator({ type: 'ema', period: 50 });
-    fixture.detectChanges();
-    (el().querySelectorAll('[data-remove]')[0] as HTMLButtonElement).click();
-    expect(state.snapshot().indicators).toEqual([{ type: 'ema', period: 50 }]);
+    expect(el().querySelector('[data-indicator-row]')).toBeNull();
+    expect(el().querySelector('[data-add]')).toBeTruthy();
   });
 
   it('add form adds the chosen type+period to state (deduped)', () => {

@@ -85,4 +85,26 @@ describe('ChartStateService (task 4.1)', () => {
     const fresh = new ChartStateService();
     expect(fresh.snapshot().indicators).toEqual([{ type: 'sma', period: 20 }, { type: 'ema', period: 50 }]);
   });
+
+  it('toggleHidden flips an indicator\'s visibility, persists it, and ignores bad indexes', () => {
+    const svc = new ChartStateService();
+    svc.addIndicator({ type: 'sma', period: 20 });
+    svc.addIndicator({ type: 'rsi', period: 14 });
+    svc.toggleHidden(1);
+    expect(svc.snapshot().indicators).toEqual([{ type: 'sma', period: 20 }, { type: 'rsi', period: 14, hidden: true }]);
+    expect(new ChartStateService().snapshot().indicators[1].hidden).toBe(true); // survives a reload
+    svc.toggleHidden(1);
+    expect(svc.snapshot().indicators[1].hidden).toBeFalsy();
+    const before = svc.snapshot();
+    svc.toggleHidden(9);
+    svc.toggleHidden(-1);
+    expect(svc.snapshot()).toBe(before);
+  });
+
+  it('a hidden indicator does not count as a different one for duplicate detection', () => {
+    const svc = new ChartStateService();
+    svc.addIndicator({ type: 'sma', period: 20 });
+    svc.toggleHidden(0);
+    expect(svc.addIndicator({ type: 'sma', period: 20 })).toBe(false);
+  });
 });

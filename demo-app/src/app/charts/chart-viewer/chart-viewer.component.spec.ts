@@ -429,6 +429,69 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('legend rows (10.2)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+
+    it('header shows symbol · interval and the LAST bar OHLC by default; hovering a bar swaps in its values', async () => {
+      const chart: any = await loaded();
+      fixture.detectChanges();
+      expect(q('[data-legend-header]')!.textContent).toContain('MSFT');
+      expect(q('[data-legend-header]')!.textContent).toContain('118.00'); // last bar close (MSFT_ROWS)
+      component.setHoverIndex(0);
+      fixture.detectChanges();
+      expect(q('[data-legend-header]')!.textContent).toContain('105.00'); // first bar close
+      expect(q('[data-legend-header]')!.textContent).toContain('95.00');
+      component.setHoverIndex(null);
+      fixture.detectChanges();
+      expect(q('[data-legend-header]')!.textContent).toContain('118.00');
+      expect(chart).toBeTruthy();
+    });
+
+    it('volume row follows the hovered bar; indicator rows show their value at that bar', async () => {
+      const st = TestBed.inject(ChartStateService);
+      sessionStorage.clear();
+      st.reset();
+      st.addIndicator({ type: 'sma', period: 2 });
+      const chart: any = await loaded();
+      component.setHoverIndex(1);
+      fixture.detectChanges();
+      expect(q('[data-legend-group="volume"]')!.textContent).toContain('1.2K');
+      const row = q('[data-indicator-row]')!;
+      expect(row.textContent).toContain('SMA 2');
+      expect(row.textContent).toContain('108.50'); // (105+112)/2
+      expect(chart.data.datasets.some((d: any) => d.label === 'SMA 2')).toBe(true);
+    });
+
+    it('eye toggle hides/shows the series without removing it; the choice persists in state', async () => {
+      const st = TestBed.inject(ChartStateService);
+      sessionStorage.clear();
+      st.reset();
+      st.addIndicator({ type: 'sma', period: 2 });
+      await loaded();
+      const ds = () => (Chart.getChart(component.chartCanvas!.nativeElement) as any).data.datasets.find((d: any) => d.label === 'SMA 2');
+      expect(ds().hidden).toBeFalsy();
+      (q('[data-eye]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(ds().hidden).toBe(true);
+      expect(st.snapshot().indicators[0].hidden).toBe(true);
+      expect(q('[data-indicator-row]')!.classList.contains('hidden')).toBe(true);
+      (q('[data-eye]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      expect(ds().hidden).toBeFalsy();
+    });
+
+    it('remove ✕ in the legend removes the indicator', async () => {
+      const st = TestBed.inject(ChartStateService);
+      sessionStorage.clear();
+      st.reset();
+      st.addIndicator({ type: 'sma', period: 2 });
+      await loaded();
+      (q('[data-remove]') as HTMLButtonElement).click();
+      expect(st.snapshot().indicators).toEqual([]);
+    });
+  });
+
   describe('error & loading states (6.3)', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
 
