@@ -168,6 +168,8 @@ export class ChartStateService {
     this.update({ indicators: next });
   }
 
+  clearIndicators(): void { this.update({ indicators: [] }); }
+
   removeIndicator(index: number): void {
     const next = this.subject.value.indicators.filter((_, i) => i !== index);
     this.update({ indicators: next });

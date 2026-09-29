@@ -60,7 +60,7 @@ export class DrawingStore {
   update(symbol: string, d: Drawing): void {
     const cur = this.list(symbol);
     if (!cur.some((x) => x.id === d.id)) return;
-    this.set(symbol, cur.map((x) => (x.id === d.id ? d : x)));
+    this.set(symbol, cur.map((x) => (x.id === d.id ? d : x)), 'update');
   }
 
   remove(symbol: string, id: string): void {
@@ -73,8 +73,44 @@ export class DrawingStore {
     if (this.list(symbol).length) this.set(symbol, []);
   }
 
-  private set(symbol: string, list: Drawing[]): void {
-    this.data = { ...this.data, [symbol.toLowerCase()]: list };
+  // ---- undo / redo (per symbol, in memory) -------------------------------------------
+  private past: Record<string, Drawing[][]> = {};
+  private future: Record<string, Drawing[][]> = {};
+  private lastEdit: { key: string; kind: string; at: number } | null = null;
+
+  canUndo(symbol: string): boolean { this.revision(); return (this.past[symbol.toLowerCase()]?.length ?? 0) > 0; }
+  canRedo(symbol: string): boolean { this.revision(); return (this.future[symbol.toLowerCase()]?.length ?? 0) > 0; }
+
+  undo(symbol: string): boolean { return this.travel(symbol, this.past, this.future); }
+  redo(symbol: string): boolean { return this.travel(symbol, this.future, this.past); }
+
+  private travel(symbol: string, from: Record<string, Drawing[][]>, to: Record<string, Drawing[][]>): boolean {
+    const key = symbol.toLowerCase();
+    const snap = from[key]?.pop();
+    if (!snap) return false;
+    (to[key] ??= []).push(this.list(key));
+    this.lastEdit = null;
+    this.write(key, snap);
+    return true;
+  }
+
+  private set(symbol: string, list: Drawing[], kind = 'edit'): void {
+    const key = symbol.toLowerCase();
+    // a drag is many quick updates of one drawing: they share one undo step
+    const now = Date.now();
+    const same = kind === 'update' && this.lastEdit?.key === key && this.lastEdit.kind === 'update' && now - this.lastEdit.at < 600;
+    if (!same) {
+      const stack = (this.past[key] ??= []);
+      stack.push(this.list(key));
+      if (stack.length > 100) stack.shift();
+      this.future[key] = [];
+    }
+    this.lastEdit = { key, kind, at: now };
+    this.write(key, list);
+  }
+
+  private write(key: string, list: Drawing[]): void {
+    this.data = { ...this.data, [key]: list };
     this.revision.update((r) => r + 1);
     try {
       sessionStorage.setItem(KEY, JSON.stringify(this.data));

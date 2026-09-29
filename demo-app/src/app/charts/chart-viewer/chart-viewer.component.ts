@@ -229,6 +229,8 @@ const DASHES: Record<OutputSpec['defaultLineStyle'], number[]> = {
   solid: [], dash: [6, 4], dot: [2, 3], dash_dot: [6, 3, 2, 3],
 };
 
+const ALT_TOOLS: Record<string, Tool> = { KeyT: 'trend', KeyH: 'hline', KeyV: 'vline', KeyC: 'cross', KeyF: 'fib' };
+
 type Computed = { index: number; resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> };
 
 /** What the legend needs to show an indicator's value at any bar. */
@@ -264,6 +266,8 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           </select>
           <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
           <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
+          <button type="button" class="tool-btn" data-undo title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!drawingStore.canUndo(currentSymbol)" (click)="undo()">↶</button>
+          <button type="button" class="tool-btn" data-redo title="Redo (Ctrl+Y)" aria-label="Redo" [disabled]="!drawingStore.canRedo(currentSymbol)" (click)="redo()">↷</button>
           <button type="button" class="reset-zoom-btn" (click)="resetZoom()">Reset zoom</button>
         </div>
       </header>
@@ -286,7 +290,8 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       <app-drawing-sidebar [tool]="tool()" [magnet]="magnetOn" [keep]="keepDrawing()"
         [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
         (keepToggle)="keepDrawing.set(!keepDrawing())" (lockToggle)="drawingStore.toggleLocked()"
-        (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" />
+        (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" (removeIndicators)="chartState.clearIndicators()"
+        (removeAll)="clearDrawings(); chartState.clearIndicators()" />
       <div class="chart-col">
       <div class="chart-panel" data-pane="panel">
         <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="!isSelectTool(tool())" (dblclick)="onDblClick($event)"
@@ -300,6 +305,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             <select data-draw-dash aria-label="Line style" (change)="setDrawStyle(sd.id, { dash: $any($event.target).value })">
               @for (d of dashes; track d) { <option [value]="d" [selected]="(sd.style?.dash ?? 'solid') === d">{{ d }}</option> }
             </select>
+            <button type="button" data-draw-clone aria-label="Clone drawing (Ctrl+D)" title="Clone (Ctrl+D)" [disabled]="drawingStore.locked()" (click)="cloneSelected()">⧉</button>
             <button type="button" data-draw-delete aria-label="Delete drawing" title="Delete drawing" [disabled]="drawingStore.locked()" (click)="deleteSelected()">🗑</button>
           </div>
         }
@@ -585,6 +591,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   redraw(): void { this.chart?.draw(); }
+
+  undo(): void { if (this.drawingStore.undo(this.currentSymbol)) this.afterHistory(); }
+  redo(): void { if (this.drawingStore.redo(this.currentSymbol)) this.afterHistory(); }
+  private afterHistory(): void { this.drawings.cancel(); this.selectedId.set(null); this.chart?.draw(); }
+  cloneSelected(): void { this.drawings.clone(); }
   styleColor(d: { style?: { color?: string } }): string {
     const c = resolveColor(d.style?.color ?? 'var(--c-primary)');
     return /^#[0-9a-f]{6}$/i.test(c) ? c : cssVar('--c-text');
@@ -645,6 +656,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const t = e.target as HTMLElement | null;
     if (t && (/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.isContentEditable)) return;
     // TradingView: start typing anywhere on the chart -> symbol search opens with that character
+    // TradingView shortcuts: Ctrl+Z / Ctrl+Y / Ctrl+D, Alt+T/H/V/C/F pick a tool
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (ctrl && !e.altKey) {
+      const k = e.key.toLowerCase();
+      if (k === 'z') { e.preventDefault(); if (e.shiftKey) this.redo(); else this.undo(); return; }
+      if (k === 'y') { e.preventDefault(); this.redo(); return; }
+      if (k === 'd') { e.preventDefault(); this.cloneSelected(); return; }
+    }
+    if (e.altKey && !ctrl && ALT_TOOLS[e.code]) { e.preventDefault(); this.setTool(ALT_TOOLS[e.code]); return; }
     // keystrokes typed while the search dialog is still opening must not be lost
     if (this.searchOpen() && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
       const box = document.querySelector<HTMLInputElement>('app-symbol-search-dialog input[type="search"]');

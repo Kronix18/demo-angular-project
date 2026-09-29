@@ -35,10 +35,21 @@ import { TOOL_GROUPS, ToolDef, ToolGroup, anyToolDef, toolsInGroup } from './dra
         title="Lock all drawings (no selecting, moving or deleting)" (click)="lockToggle.emit()">🔒</button>
       <button type="button" class="draw-btn" data-hide [attr.aria-pressed]="hidden()" aria-label="Hide all drawings"
         title="Hide all drawings" (click)="hideToggle.emit()">👁</button>
-      <button type="button" class="draw-btn" data-tool-clear aria-label="Delete all drawings on this symbol"
-        title="Delete all drawings on this symbol" (click)="clear.emit()">⌫</button>
+      <div class="grp">
+        <button type="button" class="draw-btn" data-tool-clear aria-label="Delete all drawings on this symbol"
+          title="Delete all drawings on this symbol" (click)="clear.emit()">🗑</button>
+        <button type="button" class="chev" data-flyout="remove" [attr.aria-expanded]="open() === 'remove'" aria-label="More remove options"
+          (click)="toggleFlyout('remove', $event)">›</button>
+      </div>
     </div>
-    @if (open(); as g) {
+    @if (open() === 'remove') {
+      <div class="flyout" role="menu" data-flyout-menu="remove" [style.top.px]="flyoutPos().top" [style.left.px]="flyoutPos().left">
+        <div class="flyout-title">Remove</div>
+        <button type="button" role="menuitem" class="fly-item" data-remove="drawings" (click)="remove('drawings')">Remove drawings</button>
+        <button type="button" role="menuitem" class="fly-item" data-remove="indicators" (click)="remove('indicators')">Remove indicators</button>
+        <button type="button" role="menuitem" class="fly-item" data-remove="all" (click)="remove('all')">Remove drawings &amp; indicators</button>
+      </div>
+    } @else if (open(); as g) {
       <div class="flyout" role="menu" [attr.data-flyout-menu]="g" [style.top.px]="flyoutPos().top" [style.left.px]="flyoutPos().left">
         <div class="flyout-title">{{ groupLabel(g) }}</div>
         @for (t of toolsOf(g); track t.id) {
@@ -93,9 +104,11 @@ export class DrawingSidebarComponent {
   readonly lockToggle = output<void>();
   readonly hideToggle = output<void>();
   readonly clear = output<void>();
+  readonly removeIndicators = output<void>();
+  readonly removeAll = output<void>();
 
   readonly groups = TOOL_GROUPS;
-  readonly open = signal<ToolGroup | null>(null);
+  readonly open = signal<ToolGroup | 'remove' | null>(null);
   /** The tool each group's button currently stands for (the last one picked from it). */
   private readonly last = signal<Partial<Record<ToolGroup, string>>>({});
   readonly flyoutPos = signal({ top: 0, left: 0 });
@@ -109,13 +122,20 @@ export class DrawingSidebarComponent {
 
   current(g: ToolGroup): ToolDef { return anyToolDef(this.last()[g] ?? '') ?? toolsInGroup(g)[0]; }
   groupOf(t: Tool): ToolGroup | null { return anyToolDef(t)?.group ?? null; }
-  toolsOf(g: ToolGroup): ToolDef[] { return toolsInGroup(g); }
-  groupLabel(g: ToolGroup): string { return TOOL_GROUPS.find((x) => x.id === g)?.label ?? ''; }
-  toggleFlyout(g: ToolGroup, e?: Event): void {
+  toolsOf(g: string): ToolDef[] { return toolsInGroup(g as ToolGroup); }
+  groupLabel(g: string): string { return TOOL_GROUPS.find((x) => x.id === g)?.label ?? ''; }
+  toggleFlyout(g: ToolGroup | 'remove', e?: Event): void {
     if (this.open() === g) { this.open.set(null); return; }
     const r = (e?.currentTarget as HTMLElement | undefined)?.getBoundingClientRect();
     if (r) this.flyoutPos.set({ top: Math.max(4, Math.min(r.top - 4, window.innerHeight - 320)), left: r.right + 6 });
     this.open.set(g);
+  }
+
+  remove(what: 'drawings' | 'indicators' | 'all'): void {
+    this.open.set(null);
+    if (what === 'drawings') this.clear.emit();
+    else if (what === 'indicators') this.removeIndicators.emit();
+    else this.removeAll.emit();
   }
 
   choose(t: string): void {

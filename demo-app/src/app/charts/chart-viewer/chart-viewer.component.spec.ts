@@ -1024,11 +1024,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       const { DrawingStore } = await import('../drawings/drawing-store.service');
       store = TestBed.inject(DrawingStore);
     });
-    const draw = async () => {
-      fresh();
-      if (store.locked()) store.toggleLocked();
-      store.setHidden(false);
-      await loaded();
+    const mock = () => {
       const c = Chart.getChart(component.chartCanvas!.nativeElement) as any;
       c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
       c.scales.y.top = 0; c.scales.y.bottom = 300;
@@ -1037,10 +1033,19 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       c.scales.y.getPixelForValue = (v: number) => 300 - v;
       c.scales.y.getValueForPixel = (px: number) => 300 - px;
     };
+    const use = (t: string) => { component.setTool(t as any); mock(); }; // setTool updates the chart, which rebuilds the layout
+    const draw = async () => {
+      fresh();
+      if (store.locked()) store.toggleLocked();
+      store.setHidden(false);
+      store.clear('msft'); // the store was created before fresh() emptied sessionStorage
+      await loaded();
+      mock();
+    };
 
     it('Ctrl+Z / Ctrl+Y (and the header buttons) undo and redo drawing changes', async () => {
       await draw();
-      component.setTool('hline');
+      use('hline');
       ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
       fixture.detectChanges();
       expect(store.list('msft').length).toBe(1);
@@ -1053,7 +1058,9 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       key('y', { ctrlKey: true });
       expect(store.list('msft').length).toBe(1);
       key('z', { ctrlKey: true });
+      fixture.detectChanges();
       (q('[data-redo]') as HTMLButtonElement).click();
+      fixture.detectChanges();
       expect(store.list('msft').length).toBe(1);
       (q('[data-undo]') as HTMLButtonElement).click();
       expect(store.list('msft').length).toBe(0);
@@ -1063,7 +1070,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
     it('Ctrl+D clones the selection; the style toolbar has a clone button', async () => {
       await draw();
-      component.setTool('hline');
+      use('hline');
       ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
       fixture.detectChanges();
       key('d', { ctrlKey: true });
@@ -1084,6 +1091,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     it('the trash menu removes drawings, indicators or everything', async () => {
       const st = fresh();
       st.addIndicator({ type: 'sma', period: 5 });
+      store.clear('msft');
       await loaded();
       store.add('msft', { id: 'a', type: 'hline', a: { t: 1, p: 10 } });
       (q('[data-flyout="remove"]') as HTMLButtonElement).click();

@@ -129,6 +129,19 @@ export class DrawingController {
     return null;
   }
 
+  /** Ctrl+D: a copy of the selection, a few bars to the right; the copy becomes the selection. */
+  clone(): string | null {
+    const d = this.selectedId ? this.find(this.selectedId) : undefined;
+    if (!d || this.deps.store.locked()) return null;
+    const bars = this.deps.bars();
+    const shift = (a: Anchor): Anchor => ({ t: timeForIndex(bars, indexForTime(bars, a.t) + 3), p: a.p });
+    const copy: Drawing = { ...d, id: this.newId(), a: shift(d.a), ...(d.b ? { b: shift(d.b) } : {}), ...(d.pts ? { pts: d.pts.map(shift) } : {}) };
+    this.deps.store.add(this.deps.symbol(), copy);
+    this.selectedId = copy.id;
+    this.deps.changed();
+    return copy.id;
+  }
+
   /** Style edits from the floating toolbar. */
   setStyle(id: string, patch: DrawingStyle): void {
     const d = this.find(id);
