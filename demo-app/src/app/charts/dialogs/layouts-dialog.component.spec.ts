@@ -12,6 +12,7 @@ describe('LayoutsDialogComponent (11.17)', () => {
     localStorage.clear();
     TestBed.inject(LayoutService).save('Main', state, {});
     TestBed.inject(LayoutService).save('Tech', state, {});
+    TestBed.inject(LayoutService).setCurrent(''); // otherwise the name box starts with the current layout's name
     fixture = TestBed.createComponent(LayoutsDialogComponent);
     fixture.detectChanges();
   });

@@ -28,6 +28,8 @@ import { ChartSidePanelComponent, PanelTab } from '../side-panel/chart-side-pane
 import { WatchlistService } from '../../core/services/watchlist.service';
 import { AlertService } from '../../core/services/alert.service';
 import { toolDef } from '../drawings/drawing-tools';
+import { LayoutsDialogComponent } from '../dialogs/layouts-dialog.component';
+import { LayoutService } from '../../core/services/layout.service';
 import { GotoDateDialogComponent } from '../dialogs/goto-date-dialog.component';
 import { barCountdown, formatClock } from '../market-time';
 import { ChartSettingsDialogComponent } from '../dialogs/chart-settings-dialog.component';
@@ -285,7 +287,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, ChartStatusComponent, ChartSidePanelComponent, ReplayBarComponent, ChartToastsComponent, DrawingSidebarComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, LayoutsDialogComponent, ChartStatusComponent, ChartSidePanelComponent, ReplayBarComponent, ChartToastsComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -303,6 +305,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           </select>
           <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
           <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
+          <button type="button" class="tool-btn" data-layouts title="Layouts: save / load chart setups" aria-label="Layouts" (click)="layoutsOpen.set(true)">▤ {{ layouts.current() || 'Layouts' }}</button>
           <button type="button" class="tool-btn" data-replay [attr.aria-pressed]="!!replay()" title="Bar replay" aria-label="Bar replay" (click)="toggleReplay()">⏵ Replay</button>
           <button type="button" class="tool-btn" data-compare title="Compare or add symbol" aria-label="Compare symbol" (click)="openSearch('', 'compare')">＋ Compare</button>
           <button type="button" class="tool-btn" data-panel [attr.aria-pressed]="panelOpen()" title="Object tree, data window, watchlist, alerts" aria-label="Side panel" (click)="togglePanel()">☰</button>
@@ -314,10 +317,13 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       </header>
 
       @if (indicatorsOpen()) {
-        <app-indicators-dialog (add)="addIndicatorType($event)" (closed)="indicatorsOpen.set(false)" />
+        <app-indicators-dialog [current]="stateIndicators()" (applyTemplate)="applyTemplate($event)" (add)="addIndicatorType($event)" (closed)="indicatorsOpen.set(false)" />
       }
       @if (searchOpen()) {
         <app-symbol-search-dialog [heading]="searchMode() === 'compare' ? 'Compare symbol' : 'Symbol search'" [initial]="searchInitial()" [current]="currentSymbol" (pick)="pickFromSearch($event)" (closed)="searchOpen.set(false)" />
+      }
+      @if (layoutsOpen()) {
+        <app-layouts-dialog (save)="saveLayout($event)" (load)="loadLayout($event)" (remove)="layouts.remove($event)" (closed)="layoutsOpen.set(false)" />
       }
       @if (gotoOpen() && bars.length) {
         <app-goto-date-dialog [min]="bars[0].timestamp" [max]="bars[bars.length - 1].timestamp" (pick)="goToDate($event)" (closed)="gotoOpen.set(false)" />
@@ -543,7 +549,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     return entry ? { index: i as number, entry } : null;
   });
   /** signal mirror of the persisted indicator list (state$ is an Observable) */
-  private readonly stateIndicators = signal<IndicatorEntry[]>([]);
+  protected readonly stateIndicators = signal<IndicatorEntry[]>([]);
 
   addIndicatorType(type: string): void {
     const item = catalogItem(type);
@@ -849,6 +855,23 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   readonly seriesDialog = signal<'price' | 'volume' | null>(null);
   readonly settingsOpen = signal(false);
   readonly gotoOpen = signal(false);
+
+  // ---- layouts + indicator templates (11.17) ----------------------------------------
+  protected readonly layouts = inject(LayoutService);
+  readonly layoutsOpen = signal(false);
+  saveLayout(name: string): void {
+    if (this.layouts.save(name, this.chartState.snapshot(), this.drawingStore.exportAll())) this.layoutsOpen.set(false);
+  }
+  loadLayout(name: string): void {
+    const l = this.layouts.get(name);
+    if (!l) return;
+    this.drawings.cancel();
+    this.drawingStore.importAll(l.drawings);
+    this.chartState.restore(l.state);
+    this.layouts.setCurrent(name);
+    this.layoutsOpen.set(false);
+  }
+  applyTemplate(list: IndicatorEntry[]): void { this.chartState.setIndicators(list); }
 
   // ---- bar replay + alert notifications (11.15) -------------------------------------
   readonly replay = signal<ReplayState | null>(null);

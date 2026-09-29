@@ -43,7 +43,7 @@ function cleanCompare(v: unknown): string | null {
 const DASHES = ['solid', 'dash', 'dot', 'dash_dot'];
 
 /** Validates one persisted indicator entry; anything malformed is dropped, never trusted. */
-function sanitizeIndicator(i: any): IndicatorEntry | null {
+export function sanitizeIndicator(i: any): IndicatorEntry | null {
   if (!i || typeof i.type !== 'string' || typeof i.period !== 'number' || !Number.isFinite(i.period)) return null;
   const out: IndicatorEntry = { type: i.type, period: i.period };
   if (i.hidden === true) out.hidden = true;
@@ -191,6 +191,18 @@ export class ChartStateService {
 
   removeCompare(symbol: string): void { this.update({ compare: this.subject.value.compare.filter((s) => s !== symbol) }); }
 
+  /** Replaces the whole state (loading a saved layout); anything invalid falls back to the defaults. */
+  restore(raw: unknown): void {
+    const next = sanitizeState(raw);
+    this.subject.next(next);
+    this.persist(next);
+  }
+
+  /** Replaces the indicators (applying a template). */
+  setIndicators(list: IndicatorEntry[]): void {
+    this.update({ indicators: list.map(sanitizeIndicator).filter((i): i is IndicatorEntry => i !== null) });
+  }
+
   clearIndicators(): void { this.update({ indicators: [] }); }
 
   removeIndicator(index: number): void {
@@ -222,27 +234,31 @@ export class ChartStateService {
   private readPersisted(): ChartState {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView(), compare: [] };
-      const parsed = JSON.parse(raw);
-      return {
-        symbol: typeof parsed.symbol === 'string' ? parsed.symbol : DEFAULTS.symbol,
-        interval: typeof parsed.interval === 'string' ? parsed.interval : DEFAULTS.interval,
-        range: typeof parsed.range === 'string' ? parsed.range : DEFAULTS.range,
-        chartType: CHART_TYPES.includes(parsed.chartType) ? parsed.chartType : DEFAULTS.chartType,
-        magnet: parsed.magnet === true,
-        logScale: parsed.logScale === true,
-        percentScale: parsed.percentScale === true,
-        invertScale: parsed.invertScale === true,
-        view: sanitizeView(parsed.view),
-        compare: Array.isArray(parsed.compare) ? [...new Set<string>(parsed.compare.map(cleanCompare).filter((s: string | null): s is string => !!s))].slice(0, 5) : [],
-        price: sanitizePrice(parsed.price),
-        volume: sanitizeVolume(parsed.volume),
-        indicators: Array.isArray(parsed.indicators)
-          ? parsed.indicators.map(sanitizeIndicator).filter((i: IndicatorEntry | null): i is IndicatorEntry => i !== null)
-          : [],
-      };
+      return raw ? sanitizeState(JSON.parse(raw)) : sanitizeState(null);
     } catch {
-      return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView(), compare: [] };
+      return sanitizeState(null);
     }
   }
+}
+
+/** Builds a valid chart state from anything (persisted data, a saved layout): unknown or invalid parts fall back to the defaults. */
+export function sanitizeState(parsed: any): ChartState {
+  const p = parsed && typeof parsed === 'object' ? parsed : {};
+  return {
+    symbol: typeof p.symbol === 'string' ? p.symbol : DEFAULTS.symbol,
+    interval: typeof p.interval === 'string' ? p.interval : DEFAULTS.interval,
+    range: typeof p.range === 'string' ? p.range : DEFAULTS.range,
+    chartType: CHART_TYPES.includes(p.chartType) ? p.chartType : DEFAULTS.chartType,
+    magnet: p.magnet === true,
+    logScale: p.logScale === true,
+    percentScale: p.percentScale === true,
+    invertScale: p.invertScale === true,
+    view: sanitizeView(p.view),
+    compare: Array.isArray(p.compare) ? [...new Set<string>(p.compare.map(cleanCompare).filter((s: string | null): s is string => !!s))].slice(0, 5) : [],
+    price: sanitizePrice(p.price),
+    volume: sanitizeVolume(p.volume),
+    indicators: Array.isArray(p.indicators)
+      ? p.indicators.map(sanitizeIndicator).filter((i: IndicatorEntry | null): i is IndicatorEntry => i !== null)
+      : [],
+  };
 }

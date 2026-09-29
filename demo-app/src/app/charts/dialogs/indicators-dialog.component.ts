@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, output, signal } from '@angular/core';
-import { INDICATOR_CATALOG, CatalogItem } from '../../core/indicators/indicator-catalog';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { INDICATOR_CATALOG, CatalogItem, IndicatorEntry } from '../../core/indicators/indicator-catalog';
+import { IndicatorTemplateService } from '../../core/services/indicator-template.service';
 import { ModalComponent } from './modal.component';
 
 /**
@@ -14,6 +15,20 @@ import { ModalComponent } from './modal.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal title="Indicators" (closed)="closed.emit()">
+      <section class="tpl" data-tpl-section aria-label="Templates">
+        <h3 class="cat">Templates</h3>
+        <div class="tpl-save">
+          <input data-tpl-name placeholder="Template name" aria-label="Template name" [value]="tplName()" (input)="tplName.set($any($event.target).value)" />
+          <button type="button" data-tpl-save [disabled]="!tplName().trim() || !current().length" (click)="saveTemplate()">Save chart indicators</button>
+        </div>
+        @for (t of templates.list(); track t.name) {
+          <div class="tpl-row" data-tpl-row>
+            <button type="button" class="tpl-name" data-tpl-apply title="Replace the chart's indicators with this template" (click)="applyTemplate.emit(t.indicators)">{{ t.name }}</button>
+            <span class="tpl-n">{{ t.indicators.length }} {{ t.indicators.length === 1 ? 'indicator' : 'indicators' }}</span>
+            <button type="button" class="tpl-del" data-tpl-delete aria-label="Delete template" (click)="templates.remove(t.name)">×</button>
+          </div>
+        }
+      </section>
       <input type="search" class="search" placeholder="Search indicators…" aria-label="Search indicators"
         [value]="query()" (input)="query.set($any($event.target).value)" (keydown.enter)="addFirst()" />
       @for (g of groups(); track g.category) {
@@ -42,13 +57,30 @@ import { ModalComponent } from './modal.component';
       .desc { flex: 1; color: var(--c-text-muted); }
       .plus { color: var(--c-primary); font-size: 1.1rem; }
       .empty { color: var(--c-text-muted); }
+      .tpl { margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--c-border); }
+      .tpl-save { display: flex; gap: 0.5rem; }
+      .tpl-save input { flex: 1; padding: 0.3rem 0.6rem; border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); background: var(--c-bg); color: var(--c-text); }
+      .tpl-save button, .tpl-del { padding: 0.25rem 0.6rem; border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); background: var(--c-surface); color: var(--c-text); cursor: pointer; }
+      .tpl-save button:disabled { opacity: 0.5; cursor: default; }
+      .tpl-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
+      .tpl-name { flex: 1; text-align: left; border: none; background: transparent; color: var(--c-primary); cursor: pointer; font-weight: 600; }
+      .tpl-n { color: var(--c-text-muted); font-size: 0.75rem; }
     `,
   ],
 })
 export class IndicatorsDialogComponent {
+  protected readonly templates = inject(IndicatorTemplateService);
+  /** the indicators on the chart (what "save template" stores) */
+  readonly current = input<IndicatorEntry[]>([]);
+  readonly applyTemplate = output<IndicatorEntry[]>();
+  readonly tplName = signal('');
   readonly add = output<string>();
   readonly closed = output<void>();
   readonly query = signal('');
+
+  saveTemplate(): void {
+    if (this.templates.save(this.tplName(), this.current())) this.tplName.set('');
+  }
 
   private readonly matches = computed<CatalogItem[]>(() => {
     const q = this.query().trim().toLowerCase();
