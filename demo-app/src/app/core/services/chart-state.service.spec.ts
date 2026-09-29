@@ -161,4 +161,16 @@ describe('ChartStateService (task 4.1)', () => {
     expect(a.intervals).toEqual(['1d']);
     expect(b).toEqual({ type: 'ema', period: 5 });
   });
+
+  it('logScale (11.4): default off, toggles, persists, corrupt values ignored, reset clears', () => {
+    const svc = new ChartStateService();
+    expect(svc.snapshot().logScale).toBe(false);
+    svc.toggleLogScale();
+    expect(svc.snapshot().logScale).toBe(true);
+    expect(new ChartStateService().snapshot().logScale).toBe(true);
+    svc.reset();
+    expect(svc.snapshot().logScale).toBe(false);
+    sessionStorage.setItem('chart-state', JSON.stringify({ symbol: 'msft', interval: '1d', range: '6M', indicators: [], logScale: 'yes' }));
+    expect(new ChartStateService().snapshot().logScale).toBe(false);
+  });
 });

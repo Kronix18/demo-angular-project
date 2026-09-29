@@ -509,6 +509,178 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('price scale: auto, manual pan/scale, logarithmic (11.4)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    /** long-ish history so pan/scale have room */
+    async function loadLong() {
+      stubCanvas();
+      const rows = ['<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>'];
+      for (let i = 0; i < 300; i++) {
+        const d = new Date(Date.UTC(2023, 0, 1 + i)).toISOString().slice(0, 10).replace(/-/g, '');
+        const c = 50 + Math.sin(i / 12) * 15 + i * 0.4;
+        rows.push(`MSFT.US,D,${d},000000,${c - 1},${c + 2},${c - 2},${c},${1000 + (i % 7) * 500},0`);
+      }
+      httpMock.expectOne('test-data/msft.us.txt').flush(rows.join('\r\n'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+    const mouse = (type: string, x: number, y: number, buttons = 0) => {
+      const canvas = component.chartCanvas!.nativeElement;
+      Object.defineProperty(MouseEvent.prototype, 'offsetX', { get: () => x, configurable: true });
+      Object.defineProperty(MouseEvent.prototype, 'offsetY', { get: () => y, configurable: true });
+      canvas.dispatchEvent(new MouseEvent(type, { bubbles: true, buttons }));
+      delete (MouseEvent.prototype as any).offsetX;
+      delete (MouseEvent.prototype as any).offsetY;
+    };
+    /** jsdom has no layout: give the scales/area real numbers so hit-testing works */
+    const layout = () => {
+      const c = chartOf();
+      c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
+      c.scales.y.top = 0; c.scales.y.bottom = 300; c.scales.y.height = 300;
+      return c;
+    };
+
+    it('auto + log buttons: auto is on by default; log toggles the state and rebuilds with log price AND volume scales', async () => {
+      const st = fresh();
+      await loaded();
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('true');
+      expect(q('[data-log]')!.getAttribute('aria-pressed')).toBe('false');
+      expect(chartOf().options.scales.y.type).toBe('linear');
+      (q('[data-log]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(st.snapshot().logScale).toBe(true);
+      expect(q('[data-log]')!.getAttribute('aria-pressed')).toBe('true');
+      expect(chartOf().options.scales.y.type).toBe('logarithmic');
+      expect(chartOf().options.scales.yVol.type).toBe('logarithmic'); // volume follows the price scale
+      expect(chartOf().scales.y.min).toBeGreaterThan(0);
+      expect(chartOf().scales.yVol.min).toBeGreaterThan(0);
+    });
+
+    it('log volume drops zero-volume bars instead of breaking the axis', async () => {
+      const st = fresh();
+      await loaded();
+      st.toggleLogScale();
+      await fixture.whenStable();
+      const vol = chartOf().data.datasets.find((d: any) => d.label === 'Volume').data;
+      expect(vol.every((p: any) => p.y === null || p.y > 0)).toBe(true);
+    });
+
+    it('log price fit is multiplicative and covers the visible candles', async () => {
+      const st = fresh();
+      await loadLong();
+      st.toggleLogScale();
+      await fixture.whenStable();
+      const y = chartOf().scales.y;
+      const view = chartOf().data.datasets[0].data.filter((p: any) => p.x >= chartOf().scales.x.min && p.x <= chartOf().scales.x.max);
+      expect(y.min).toBeLessThanOrEqual(Math.min(...view.map((p: any) => p.l)));
+      expect(y.max).toBeGreaterThanOrEqual(Math.max(...view.map((p: any) => p.h)));
+      expect(y.min).toBeGreaterThan(0);
+    });
+
+    it('vertical drag on the price pane turns auto off and pans the price range (chart down = higher prices)', async () => {
+      fresh();
+      await loadLong();
+      const c = layout();
+      const before = { min: c.scales.y.min, max: c.scales.y.max };
+      mouse('mousedown', 400, 100, 1);
+      mouse('mousemove', 400, 110, 1); // 10px: over the threshold
+      mouse('mousemove', 400, 160, 1);
+      mouse('mouseup', 400, 160);
+      fixture.detectChanges();
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('false');
+      const after = chartOf().options.scales.y;
+      expect(after.min).toBeGreaterThan(before.min);
+      expect(after.max).toBeGreaterThan(before.max);
+      expect(after.max - after.min).toBeCloseTo(before.max - before.min, 4); // pure pan: same span
+    });
+
+    it('a small jitter while dragging horizontally does NOT switch auto off', async () => {
+      fresh();
+      await loadLong();
+      layout();
+      mouse('mousedown', 400, 100, 1);
+      mouse('mousemove', 450, 102, 1);
+      mouse('mouseup', 450, 102);
+      fixture.detectChanges();
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('dragging on the price axis scales the range around its centre and turns auto off', async () => {
+      fresh();
+      await loadLong();
+      const c = layout();
+      const before = { min: c.scales.y.min, max: c.scales.y.max };
+      mouse('mousedown', 950, 100, 1); // x > chartArea.right = on the axis
+      mouse('mousemove', 950, 200, 1);
+      mouse('mouseup', 950, 200);
+      fixture.detectChanges();
+      const after = chartOf().options.scales.y;
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('false');
+      expect((after.min + after.max) / 2).toBeCloseTo((before.min + before.max) / 2, 4);
+      expect(after.max - after.min).toBeGreaterThan(before.max - before.min); // dragged down = zoom out
+    });
+
+    it('in manual mode the price range stays put when the view pans horizontally; Auto restores the fit', async () => {
+      fresh();
+      await loadLong();
+      const c = layout();
+      mouse('mousedown', 400, 100, 1); mouse('mousemove', 400, 120, 1); mouse('mousemove', 400, 140, 1); mouse('mouseup', 400, 140);
+      const manual = { min: chartOf().options.scales.y.min, max: chartOf().options.scales.y.max };
+      c.zoomScale('x', { min: 20, max: 80 });
+      expect(chartOf().options.scales.y.min).toBeCloseTo(manual.min, 6);
+      expect(chartOf().options.scales.y.max).toBeCloseTo(manual.max, 6);
+      (q('[data-auto]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('true');
+      expect(chartOf().options.scales.y.min).not.toBeCloseTo(manual.min, 3); // refit to the visible bars
+    });
+
+    it('manual scale survives an indicator toggle (chart rebuild) but resets on symbol / range changes', async () => {
+      const st = fresh();
+      await loadLong();
+      layout();
+      mouse('mousedown', 400, 100, 1); mouse('mousemove', 400, 120, 1); mouse('mousemove', 400, 150, 1); mouse('mouseup', 400, 150);
+      const manual = chartOf().options.scales.y.min;
+      st.addIndicator({ type: 'sma', period: 5 });
+      await fixture.whenStable();
+      expect(chartOf().options.scales.y.min).toBeCloseTo(manual, 6);
+      st.setRange('1Y');
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('double-clicking the price axis re-enables auto (and does not reset the x zoom)', async () => {
+      fresh();
+      await loadLong();
+      layout();
+      mouse('mousedown', 400, 100, 1); mouse('mousemove', 400, 125, 1); mouse('mousemove', 400, 160, 1); mouse('mouseup', 400, 160);
+      const spy = vi.spyOn(chartOf(), 'resetZoom');
+      Object.defineProperty(MouseEvent.prototype, 'offsetX', { get: () => 950, configurable: true });
+      Object.defineProperty(MouseEvent.prototype, 'offsetY', { get: () => 100, configurable: true });
+      component.chartCanvas!.nativeElement.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      delete (MouseEvent.prototype as any).offsetX;
+      delete (MouseEvent.prototype as any).offsetY;
+      fixture.detectChanges();
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('true');
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('dragging a selected drawing does not pan the price scale', async () => {
+      fresh();
+      await loadLong();
+      layout();
+      const ctl: any = (component as any).drawings;
+      vi.spyOn(ctl, 'isDragging').mockReturnValue(true);
+      mouse('mousedown', 400, 100, 1); mouse('mousemove', 400, 130, 1); mouse('mousemove', 400, 170, 1); mouse('mouseup', 400, 170);
+      fixture.detectChanges();
+      expect(q('[data-auto]')!.getAttribute('aria-pressed')).toBe('true');
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>
