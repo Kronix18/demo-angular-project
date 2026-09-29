@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
-import { ChartDataService } from '../../core/services/chart-data.service';
+import { ChartDataService, AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
 import { ChartStateService } from '../../core/services/chart-state.service';
 import { filterByRange, aggregateWeeklyWFri } from '../../core/services/data-aggregation';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -11,6 +11,7 @@ import { IndicatorPanel } from '../indicator-panel/indicator-panel';
 import { IndicatorCalculationService } from '../../core/services/indicator-calculation.service';
 import { ResolvedIndicator, resolveEntry } from '../../core/indicators/indicator-catalog';
 import { OutputSpec } from '../../core/indicators/indicator-definitions';
+import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
@@ -159,13 +160,27 @@ type DataBuilder = (pts: LodPoint[]) => any[];
       </header>
 
       <div class="chart-panel" data-pane="panel">
-        <canvas #chartCanvas></canvas>
+        <canvas #chartCanvas [attr.hidden]="error ? '' : null"></canvas>
         @if (loading) {
-          <div class="loading-overlay">Loading chart...</div>
+          <div class="loading-overlay skeleton" role="status" aria-live="polite">
+            <span class="skeleton-label">Loading chart...</span>
+          </div>
         }
-        @if (error) {
+        @if (error && !loading) {
           <div class="error-message">
-            <p>Error loading chart: {{ error }}</p>
+            <div class="error-card" role="alert">
+              <h2>{{ errorTitle }}</h2>
+              <p>{{ error }}</p>
+              @if (errorKind === 'unknown-symbol') {
+                <p class="hint">Available symbols:</p>
+                <div class="symbol-list">
+                  @for (s of availableSymbols; track s) {
+                    <button type="button" class="symbol-btn" [attr.data-symbol]="s" (click)="pickSymbol(s)">{{ s }}</button>
+                  }
+                </div>
+              }
+              <button type="button" class="retry-btn" data-retry (click)="retry()">Retry</button>
+            </div>
           </div>
         }
       </div>
@@ -217,16 +232,52 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         background: var(--c-surface, rgba(255, 255, 255, 0.7));
         z-index: 5;
       }
+      canvas[hidden] { display: none; }
+      /* CSS-only shimmer skeleton: pane-shaped placeholder while loading */
+      .skeleton {
+        background: linear-gradient(
+          100deg,
+          var(--c-surface, #fff) 30%,
+          var(--c-grid, rgba(0, 0, 0, 0.06)) 50%,
+          var(--c-surface, #fff) 70%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.4s linear infinite;
+      }
+      .skeleton-label { color: var(--c-text-muted, #6b7280); font-size: 0.875rem; }
+      @keyframes shimmer { to { background-position: -200% 0; } }
       .error-message {
         position: absolute;
         inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: var(--auth-error-color, #dc3545);
-        text-align: center;
         z-index: 6;
       }
+      .error-card {
+        max-width: 32rem;
+        padding: 1.25rem 1.5rem;
+        text-align: center;
+        border: 1px solid var(--c-pane-border, #d1d5db);
+        border-radius: var(--border-radius, 8px);
+        background: var(--c-surface, #fff);
+        color: var(--c-text, #1f2937);
+      }
+      .error-card h2 { margin: 0 0 0.5rem; font-size: 1.125rem; color: var(--auth-error-color, #dc3545); }
+      .error-card p { margin: 0.25rem 0; }
+      .hint { color: var(--c-text-muted, #6b7280); font-size: 0.8125rem; }
+      .symbol-list { display: flex; flex-wrap: wrap; gap: 0.375rem; justify-content: center; margin: 0.5rem 0 0.75rem; }
+      .symbol-btn, .retry-btn {
+        padding: 0.25rem 0.75rem;
+        border: 1px solid var(--c-border, #d1d5db);
+        border-radius: var(--border-radius-sm, 4px);
+        background: var(--c-surface, #fff);
+        color: var(--c-text, #1f2937);
+        cursor: pointer;
+        font-size: 0.8125rem;
+      }
+      .retry-btn { background: var(--c-primary, #2563eb); border-color: var(--c-primary, #2563eb); color: #fff; }
+      .symbol-btn:hover { border-color: var(--c-primary, #2563eb); color: var(--c-primary, #2563eb); }
       .reset-zoom-btn {
         margin-left: auto;
         padding: 0.25rem 0.625rem;
@@ -249,6 +300,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private chart: Chart | null = null;
   loading = true;
   error: string | null = null;
+  errorTitle = '';
+  errorKind: 'unknown-symbol' | 'no-data' | 'failed' | null = null;
+  readonly availableSymbols = [...AVAILABLE_SYMBOLS];
+  /** The symbol/interval of the last load attempt (Retry re-runs it). */
+  private lastLoad = { symbol: 'msft', interval: '1d' };
   currentSymbol: string = '';
   currentInterval: string = '1d';
   currentRange: string = '6m';
@@ -321,26 +377,56 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   // Public since 2.2: specs drive reloads through it.
   loadChartData(symbol: string, interval: string): void {
     this.loading = true;
-    this.error = null;
+    this.clearError();
+    this.lastLoad = { symbol, interval };
     // 4.3 PAN FIX: fetch the FULL file; the range preset only FRAMES the view.
-    this.chartDataService.getOHLCV(symbol, interval, 100000).subscribe({
-      next: (data) => {
-        this.allData = data;
-        if (data && data.length > 0) {
-          this.createChart(data);
-        } else {
-          this.error = 'No data available';
-        }
-        this.loading = false;
-        this.cdr.markForCheck();
-      },
-      error: (err) => {
-        console.error('Failed to load chart data:', err);
-        this.error = 'Failed to load chart data';
-        this.loading = false;
-        this.cdr.markForCheck();
-      },
-    });
+    this.chartDataService
+      .getOHLCV(symbol, interval, 100000)
+      .pipe(finalize(() => { this.loading = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: (data) => {
+          this.allData = data;
+          if (data && data.length > 0) {
+            this.createChart(data);
+          } else {
+            // ChartDataService maps 404s to [] (2.1 contract), so tell "not one of
+            // ours" from "ours but empty" by the symbol list.
+            const known = (AVAILABLE_SYMBOLS as readonly string[]).includes(symbol.toLowerCase().replace(/\.us$/, ''));
+            this.showError(
+              known ? 'no-data' : 'unknown-symbol',
+              known ? 'No data' : `Unknown symbol ${symbol.toUpperCase()}`,
+              known ? `No data available for ${symbol.toUpperCase()}.` : `There is no demo data for ${symbol.toUpperCase()}.`,
+            );
+          }
+        },
+        error: (err) => {
+          console.error('Failed to load chart data:', err);
+          this.showError('failed', 'Could not load chart', 'Failed to load chart data');
+        },
+      });
+  }
+
+  /** Error card actions. */
+  retry(): void {
+    this.loadChartData(this.lastLoad.symbol, this.lastLoad.interval);
+  }
+
+  pickSymbol(symbol: string): void {
+    this.chartState.setSymbol(symbol);
+  }
+
+  private clearError(): void {
+    this.error = null;
+    this.errorTitle = '';
+    this.errorKind = null;
+  }
+
+  /** Error state: message + no stale chart behind the card. */
+  private showError(kind: 'unknown-symbol' | 'no-data' | 'failed', title: string, message: string): void {
+    this.destroyChart();
+    this.errorKind = kind;
+    this.errorTitle = title;
+    this.error = message;
   }
 
   private formatBarDate(ts: number): string {
@@ -413,7 +499,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     // The range preset only FRAMES the view (4.3); all bars stay reachable by pan/zoom.
     const rangeSlice = filterByRange(data, this.currentRange as any, this.currentInterval);
     if (!rangeSlice.length) {
-      this.error = 'No data in range';
+      this.showError('no-data', 'No data', 'No data in range');
       return;
     }
     // Weekly aggregation applies to the whole file so pan-left shows weekly bars.

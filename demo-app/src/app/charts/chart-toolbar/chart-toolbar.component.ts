@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
 import { ChartStateService } from '../../core/services/chart-state.service';
@@ -165,6 +166,13 @@ export class ChartToolbarComponent {
     this.symbol = snap.symbol;
     this.interval = snap.interval;
     this.range = snap.range;
+    // ...and keep following it: the route param, the error card's symbol picker
+    // and reset() all write the store after this component was constructed.
+    this.store.state$.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((s) => {
+      this.symbol = s.symbol;
+      this.interval = s.interval;
+      this.range = s.range;
+    });
   }
 
   /** Enter key / Update button: write the store ONCE with the current input value. */

@@ -5,10 +5,10 @@
       <h1 class="logo" routerLink="/home">Stock Screener</h1>
 
       <div class="nav-links">
-        <a routerLink="/home" class="nav-link">Home</a>
-        <a routerLink="/screener" class="nav-link">Screener</a>
-        <a routerLink="/charts/msft" class="nav-link">Charts</a>
-        <a routerLink="/pricing" class="nav-link">Pricing</a>
+        <a routerLink="/home" routerLinkActive="active" class="nav-link">Home</a>
+        <a routerLink="/screener" routerLinkActive="active" class="nav-link">Screener</a>
+        <a [routerLink]="['/charts', chartsSymbol()]" routerLinkActive="active" class="nav-link">Charts</a>
+        <a routerLink="/pricing" routerLinkActive="active" class="nav-link">Pricing</a>
       </div>
 
       <div class="nav-actions">

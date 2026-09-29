@@ -64,9 +64,9 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 5.2 | phase-5-indicators/5.2-indicator-panel.md | DONE (browser-verified 12/12, `scripts/verify-5-2.cjs`) | overlay + oscillator panes, panel add/remove, state-driven |
 | 5.3 | phase-5-indicators/5.3-indicator-management.md | DONE (browser-verified, `verify-5-2.cjs` 14/14) | inline validation (2..500), duplicate error, WMA/RMA, rehydration sanitising; persistence from 4.1 |
 | 5.4 | phase-5-indicators/5.4-chart-layout-redesign.md | DONE (browser-verified 25/25, `scripts/verify-layout.cjs`) | one-panel chart, LOD windowing, full-viewport layout, compact navbar (Kevin, 2026-09-29) |
-| 6.1 | phase-6-integration/6.1-routing-navigation.md | NOT STARTED | charts route exists; navbar link missing |
+| 6.1 | phase-6-integration/6.1-routing-navigation.md | DONE (browser-verified, `scripts/verify-6-1-6-3.cjs`) | active-route styling, Charts link reopens last symbol, chart routes are fullscreen |
 | 6.2 | phase-6-integration/6.2-design-token-compliance.md | NOT STARTED | constraint currently violated |
-| 6.3 | phase-6-integration/6.3-error-loading-states.md | NOT STARTED | |
+| 6.3 | phase-6-integration/6.3-error-loading-states.md | DONE (browser-verified 13/13) | skeleton, error card (unknown symbol / no data / failed) + symbol picker + Retry |
 | 6.4 | phase-6-integration/6.4-performance.md | NOT STARTED | MSFT has ~40y of daily bars |
 | 7.1 | phase-7-testing/7.1-coverage-gate.md | NOT STARTED | |
 | 7.2 | phase-7-testing/7.2-e2e-playwright.md | NOT STARTED | replaces stray gen-baselines scripts |
