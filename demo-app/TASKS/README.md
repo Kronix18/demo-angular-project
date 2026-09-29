@@ -71,7 +71,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 7.1 | phase-7-testing/7.1-coverage-gate.md | NOT STARTED | |
 | 7.2 | phase-7-testing/7.2-e2e-playwright.md | NOT STARTED | replaces stray gen-baselines scripts |
 | 7.3 | phase-7-testing/7.3-manual-matrix.md | NOT STARTED | |
-| 8.1 | phase-8-cleanup-docs/8.1-dead-file-removal.md | NOT STARTED | |
+| 8.1 | phase-8-cleanup-docs/8.1-dead-file-removal.md | DONE | 20 dead files removed; build + 14 spec files + browser scripts green |
 | 8.2 | phase-8-cleanup-docs/8.2-readme-architecture.md | NOT STARTED | |
 | 8.3 | phase-8-cleanup-docs/8.3-production-build.md | NOT STARTED | |
 | 9.1 | phase-9-final/9.1-real-backend-auth.md | NOT STARTED | last task, needs backend |
