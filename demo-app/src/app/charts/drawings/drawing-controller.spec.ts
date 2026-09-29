@@ -445,4 +445,68 @@ describe('DrawingController (10.3)', () => {
       expect(ctl.clone()).toBeNull();
     });
   });
+
+  describe('per-drawing lock / hide, anchored text, emoji, table (11.12)', () => {
+    const click = (x: number, y: number) => { ctl.pointerDown(x, y); ctl.pointerUp(x, y); };
+    const hl = (extra: object = {}) => store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 }, ...extra } as any);
+
+    it('a locked drawing can be selected but not moved, deleted or handle-dragged', () => {
+      hl({ locked: true });
+      click(200, 170);
+      expect(ctl.view().selectedId).toBe('h');
+      ctl.pointerDown(200, 170); ctl.pointerMove(200, 120); ctl.pointerUp(200, 120);
+      expect(store.list('msft')[0].a.p).toBe(30);
+      ctl.key('Delete');
+      expect(store.list('msft').length).toBe(1);
+    });
+
+    it('a hidden drawing is not selectable and not erased', () => {
+      hl({ hidden: true });
+      click(200, 170);
+      expect(ctl.view().selectedId).toBeNull();
+      tool = 'eraser';
+      click(200, 170);
+      expect(store.list('msft').length).toBe(1);
+    });
+
+    it('setLocked / setHidden toggle the flags; hiding deselects', () => {
+      hl();
+      click(200, 170);
+      ctl.setFlag('h', 'locked', true);
+      expect(store.list('msft')[0].locked).toBe(true);
+      ctl.setFlag('h', 'hidden', true);
+      expect(store.list('msft')[0].hidden).toBe(true);
+      expect(ctl.view().selectedId).toBeNull();
+      ctl.setFlag('h', 'hidden', false);
+      expect(store.list('msft')[0].hidden).toBeUndefined();
+    });
+
+    it('anchored text remembers where in the pane it was placed and moves by pixels', () => {
+      tool = 'anchoredtext';
+      click(245, 100); // pane is x 0..490, y 0..200
+      const d = store.list('msft')[0];
+      expect(d.view).toEqual({ x: 0.5, y: 0.5 });
+      expect(edits).toEqual([d.id]);
+      ctl.setText(d.id, 'hi');
+      tool = 'cursor';
+      ctl.pointerDown(250, 100); ctl.pointerMove(300, 120); ctl.pointerUp(300, 120);
+      const moved = store.list('msft')[0].view!;
+      expect(moved.x).toBeCloseTo(0.5 + 55 / 490, 5);
+      expect(moved.y).toBeCloseTo(0.5 + 20 / 200, 5);
+    });
+
+    it('emoji tool stamps the current emoji; table starts with placeholder text to edit', () => {
+      const c2 = new DrawingController({ chart: () => chart, bars: () => bars, store, symbol: () => 'msft', tool: () => tool, changed: () => changes++, emoji: () => '🦄', editText: (id) => edits.push(id) });
+      tool = 'emoji';
+      c2.pointerDown(100, 100); c2.pointerUp(100, 100);
+      expect(store.list('msft')[0]).toMatchObject({ type: 'emoji', text: '🦄' });
+      expect(edits).toEqual([]);
+      tool = 'table';
+      c2.pointerDown(200, 100); c2.pointerUp(200, 100);
+      const t = store.list('msft')[1];
+      expect(t.type).toBe('table');
+      expect(t.text).toContain('|');
+      expect(edits).toEqual([t.id]);
+    });
+  });
 });

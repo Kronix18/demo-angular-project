@@ -137,4 +137,51 @@ describe('DrawingStore (10.3)', () => {
       expect(n).toBe(100);
     });
   });
+
+  describe('per-drawing state and z-order (11.12)', () => {
+    const h = (id: string) => ({ id, type: 'hline' as const, a: { t: 1, p: 10 } });
+
+    it('locked / hidden flags and the anchored-text position survive persistence; junk is dropped', () => {
+      const st = new DrawingStore();
+      st.add('msft', { ...h('a'), locked: true, hidden: true });
+      st.add('msft', { id: 't', type: 'anchoredtext', a: { t: 1, p: 1 }, text: 'x', view: { x: 0.2, y: 0.3 } });
+      const again = new DrawingStore();
+      expect(again.list('msft')[0]).toMatchObject({ locked: true, hidden: true });
+      expect(again.list('msft')[1].view).toEqual({ x: 0.2, y: 0.3 });
+      sessionStorage.setItem('chart-drawings', JSON.stringify({ msft: [{ ...h('b'), locked: 'yes', view: { x: 'a' } }] }));
+      const clean = new DrawingStore().list('msft')[0];
+      expect(clean.locked).toBeUndefined();
+      expect(clean.view).toBeUndefined();
+    });
+
+    it('move() reorders: front, back, forward, backward (and is undoable)', () => {
+      const st = new DrawingStore();
+      for (const id of ['a', 'b', 'c']) st.add('msft', h(id));
+      const order = () => st.list('msft').map((d) => d.id);
+      st.move('msft', 'a', 'front');
+      expect(order()).toEqual(['b', 'c', 'a']);
+      st.move('msft', 'a', 'backward');
+      expect(order()).toEqual(['b', 'a', 'c']);
+      st.move('msft', 'c', 'back');
+      expect(order()).toEqual(['c', 'b', 'a']);
+      st.move('msft', 'c', 'forward');
+      expect(order()).toEqual(['b', 'c', 'a']);
+      st.move('msft', 'a', 'front'); // already there: no-op, no history entry
+      st.undo('msft');
+      expect(order()).toEqual(['b', 'a', 'c']);
+    });
+
+    it('exportAll / importAll round-trip every symbol (used by layouts)', () => {
+      const st = new DrawingStore();
+      st.add('msft', h('a'));
+      st.add('nvda', h('b'));
+      const dump = st.exportAll();
+      st.clear('msft');
+      st.importAll(dump);
+      expect(st.list('msft').map((d) => d.id)).toEqual(['a']);
+      expect(st.list('nvda').map((d) => d.id)).toEqual(['b']);
+      st.importAll({ bad: 'x' } as any);
+      expect(st.list('msft')).toEqual([]);
+    });
+  });
 });

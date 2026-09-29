@@ -26,7 +26,7 @@ describe('drawing tool registry (11.7)', () => {
   it('has unique ids, every group is populated and TradingView-sized (80+ tools)', () => {
     const ids = TOOL_DEFS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeGreaterThanOrEqual(80);
+    expect(ids.length).toBeGreaterThanOrEqual(95);
     for (const g of TOOL_GROUPS) expect(toolsInGroup(g.id).length, g.id).toBeGreaterThan(0);
     expect(isDrawingType('fibext')).toBe(true);
     expect(isDrawingType('measure')).toBe(false); // transient, not a stored drawing
@@ -262,6 +262,42 @@ describe('drawing shapes (11.7)', () => {
       for (const id of ['iconheart', 'iconthumb', 'iconfire', 'iconrocket', 'iconwarn', 'iconbulb', 'iconbell', 'icondollar']) {
         expect(shapesFor(drawing(id, [at(10, 100)]), env).length, id).toBe(1);
       }
+    });
+  });
+
+  describe('third wave (11.12)', () => {
+    it('anchored text sits at a fixed spot of the pane (fractions), whatever the anchor says', () => {
+      const d = drawing('anchoredtext', [at(10, 100)], { text: 'hello', view: { x: 0.5, y: 0.25 } } as any);
+      const [t] = shapesFor(d, env).filter((s) => s.k === 'text') as Extract<Shape, { k: 'text' }>[];
+      expect([t.x, t.y]).toEqual([450, 75]); // 0.5 of 0..900, 0.25 of 0..300
+      const other = shapesFor({ ...d, a: at(50, 300) }, env)[0] as Extract<Shape, { k: 'text' }>;
+      expect([other.x, other.y]).toEqual([450, 75]);
+      expect(handlePoints(d, env)).toEqual([]);
+    });
+
+    it('table: a grid of cells (rows split by ";", cells by "|")', () => {
+      const shapes = shapesFor(drawing('table', [at(10, 100)], { text: 'A|B|C;1|2|3' }), env);
+      expect(shapes.filter((s) => s.k === 'rect').length).toBe(6);
+      expect(texts(shapes)).toEqual(['A', 'B', 'C', '1', '2', '3']);
+      const empty = shapesFor(drawing('table', [at(10, 100)], { text: '' }), env);
+      expect(empty.length).toBeGreaterThan(0); // an empty table still shows one cell
+    });
+
+    it('emoji stamps draw the chosen glyph', () => {
+      expect(texts(shapesFor(drawing('emoji', [at(10, 100)], { text: '🦄' }), env))).toEqual(['🦄']);
+    });
+
+    it('ghost feed repeats the bars between a and b starting at b', () => {
+      const shapes = shapesFor(drawing('ghostfeed', [at(10, 110), at(20, 120)]), env);
+      expect(shapes.length).toBeGreaterThan(20);
+      const xs = lines(shapes).map((l) => l.x1);
+      expect(Math.min(...xs)).toBeGreaterThanOrEqual(200 - 1); // nothing left of b (x = 200)
+    });
+
+    it('anchored volume profile runs from the anchor to the latest bar', () => {
+      const rects = shapesFor(drawing('avp', [at(50, 150)]), env).filter((s) => s.k === 'rect');
+      expect(rects.length).toBeGreaterThan(5);
+      expect(Math.min(...rects.map((r) => (r as any).x))).toBe(500);
     });
   });
 });
