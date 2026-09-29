@@ -1,3 +1,7 @@
+> **v2 contract (2026-09-29):** the full, current contract the backend has to implement — tables, fields, formats, tiers — is in
+> [`docs/api/README.md`](docs/api/README.md) (files `00`–`10`); the plan behind it is [`docs/DATA-PLAN.md`](docs/DATA-PLAN.md).
+> This file is the **v1** chart/auth spec; v2 extends it additively and never breaks it.
+
 # API Backend Specification for Charting Features
 
 ## Purpose
