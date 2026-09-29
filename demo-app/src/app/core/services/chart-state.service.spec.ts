@@ -173,4 +173,28 @@ describe('ChartStateService (task 4.1)', () => {
     sessionStorage.setItem('chart-state', JSON.stringify({ symbol: 'msft', interval: '1d', range: '6M', indicators: [], logScale: 'yes' }));
     expect(new ChartStateService().snapshot().logScale).toBe(false);
   });
+
+  it('symbol + volume settings (11.6): defaults, replace, hide toggles, persistence, sanitising', () => {
+    const svc = TestBed.inject(ChartStateService);
+    expect(svc.snapshot().price).toEqual({});
+    expect(svc.snapshot().volume).toEqual({});
+    svc.setPriceSettings({ up: '#00ff00', width: 3, byPrevClose: true });
+    svc.setVolumeSettings({ down: '#ff0000' });
+    svc.togglePriceHidden();
+    svc.toggleVolumeHidden();
+    expect(svc.snapshot().price).toEqual({ up: '#00ff00', width: 3, byPrevClose: true, hidden: true });
+    expect(svc.snapshot().volume).toEqual({ down: '#ff0000', hidden: true });
+    svc.togglePriceHidden();
+    expect(svc.snapshot().price.hidden).toBeUndefined();
+    svc.setPriceSettings({ up: 'not-a-colour', width: 50 } as any);
+    expect(svc.snapshot().price).toEqual({}); // invalid values are dropped
+    expect(JSON.parse(sessionStorage.getItem('chart-state')!).volume).toEqual({ down: '#ff0000', hidden: true });
+  });
+
+  it('rehydrates price / volume settings and ignores corrupt ones', () => {
+    sessionStorage.setItem('chart-state', JSON.stringify({ price: { up: '#112233', byPrevClose: true }, volume: 'junk' }));
+    const svc = TestBed.inject(ChartStateService);
+    expect(svc.snapshot().price).toEqual({ up: '#112233', byPrevClose: true });
+    expect(svc.snapshot().volume).toEqual({});
+  });
 });

@@ -80,4 +80,27 @@ describe('ChartLegendComponent (10.2)', () => {
     expect(asked).toBe(1);
     expect(el().querySelector('[data-symbol-btn]')!.getAttribute('aria-label')).toMatch(/search.*symbol/i);
   });
+
+  it('header + volume row have eye and settings buttons that emit the series (11.6)', () => {
+    const g = groups();
+    g[0].header!.hidden = false;
+    g[0].rows.push({ key: 'volume', label: 'Volume', value: '1.2M', color: 'rgb(9, 9, 9)', hidden: true, builtin: 'volume' });
+    fixture.componentRef.setInput('groups', g);
+    fixture.detectChanges();
+    const toggled: string[] = [];
+    const opened: string[] = [];
+    fixture.componentInstance.seriesToggle.subscribe((k) => toggled.push(k));
+    fixture.componentInstance.seriesSettings.subscribe((k) => opened.push(k));
+    (el().querySelector('[data-price-eye]') as HTMLButtonElement).click();
+    (el().querySelector('[data-price-settings]') as HTMLButtonElement).click();
+    (el().querySelector('[data-volume-eye]') as HTMLButtonElement).click();
+    (el().querySelector('[data-volume-settings]') as HTMLButtonElement).click();
+    expect(toggled).toEqual(['price', 'volume']);
+    expect(opened).toEqual(['price', 'volume']);
+    expect(el().querySelector('[data-volume-row]')!.classList.contains('hidden')).toBe(true);
+    expect(el().querySelector('[data-volume-remove]')).toBeNull(); // volume cannot be removed
+    for (const s of ['[data-price-eye]', '[data-price-settings]', '[data-volume-eye]', '[data-volume-settings]']) {
+      expect(el().querySelector(s)!.getAttribute('aria-label'), s).toBeTruthy();
+    }
+  });
 });

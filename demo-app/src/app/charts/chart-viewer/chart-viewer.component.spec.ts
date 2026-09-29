@@ -850,6 +850,90 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('symbol + volume settings (11.6)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const setColor = (sel: string, v: string) => { const i = q(sel) as HTMLInputElement; i.value = v; i.dispatchEvent(new Event('input')); };
+
+    it('the legend header has an eye and a gear; the gear opens the symbol settings, OK restyles the bars', async () => {
+      const st = fresh();
+      await loaded();
+      (q('[data-price-settings]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-symbol-settings-dialog')).toBeTruthy();
+      setColor('[data-set="up"]', '#112233');
+      setColor('[data-set="down"]', '#445566');
+      const w = q('[data-set="width"]') as HTMLSelectElement;
+      w.value = '3'; w.dispatchEvent(new Event('change'));
+      (q('[data-ok]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().price).toMatchObject({ up: '#112233', down: '#445566', width: 3 });
+      const ds = chartOf().data.datasets[0];
+      expect(ds.backgroundColors.up).toBe('#112233');
+      expect(ds.borderColors.down).toBe('#445566');
+      expect(ds.borderWidth).toBe(3);
+      expect(q('app-symbol-settings-dialog')).toBeNull();
+    });
+
+    it('previous-close colouring puts a direction on every bar; the eye hides / shows the price series', async () => {
+      const st = fresh();
+      st.setPriceSettings({ byPrevClose: true });
+      await loaded();
+      const pts = chartOf().data.datasets[0].data;
+      expect(pts.every((p: any) => p.dir === 'up' || p.dir === 'down')).toBe(true);
+      (q('[data-price-eye]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().price.hidden).toBe(true);
+      expect(chartOf().data.datasets[0].hidden).toBe(true);
+      expect(q('[data-legend-header]')!.classList.contains('hidden')).toBe(true);
+      (q('[data-price-eye]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      expect(chartOf().data.datasets[0].hidden).toBeFalsy();
+    });
+
+    it('line styles get source + line colour in the dialog and use them', async () => {
+      const st = fresh();
+      st.setChartType('line');
+      st.setPriceSettings({ source: 'high', line: '#abcdef', width: 4 });
+      await loaded();
+      const ds = chartOf().data.datasets[0];
+      expect(ds.borderColor).toBe('#abcdef');
+      expect(ds.borderWidth).toBe(4);
+      expect(ds.data[0].y).toBe(chartOf().data.datasets[0].data[0].y);
+      (q('[data-price-settings]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('[data-set="source"]')).toBeTruthy();
+    });
+
+    it('the Volume row: eye hides the histogram, gear edits colours and previous-close colouring', async () => {
+      const st = fresh();
+      await loaded();
+      expect(q('[data-volume-row]')).toBeTruthy();
+      (q('[data-volume-eye]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(chartOf().data.datasets.find((d: any) => d.label === 'Volume').hidden).toBe(true);
+      (q('[data-volume-eye]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      (q('[data-volume-settings]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      setColor('[data-set="up"]', '#0a0b0c');
+      (q('[data-set="prev"]') as HTMLInputElement).click();
+      (q('[data-ok]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().volume).toEqual({ up: '#0a0b0c', byPrevClose: true });
+      const vol = chartOf().data.datasets.find((d: any) => d.label === 'Volume');
+      const raw = vol.data[1];
+      expect(typeof raw.up).toBe('boolean');
+      expect(vol.backgroundColor({ raw: { up: true } })).toBe('#0a0b0c');
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>

@@ -62,4 +62,11 @@ describe('chart LOD helpers (level-of-detail windowing)', () => {
     const flat = fitRange(50, 50, 0.05);
     expect(flat.max).toBeGreaterThan(flat.min);
   });
+
+  it('carries upPc: did the bucket close above the PREVIOUS bar\'s close (first bar: vs its own open)', () => {
+    const b = [bar(0, 10, 11), bar(1, 20, 9), bar(2, 8, 12)];
+    const pts = bucketWindow(b, 0, 2, 1);
+    expect(pts.map((p) => p.upPc)).toEqual([true, false, true]);
+    expect(bucketWindow(b, 1, 2, 2)[0].upPc).toBe(true); // bucket [1..2] closes at 12, previous close is 11
+  });
 });
