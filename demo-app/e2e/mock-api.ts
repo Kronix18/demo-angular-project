@@ -26,6 +26,8 @@ export interface MockOptions {
   overrides?: Record<string, unknown>;
   /** Access tokens the mock treats as expired: non-auth requests carrying them get 401 token_expired. */
   expiredTokens?: string[];
+  /** path → fail the first `times` GETs with `status` (then behave normally). */
+  flaky?: Record<string, { status: number; times: number; headers?: Record<string, string> }>;
   /** Send ETag on GET 200s and honour If-None-Match with 304. */
   etag?: boolean;
   /** Called for each mocked request (path incl. query). */
@@ -55,6 +57,7 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<void>
     [/^\/api\/user\/entitlements$/, ent],
     [/^\/api\/plans$/, load('plans.json')],
   ];
+  const flakyCount: Record<string, number> = {};
   await page.route(/\/api\//, async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -65,6 +68,8 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<void>
     if (path === '/api/auth/refresh') return json(200, { access_token: 'new-token', refresh_token: 'new-refresh', expires_in: 900 });
     const bearer = route.request().headers()['authorization']?.replace('Bearer ', '');
     if (bearer && opts.expiredTokens?.includes(bearer)) return json(401, { error: 'token_expired', message: 'Token expired' });
+    const fl = opts.flaky?.[path];
+    if (fl && (flakyCount[path] = (flakyCount[path] ?? 0) + 1) <= fl.times) return json(fl.status, { error: 'server_error', message: 'Temporarily unavailable' }, fl.headers);
     const err = opts.errors?.[path];
     if (err) return json(err.status, err.body, err.headers);
     if (opts.overrides && path in opts.overrides) {

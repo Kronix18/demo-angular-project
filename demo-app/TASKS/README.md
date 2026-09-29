@@ -101,7 +101,7 @@ No backend dataset needed: everything is built and verified against contract fix
 | 12.3 | phase-12-api-foundation/12.3-apierror-mapping-and-errorinterceptor.md | DONE | ApiError mapping and errorInterceptor — needs: none |
 | 12.4 | phase-12-api-foundation/12.4-authinterceptor-with-refresh.md | DONE | authInterceptor with refresh — needs: none (mock auth); real endpoints from 9.1 |
 | 12.5 | phase-12-api-foundation/12.5-etagcacheinterceptor.md | DONE | etagCacheInterceptor — needs: none |
-| 12.6 | phase-12-api-foundation/12.6-retryinterceptor.md | NOT STARTED | retryInterceptor — needs: none |
+| 12.6 | phase-12-api-foundation/12.6-retryinterceptor.md | DONE | retryInterceptor — needs: none |
 | 12.7 | phase-12-api-foundation/12.7-entitlementinterceptor-and-upgrade-event.md | NOT STARTED | entitlementInterceptor and upgrade event — needs: none (mock 402) |
 | 12.8 | phase-12-api-foundation/12.8-metaservice-api-meta-with-dataset-signals.md | NOT STARTED | MetaService (`/api/meta`) with dataset signals — needs: `meta` |
 | 12.9 | phase-12-api-foundation/12.9-symbolcapabilities-api-chart-symbol-meta.md | NOT STARTED | SymbolCapabilities (`/api/chart/{symbol}/meta`) — needs: `prices` |

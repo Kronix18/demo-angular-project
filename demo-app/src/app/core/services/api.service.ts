@@ -2,15 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { API_URL } from '../api-url';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError, of } from 'rxjs';
-import { catchError, retry, timeout } from 'rxjs/operators';
-import { timer } from 'rxjs';
+import { catchError, timeout } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
   private apiUrl = inject(API_URL);
-  private readonly maxRetries = 3;
   private readonly timeoutMs = 10000;
 
   constructor(private http: HttpClient) {}
@@ -18,18 +16,9 @@ export class ApiService {
   get<T>(endpoint: string): Observable<T> {
     const url = `${this.apiUrl}/${endpoint}`;
     console.log('ApiService GET request to:', url);
-    const headers = { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` };
-    return this.http.get<T>(url, { headers }).pipe(
+    // Authorization is attached by authInterceptor (task 12.4).
+    return this.http.get<T>(url).pipe(
       timeout(this.timeoutMs),
-      // exponential backoff (1s, 2s, 4s); the error surfaces once retries are used up
-      retry({
-        count: this.maxRetries,
-        delay: (error, retryCount) => {
-          const delayMs = Math.pow(2, retryCount - 1) * 1000;
-          console.warn(`Retry attempt ${retryCount} after ${delayMs}ms`, error);
-          return timer(delayMs);
-        },
-      }),
       catchError(error => this.handleError(error, url))
     );
   }

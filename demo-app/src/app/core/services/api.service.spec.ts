@@ -25,11 +25,11 @@ describe('ApiService (coverage gate 7.1)', () => {
     vi.useRealTimers();
   });
 
-  it('GET sends the bearer token and returns the body', () => {
+  it('GET returns the body (the bearer header is added by authInterceptor, task 12.4)', () => {
     let out: unknown;
     api.get<{ a: number }>('x').subscribe((v) => (out = v));
     const req = http.expectOne(`${BASE}/x`);
-    expect(req.request.headers.get('Authorization')).toBe('Bearer tok');
+    expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({ a: 1 });
     expect(out).toEqual({ a: 1 });
   });
