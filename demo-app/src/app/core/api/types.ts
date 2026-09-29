@@ -68,3 +68,20 @@ export interface MetaResponse {
   benchmarks?: Benchmarks;
   display_names?: Record<string, string>;
 }
+
+/** GET /api/chart/{symbol}/meta (docs/api/02-prices.md). */
+export interface ChartMetaResponse {
+  security_id: number;
+  first_bar: string | null;
+  last_bar: string | null;
+  bar_count: number;
+  intervals: string[];
+  price_basis: 'split_adjusted';
+  volume_basis: 'as_reported' | 'split_adjusted';
+  split_count?: number;
+  source?: string;
+  price_scale?: number;
+  currency?: string;
+  delisted: boolean;
+  datasets: Partial<Record<'technicals' | 'rs_line' | 'patterns' | 'fundamental_markers', boolean>> & Record<string, boolean>;
+}
