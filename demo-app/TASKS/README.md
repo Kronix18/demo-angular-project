@@ -98,7 +98,7 @@ No backend dataset needed: everything is built and verified against contract fix
 |---|---|---|---|
 | 12.1 | phase-12-api-foundation/12.1-typed-api-models-from-the-contract.md | DONE | Typed API models from the contract — needs: none |
 | 12.2 | phase-12-api-foundation/12.2-contract-fixtures-and-mock-backend-for-e2e.md | DONE | Contract fixtures and mock backend for e2e — needs: none |
-| 12.3 | phase-12-api-foundation/12.3-apierror-mapping-and-errorinterceptor.md | NOT STARTED | ApiError mapping and errorInterceptor — needs: none |
+| 12.3 | phase-12-api-foundation/12.3-apierror-mapping-and-errorinterceptor.md | DONE | ApiError mapping and errorInterceptor — needs: none |
 | 12.4 | phase-12-api-foundation/12.4-authinterceptor-with-refresh.md | NOT STARTED | authInterceptor with refresh — needs: none (mock auth); real endpoints from 9.1 |
 | 12.5 | phase-12-api-foundation/12.5-etagcacheinterceptor.md | NOT STARTED | etagCacheInterceptor — needs: none |
 | 12.6 | phase-12-api-foundation/12.6-retryinterceptor.md | NOT STARTED | retryInterceptor — needs: none |

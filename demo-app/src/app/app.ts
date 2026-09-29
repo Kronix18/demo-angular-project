@@ -1,3 +1,4 @@
+import { ApiToastComponent } from './shared/api-toast/api-toast.component';
 import { IconComponent } from './shared/icons/icon.component';
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -11,7 +12,7 @@ import { filter, startWith, takeUntil } from 'rxjs/operators';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ApiToastComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
