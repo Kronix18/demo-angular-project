@@ -2,12 +2,12 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-/** Chart state shape (4.1). Indicators list: {type, period} entries — wired in 5.x. */
+/** Chart state shape (4.1). Indicators: {type, period, hidden?} entries (hidden = eye toggle, 10.2). */
 export interface ChartState {
   symbol: string;
   interval: string;
   range: string;
-  indicators: Array<{ type: string; period: number }>;
+  indicators: Array<{ type: string; period: number; hidden?: boolean }>;
 }
 
 const STORAGE_KEY = 'chart-state';
@@ -59,13 +59,25 @@ export class ChartStateService {
   }
 
   /** Indicator CRUD (5.2/5.3 use this): add (dedup by type+period), remove by index. */
-  addIndicator(entry: { type: string; period: number }): boolean {
+  addIndicator(entry: { type: string; period: number; hidden?: boolean }): boolean {
     const exists = this.subject.value.indicators.some(
       (i) => i.type === entry.type && i.period === entry.period
     );
     if (exists) return false;
     this.update({ indicators: [...this.subject.value.indicators, entry] });
     return true;
+  }
+
+  /** Eye toggle (10.2): flips visibility, keeps the indicator and its pane. */
+  toggleHidden(index: number): void {
+    const list = this.subject.value.indicators;
+    if (index < 0 || index >= list.length) return;
+    const next = list.map((e, i) => {
+      if (i !== index) return e;
+      const { hidden, ...rest } = e;
+      return hidden ? rest : { ...rest, hidden: true };
+    });
+    this.update({ indicators: next });
   }
 
   removeIndicator(index: number): void {
@@ -104,9 +116,9 @@ export class ChartStateService {
         interval: typeof parsed.interval === 'string' ? parsed.interval : DEFAULTS.interval,
         range: typeof parsed.range === 'string' ? parsed.range : DEFAULTS.range,
         indicators: Array.isArray(parsed.indicators)
-          ? parsed.indicators.filter(
-              (i: any) => i && typeof i.type === 'string' && typeof i.period === 'number' && Number.isFinite(i.period)
-            )
+          ? parsed.indicators
+              .filter((i: any) => i && typeof i.type === 'string' && typeof i.period === 'number' && Number.isFinite(i.period))
+              .map((i: any) => (i.hidden === true ? { type: i.type, period: i.period, hidden: true } : { type: i.type, period: i.period }))
           : [],
       };
     } catch {

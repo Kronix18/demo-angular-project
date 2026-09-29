@@ -7,6 +7,8 @@
 export interface IndicatorEntry {
   type: string;
   period: number;
+  /** eye toggle (10.2): series hidden, indicator kept */
+  hidden?: boolean;
 }
 
 export type IndicatorKind = 'overlay' | 'pane';
@@ -71,6 +73,7 @@ export interface ResolvedIndicator {
   definitionId: string;
   params: Record<string, unknown>;
   label: string;
+  hidden: boolean;
 }
 
 export function resolveEntry(entry: IndicatorEntry): ResolvedIndicator {
@@ -82,5 +85,6 @@ export function resolveEntry(entry: IndicatorEntry): ResolvedIndicator {
     definitionId: item.definitionId,
     params: item.buildParams(entry.period),
     label: item.usesPeriod ? `${item.label} ${entry.period}` : item.label,
+    hidden: entry.hidden === true,
   };
 }

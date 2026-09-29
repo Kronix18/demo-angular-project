@@ -342,11 +342,9 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(snapped.calls).toContain('moveTo');
     });
 
-    it('paneDecor: separators above every pane but the first, plus pane labels', () => {
+    it('paneDecor: draws separators above every pane but the first (labels are the legend\'s job)', () => {
       const p = plugin('paneDecor');
-      const texts: string[] = [];
       const c = fakeChart({
-        ctx: new Proxy({}, { get: (_t, prop) => (...a: unknown[]) => { if (prop === 'fillText') texts.push(String(a[0])); }, set: () => true }),
         scales: {
           x: { top: 0, options: {} },
           y: { top: 0, options: { paneLabel: 'MSFT' } },
@@ -355,7 +353,8 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
         },
       });
       p.afterDraw(c);
-      expect(texts).toEqual(['MSFT', 'Volume']);
+      expect(c.calls.filter((k: string) => k === 'stroke').length).toBe(2); // above yVol and yInd0, not above y
+      expect(c.calls).not.toContain('fillText');
       p.afterDraw({ ...c, ctx: null }); // no context: no crash
     });
 
@@ -433,6 +432,8 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
 
     it('header shows symbol · interval and the LAST bar OHLC by default; hovering a bar swaps in its values', async () => {
+      sessionStorage.clear();
+      TestBed.inject(ChartStateService).reset();
       const chart: any = await loaded();
       fixture.detectChanges();
       expect(q('[data-legend-header]')!.textContent).toContain('MSFT');

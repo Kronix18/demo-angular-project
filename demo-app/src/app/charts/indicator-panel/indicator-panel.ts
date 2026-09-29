@@ -1,16 +1,14 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChartStateService } from '../../core/services/chart-state.service';
 import {
-  INDICATOR_CATALOG, IndicatorEntry, PERIOD_MAX, PERIOD_MIN, ResolvedIndicator, catalogItem, resolveEntry,
+  INDICATOR_CATALOG, PERIOD_MAX, PERIOD_MIN, catalogItem, resolveEntry,
 } from '../../core/indicators/indicator-catalog';
 
 /**
- * Indicator panel (5.2): lists the ACTIVE indicators from ChartStateService
- * (single source of truth, persisted) and lets the user add/remove them. The
- * viewer derives overlays/panes from the same state — this component only
- * writes state. Full management UX (menus, params, visibility) is 5.3.
+ * Indicator panel: the ADD form (type + period, inline validation, duplicate
+ * detection). The active indicators themselves — value, eye, remove — live in
+ * the chart legend (10.2). Writes ChartStateService; the viewer derives from it.
  */
 @Component({
   selector: 'app-indicator-panel',
@@ -23,19 +21,11 @@ export class IndicatorPanel {
   private readonly chartState = inject(ChartStateService);
 
   readonly catalog = INDICATOR_CATALOG;
-  readonly rows = signal<{ index: number; resolved: ResolvedIndicator }[]>([]);
-
   /** Inline validation message (design-token styled, never alert()). */
   readonly error = signal<string | null>(null);
 
   type = 'sma';
   period = 20;
-
-  constructor() {
-    this.chartState.state$.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((s) => {
-      this.rows.set(this.toRows(s.indicators));
-    });
-  }
 
   get periodEnabled(): boolean {
     return catalogItem(this.type)?.usesPeriod ?? true;
@@ -63,21 +53,5 @@ export class IndicatorPanel {
       return;
     }
     this.error.set(null);
-  }
-
-  remove(index: number): void {
-    this.chartState.removeIndicator(index);
-  }
-
-  private toRows(entries: IndicatorEntry[]) {
-    const out: { index: number; resolved: ResolvedIndicator }[] = [];
-    entries.forEach((entry, index) => {
-      try {
-        out.push({ index, resolved: resolveEntry(entry) });
-      } catch {
-        // stale/unknown entry rehydrated from sessionStorage — skip instead of crashing
-      }
-    });
-    return out;
   }
 }

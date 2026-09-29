@@ -78,7 +78,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 8.3 | phase-8-cleanup-docs/8.3-production-build.md | DONE (browser-verified) | production build clean (no warnings), `npm run e2e:prod` smoke on the static bundle |
 | 9.1 | phase-9-final/9.1-real-backend-auth.md | NOT STARTED | last task, needs backend |
 | 10.1 | phase-10-tradingview/README.md#101 | DONE (browser-verified) | TradingView dark palette (#131722/#1e222d/#d1d4dc), theme toggle + OS auto-follow, zero colour literals app-wide |
-| 10.2 | phase-10-tradingview/README.md#102 | NOT STARTED | legend rows + eye toggles |
+| 10.2 | phase-10-tradingview/README.md#102 | DONE (browser-verified) | HTML legend per pane: OHLC of hovered bar, indicator values, eye toggle (persisted), remove |
 | 10.3 | phase-10-tradingview/README.md#103 | NOT STARTED | drawing tools (chartjs-plugin-annotation) |
 | 10.4 | phase-10-tradingview/README.md#104 | NOT STARTED | multi-pane layout, per-pane Y |
 | 10.5 | phase-10-tradingview/README.md#105 | NOT STARTED | bottom toolbar + chart-type switcher |

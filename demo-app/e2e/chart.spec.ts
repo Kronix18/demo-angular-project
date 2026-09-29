@@ -82,4 +82,55 @@ test.describe('chart panel (2.x–5.x)', () => {
     for (let i = 0; i < 25; i++) await page.mouse.wheel(0, -300);
     await page.waitForFunction(() => { const x = (window as any).__charts.chart.scales.x; return x.max - x.min < 800; });
   });
+
+  test('legend (10.2): OHLC follows the hovered bar, indicator rows show live values, eye hides the series, ✕ removes', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    await addIndicator(page, 'sma', 20);
+    await addIndicator(page, 'rsi', 14);
+    const header = page.locator('[data-legend-header]');
+    await expect(header).toContainText('MSFT');
+    const lastClose = await page.evaluate(() => (window as any).__charts.chart.data.datasets[0].data.at(-1).c.toFixed(2));
+    await expect(header).toContainText(lastClose); // no hover: latest bar
+    // hover a bar in the middle of the price pane -> the header changes to that bar's values
+    const box = (await page.locator('canvas').boundingBox())!;
+    const before = await header.textContent();
+    await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.3);
+    await expect.poll(async () => header.textContent()).not.toBe(before);
+    const hovered = await page.evaluate(() => {
+      const c = (window as any).__charts.chart;
+      const v = Math.round(c.scales.x.getValueForPixel(c.canvas.getBoundingClientRect().width * 0.4));
+      return v;
+    });
+    expect(hovered).toBeGreaterThan(0);
+    // indicator rows: chip + value at that bar; RSI row sits inside its own pane
+    const rows = page.locator('[data-indicator-row]');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('SMA 20');
+    await expect(rows.nth(1)).toContainText(/RSI 14\s*\d/);
+    const geo = await page.evaluate(() => {
+      const c = (window as any).__charts.chart;
+      const row = document.querySelectorAll('[data-indicator-row]')[1].getBoundingClientRect();
+      const panel = document.querySelector('.chart-panel')!.getBoundingClientRect();
+      return { rowTop: row.top - panel.top, paneTop: c.scales.yInd0.top, paneBottom: c.scales.yInd0.bottom };
+    });
+    expect(geo.rowTop).toBeGreaterThanOrEqual(geo.paneTop - 2);
+    expect(geo.rowTop).toBeLessThan(geo.paneBottom);
+    // eye: hide SMA -> dataset hidden, row dimmed, survives reload; show again
+    await rows.nth(0).hover();
+    await rows.nth(0).locator('[data-eye]').click();
+    await expect(rows.nth(0)).toHaveClass(/hidden/);
+    expect(await page.evaluate(() => (window as any).__charts.chart.data.datasets.find((d: any) => d.label === 'SMA 20').hidden)).toBe(true);
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__charts?.chart);
+    await expect(page.locator('[data-indicator-row]').nth(0)).toHaveClass(/hidden/);
+    await page.locator('[data-indicator-row]').nth(0).hover();
+    await page.locator('[data-indicator-row]').nth(0).locator('[data-eye]').click();
+    await expect(page.locator('[data-indicator-row]').nth(0)).not.toHaveClass(/hidden/);
+    // ✕ removes
+    await page.locator('[data-indicator-row]').nth(1).hover();
+    await page.locator('[data-indicator-row]').nth(1).locator('[data-remove]').click();
+    await expect(page.locator('[data-indicator-row]')).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
 });

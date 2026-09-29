@@ -30,7 +30,7 @@ up #26a69a, down #ef5350, volume up/down 40% alpha, crosshair #758696 dashed.
 **Verify:** side-by-side screenshot vs TradingView dark reference; prefers-color-scheme
 emulation swaps themes (tokens only — no hardcoded colors remain, enforced by 6.2's style-guard spec).
 
-### 10.2 — TradingView Legend Rows (OHLC row + eye toggles)
+### 10.2 — TradingView Legend Rows (OHLC row + eye toggles) — DONE 2026-09-29
 **Files:** new `chart-legend` component (overlay top-left of chart), state service.
 **Spec:** TradingView-style: first row = symbol + interval + OHLC values of the
 hovered bar (live-updating on crosshair move); indicator rows (5.2) each with an
@@ -74,3 +74,11 @@ render (pixel-verified different signature per type).
 - Tests: `theme.service.spec` (5), app.spec toggle, styles.spec, e2e `states-and-theme.spec` (light/dark token checks, OS emulation incl. live change, toggle persistence across pages). Screenshots: `docs/screenshots/10.1-dark-pricing.png`, `10.1-dark-profile.png`, `6.2-dark.png`.
 - Deviation: no side-by-side against a live TradingView screenshot (no access from this environment); palette values follow the spec above.
 - Also fixed: pricing page rendered a literal backslash before prices (`\$0`).
+
+## 10.2 results (DONE)
+- New `charts/chart-legend/chart-legend.component.ts` (dumb, tokens only) overlaid on the chart panel, one group per pane placed at the pane's top edge: price pane header `SYMBOL · 1D  O H L C  change (%)` (coloured by bar direction) + overlay indicator rows; Volume row with the hovered bar's volume; one group per oscillator pane. Indicator rows = colour chip, live value at the hovered bar, eye toggle, remove ✕ (controls appear on row hover / focus).
+- Viewer feeds it through a chart plugin (`legendFeed`: hovered bar index from `afterEvent`, pane tops from `afterLayout`) and signals; no hover ⇒ latest bar. Canvas pane labels were removed (the legend replaces them); the canvas only draws separators.
+- Eye = `hidden` flag on the persisted indicator entry (`ChartStateService.toggleHidden`, rehydration keeps it): the series' datasets are hidden, the pane and row stay (dimmed, struck through). Duplicate detection ignores the flag.
+- The header indicator list moved into the legend — `indicator-panel` is now only the add form (validation unchanged).
+- Tests: `chart-legend.component.spec` (5), `chart-state.service.spec` (+2), viewer "legend rows" (4), e2e `legend (10.2)` (hover changes OHLC, values, row inside its pane, eye persists over reload, ✕). Screenshot `docs/screenshots/10.2-legend-dark.png`. Full e2e 23 passed.
+- Deviation: no side-by-side against a TradingView reference screenshot (not available here).

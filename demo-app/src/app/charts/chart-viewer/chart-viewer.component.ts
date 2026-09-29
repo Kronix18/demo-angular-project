@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef, signal, computed } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService, AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
@@ -8,6 +8,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
 import { IndicatorPanel } from '../indicator-panel/indicator-panel';
+import { ChartLegendComponent, LegendGroup, LegendRow } from '../chart-legend/chart-legend.component';
 import { IndicatorCalculationService } from '../../core/services/indicator-calculation.service';
 import { ResolvedIndicator, resolveEntry } from '../../core/indicators/indicator-catalog';
 import { OutputSpec } from '../../core/indicators/indicator-definitions';
@@ -54,9 +55,9 @@ const crosshairPlugin = {
 Chart.register(crosshairPlugin);
 
 /**
- * Pane decoration: a thin separator above every stacked pane except the first,
- * and each pane's label (`scales[id].paneLabel`) in its top-left corner. The
- * panes share ONE canvas, x-axis and grid, so they read as a single panel.
+ * Pane decoration: a thin separator above every stacked pane except the first.
+ * The panes share ONE canvas, x-axis and grid, so they read as a single panel.
+ * Pane labels/values are the HTML legend's job (chart-legend component, 10.2).
  */
 const paneDecorPlugin = {
   id: 'paneDecor',
@@ -64,11 +65,8 @@ const paneDecorPlugin = {
     const { ctx, chartArea } = chart;
     if (!ctx || !chartArea) return;
     const border = cssVar('--c-pane-border');
-    const text = cssVar('--c-text-muted');
     const ids = Object.keys(chart.scales).filter((k) => k.startsWith('y'));
     ctx.save();
-    ctx.font = '12px sans-serif';
-    ctx.textBaseline = 'top';
     ids.forEach((id, idx) => {
       const scale = chart.scales[id];
       if (idx > 0) {
@@ -78,11 +76,6 @@ const paneDecorPlugin = {
         ctx.moveTo(chartArea.left, Math.round(scale.top) + 0.5);
         ctx.lineTo(chartArea.right, Math.round(scale.top) + 0.5);
         ctx.stroke();
-      }
-      const label = scale.options?.paneLabel;
-      if (label) {
-        ctx.fillStyle = text;
-        ctx.fillText(label, chartArea.left + 8, scale.top + 6);
       }
     });
     ctx.restore();
@@ -124,7 +117,10 @@ const DASHES: Record<OutputSpec['defaultLineStyle'], number[]> = {
   solid: [], dash: [6, 4], dot: [2, 3], dash_dot: [6, 3, 2, 3],
 };
 
-type Computed = { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> };
+type Computed = { index: number; resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> };
+
+/** What the legend needs to show an indicator's value at any bar. */
+interface LegendSeries { index: number; label: string; color: string; hidden: boolean; values: (number | null)[]; pane: boolean; }
 
 /** Builds the data array of one dataset from the current LOD points. */
 type DataBuilder = (pts: LodPoint[]) => any[];
@@ -141,7 +137,7 @@ type DataBuilder = (pts: LodPoint[]) => any[];
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, IndicatorPanel],
+  imports: [CommonModule, ChartToolbarComponent, IndicatorPanel, ChartLegendComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -152,6 +148,9 @@ type DataBuilder = (pts: LodPoint[]) => any[];
 
       <div class="chart-panel" data-pane="panel">
         <canvas #chartCanvas [attr.hidden]="error ? '' : null"></canvas>
+        @if (!error) {
+          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" />
+        }
         @if (loading) {
           <div class="loading-overlay skeleton" role="status" aria-live="polite">
             <span class="skeleton-label">Loading chart...</span>
@@ -314,6 +313,71 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private allData: OHLCV[] = [];
   /** Bars the chart indexes into (weekly-aggregated when interval = 1w). */
   private bars: OHLCV[] = [];
+  // ---- legend (10.2) ----------------------------------------------------------
+  /** Bar under the crosshair (null = show the latest bar). */
+  readonly hoverIndex = signal<number | null>(null);
+  private readonly paneTops = signal<Record<string, number>>({});
+  private readonly legendSource = signal<{ series: LegendSeries[]; paneKeys: number } | null>(null);
+  readonly legendGroups = computed<LegendGroup[]>(() => this.buildLegend());
+
+  setHoverIndex(i: number | null): void {
+    if (this.hoverIndex() !== i) this.hoverIndex.set(i);
+  }
+  toggleIndicator(index: number): void { this.chartState.toggleHidden(index); }
+  removeIndicator(index: number): void { this.chartState.removeIndicator(index); }
+
+  private feedHover(chart: Chart, e: any): void {
+    if (!e) return;
+    if (e.type === 'mouseout') return this.setHoverIndex(null);
+    if (e.type !== 'mousemove' || typeof e.x !== 'number') return;
+    const a = chart.chartArea;
+    if (!a || e.x < a.left || e.x > a.right || e.y < a.top || e.y > a.bottom) return this.setHoverIndex(null);
+    const v = (chart.scales['x'] as any)?.getValueForPixel(e.x);
+    if (typeof v !== 'number' || !this.bars.length) return;
+    this.setHoverIndex(Math.min(this.bars.length - 1, Math.max(0, Math.round(v))));
+  }
+
+  private feedPaneTops(chart: Chart): void {
+    const tops: Record<string, number> = {};
+    for (const id of Object.keys(chart.scales)) if (id.startsWith('y')) tops[id] = Math.round((chart.scales[id] as any).top);
+    const cur = this.paneTops();
+    const same = Object.keys(tops).length === Object.keys(cur).length && Object.keys(tops).every((k) => cur[k] === tops[k]);
+    if (!same) this.paneTops.set(tops);
+  }
+
+  private buildLegend(): LegendGroup[] {
+    const src = this.legendSource();
+    const bars = this.bars;
+    if (!src || !bars.length) return [];
+    const tops = this.paneTops();
+    const i = this.hoverIndex() ?? bars.length - 1;
+    const bar = bars[Math.min(Math.max(0, i), bars.length - 1)];
+    const prev = i > 0 ? bars[i - 1] : null;
+    const f2 = (v: number) => v.toFixed(2);
+    const diff = prev ? bar.close - prev.close : 0;
+    const ohlc = {
+      o: f2(bar.open), h: f2(bar.high), l: f2(bar.low), c: f2(bar.close),
+      change: prev ? `${diff >= 0 ? '+' : ''}${f2(diff)} (${diff >= 0 ? '+' : ''}${f2((diff / prev.close) * 100)}%)` : '',
+      up: bar.close >= bar.open,
+    };
+    const row = (s: LegendSeries): LegendRow => {
+      const v = s.values[Math.min(Math.max(0, i), s.values.length - 1)];
+      return { key: `ind${s.index}`, label: s.label, value: typeof v === 'number' ? f2(v) : '–', color: s.color, hidden: s.hidden, index: s.index };
+    };
+    const groups: LegendGroup[] = [
+      {
+        key: 'price', top: tops['y'] ?? 0,
+        header: { symbol: this.currentSymbol.toUpperCase(), interval: this.currentInterval.toUpperCase(), ohlc },
+        rows: src.series.filter((s) => !s.pane).map(row),
+      },
+      { key: 'volume', top: tops['yVol'] ?? 0, rows: [{ key: 'vol', label: 'Volume', value: compactVolume(bar.volume), color: '', hidden: false }] },
+    ];
+    src.series.filter((s) => s.pane).forEach((s, k) => {
+      groups.push({ key: `yInd${k}`, top: tops[`yInd${k}`] ?? 0, rows: [row(s)] });
+    });
+    return groups;
+  }
+
   /** Per-dataset data builders + the window currently loaded into the chart. */
   private builders: DataBuilder[] = [];
   private loaded: { from: number; to: number; bucket: number } | null = null;
@@ -446,15 +510,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private computeIndicators(bars: OHLCV[]): { overlays: Computed[]; panes: Computed[] } {
     const overlays: Computed[] = [];
     const panes: Computed[] = [];
-    for (const entry of this.chartState.snapshot().indicators) {
+    this.chartState.snapshot().indicators.forEach((entry, index) => {
       try {
         const resolved = resolveEntry(entry);
         const outputs = this.indicatorCalc.calculate(resolved.definitionId, resolved.params, bars);
-        (resolved.kind === 'overlay' ? overlays : panes).push({ resolved, outputs });
+        (resolved.kind === 'overlay' ? overlays : panes).push({ index, resolved, outputs });
       } catch (e) {
         console.warn('indicator skipped:', entry, (e as Error).message);
       }
-    }
+    });
     return { overlays, panes };
   }
 
@@ -464,9 +528,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     return Math.min(500, Math.max(120, Math.floor(w / 4)));
   }
 
-  private lineDataset(label: string, yAxisID: string, color: string, width: number, dash: number[]) {
+  private lineDataset(label: string, yAxisID: string, color: string, width: number, dash: number[], hidden = false) {
     return {
-      type: 'line' as const, label, yAxisID, data: [] as any[],
+      type: 'line' as const, label, yAxisID, data: [] as any[], hidden,
       borderColor: color, backgroundColor: color, borderWidth: width, borderDash: dash,
       pointRadius: 0, pointHoverRadius: 3, tension: 0, spanGaps: false,
       parsing: false, normalized: true,
@@ -537,10 +601,14 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       borderColor: { up, down, unchanged: cssVar('--c-text-muted') },
     },
       (pts) => pts.map((p) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t })));
-    overlays.forEach(({ resolved, outputs }, i) => {
+    const legendSeries: LegendSeries[] = [];
+    overlays.forEach(({ index, resolved, outputs }, i) => {
       const color = cssVar(`--c-indicator-${(i % 4) + 1}`);
       const first = Object.values(outputs)[0];
-      if (first) add(this.lineDataset(resolved.label, 'y', color, 1.5, []), this.lineBuilder(first));
+      if (first) {
+        add(this.lineDataset(resolved.label, 'y', color, 1.5, [], resolved.hidden), this.lineBuilder(first));
+        legendSeries.push({ index, label: resolved.label, color, hidden: resolved.hidden, values: first, pane: false });
+      }
     });
     add({
       type: 'bar', label: 'Volume', yAxisID: 'yVol', data: [], parsing: false, normalized: true,
@@ -549,13 +617,18 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     }, (pts) => pts.map((p) => ({ x: p.x, y: p.v, up: p.up, t: p.t })));
 
     const paneScales: Record<string, any> = {};
-    panes.forEach(({ resolved, outputs }, i) => {
+    panes.forEach(({ index, resolved, outputs }, i) => {
       const id = `yInd${i}`;
       const def = this.indicatorCalc.definition(resolved.definitionId);
+      let main = true;
       for (const o of def.outputs) {
         if (!outputs[o.key]) continue;
-        add(this.lineDataset(o.label, id, resolveColor(o.defaultColor), o.defaultWidth, DASHES[o.defaultLineStyle]),
+        add(this.lineDataset(o.label, id, resolveColor(o.defaultColor), o.defaultWidth, DASHES[o.defaultLineStyle], resolved.hidden),
           this.lineBuilder(outputs[o.key]));
+        if (main) {
+          legendSeries.push({ index, label: resolved.label, color: resolveColor(o.defaultColor), hidden: resolved.hidden, values: outputs[o.key], pane: true });
+          main = false;
+        }
       }
       paneScales[id] = {
         type: 'linear', position: 'right', stack: 'panel', stackWeight: PANE_WEIGHT,
@@ -613,6 +686,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         // y-fit must run once the scales exist but before they're laid out
         // (beforeUpdate is too early: the resolved scale options are stale then)
         beforeLayout: (c: Chart) => this.fitYAxes(c),
+      }, {
+        // legend feed (10.2): hovered bar index + each pane's top edge
+        id: 'legendFeed',
+        afterEvent: (c: Chart, args: any) => this.feedHover(c, args?.event),
+        afterLayout: (c: Chart) => this.feedPaneTops(c),
       }],
       options: {
         responsive: true,
@@ -650,6 +728,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       } as any,
     });
 
+    this.legendSource.set({ series: legendSeries, paneKeys: panes.length });
+    this.hoverIndex.set(null);
     // Dev-only test handle for the Playwright verification scripts.
     if (typeof ngDevMode !== 'undefined' && ngDevMode) {
       (window as any).__charts = { chart: this.chart };

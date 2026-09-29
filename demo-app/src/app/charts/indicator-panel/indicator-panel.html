@@ -17,17 +17,4 @@
   @if (error(); as msg) {
     <span class="error" data-error role="alert">{{ msg }}</span>
   }
-
-  <ul class="rows" aria-label="Active indicators">
-    @for (row of rows(); track row.index + row.resolved.label) {
-      <li class="row" data-indicator-row [attr.data-kind]="row.resolved.kind">
-        <span class="label">{{ row.resolved.label }}</span>
-        <span class="kind">{{ row.resolved.kind === 'overlay' ? 'overlay' : 'own pane' }}</span>
-        <button type="button" class="remove-btn" data-remove
-          [attr.aria-label]="'Remove ' + row.resolved.label" (click)="remove(row.index)">×</button>
-      </li>
-    } @empty {
-      <li class="empty" data-empty>No indicators — add one above.</li>
-    }
-  </ul>
 </div>
