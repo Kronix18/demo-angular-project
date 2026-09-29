@@ -1,6 +1,19 @@
 import { TestBed } from '@angular/core/testing';
-import { IndicatorCalculationService } from './indicator-calculation.service';
+import { IndicatorCalculationService, IndicatorOutputs } from './indicator-calculation.service';
 import { OHLCV } from '../models/ohlcv.model';
+import moving_average_sma50 from '../indicators/__fixtures__/moving_average_sma50.json';
+import moving_average_ema21 from '../indicators/__fixtures__/moving_average_ema21.json';
+import moving_average_wma10 from '../indicators/__fixtures__/moving_average_wma10.json';
+import moving_average_rma14 from '../indicators/__fixtures__/moving_average_rma14.json';
+import rsi14 from '../indicators/__fixtures__/rsi14.json';
+import rsi_flat from '../indicators/__fixtures__/rsi_flat.json';
+import rsi_noloss from '../indicators/__fixtures__/rsi_noloss.json';
+import atr14_rma from '../indicators/__fixtures__/atr14_rma.json';
+import atr14_sma from '../indicators/__fixtures__/atr14_sma.json';
+import webby_rsi_5150 from '../indicators/__fixtures__/webby_rsi_5150.json';
+import webby_rsi_original from '../indicators/__fixtures__/webby_rsi_original.json';
+import bob_marley_52w from '../indicators/__fixtures__/bob_marley_52w.json';
+import fixtureInput from '../indicators/__fixtures__/fixture_input.json';
 
 /**
  * Task 5.1 — golden-value tests: the TS port MUST match the real Python
@@ -10,29 +23,22 @@ import { OHLCV } from '../models/ohlcv.model';
  */
 
 interface GoldenFixture {
-  description: string;
-  input_hash: string;
   n: number;
-  params: Record<string, unknown>;
   outputs: Record<string, (number | null)[]>;
 }
 
-const FIXTURES: Record<string, GoldenFixture> = {
-  'moving_average_sma50': require('../indicators/__fixtures__/moving_average_sma50.json'),
-  'moving_average_ema21': require('../indicators/__fixtures__/moving_average_ema21.json'),
-  'moving_average_wma10': require('../indicators/__fixtures__/moving_average_wma10.json'),
-  'moving_average_rma14': require('../indicators/__fixtures__/moving_average_rma14.json'),
-  'rsi14': require('../indicators/__fixtures__/rsi14.json'),
-  'rsi_flat': require('../indicators/__fixtures__/rsi_flat.json'),
-  'rsi_noloss': require('../indicators/__fixtures__/rsi_noloss.json'),
-  'atr14_rma': require('../indicators/__fixtures__/atr14_rma.json'),
-  'atr14_sma': require('../indicators/__fixtures__/atr14_sma.json'),
-  'webby_rsi_5150': require('../indicators/__fixtures__/webby_rsi_5150.json'),
-  'webby_rsi_original': require('../indicators/__fixtures__/webby_rsi_original.json'),
-  'bob_marley_52w': require('../indicators/__fixtures__/bob_marley_52w.json'),
-};
-
 const TOL = 1e-6;
+const G = (f: unknown) => f as GoldenFixture;
+
+const ohlcv = fixtureInput as OHLCV[];
+// Edge inputs — same construction as gen_indicator_fixtures.py: first 16 bars,
+// flat at 100 / sorted by close ascending and x5 (monotonic rise → no losses).
+const flatBars: OHLCV[] = ohlcv.slice(0, 16).map((b) => ({ ...b, open: 100, high: 100, low: 100, close: 100 }));
+const risingBars: OHLCV[] = [...ohlcv.slice(0, 16)]
+  .sort((a, b) => a.close - b.close)
+  .map((b) => ({ ...b, high: b.high * 5, low: b.low * 5, close: b.close * 5 }));
+
+const RSI_PARAMS = { source: 'close', length: 14, overbought: 70, oversold: 30 };
 
 describe('IndicatorCalculationService — 5.1 golden values (Python-ported)', () => {
   let service: IndicatorCalculationService;
@@ -42,111 +48,120 @@ describe('IndicatorCalculationService — 5.1 golden values (Python-ported)', ()
     service = TestBed.inject(IndicatorCalculationService);
   });
 
-  // The fixture input data (last 120 bars of msft.us.txt) as OHLCV — the SAME
-  // bytes the Python ran over (hash checked against input_hash in the impl test).
-  let ohlcv: OHLCV[];
-  beforeAll(() => {
-    const raw = FIXTURES['rsi14'];
-    // Reconstruct OHLCV from the fixture's sibling data files is impossible from
-    // the golden JSON alone (it stores outputs only) — the OHLCV input is loaded
-    // from the same Stooq slice via the shared test helper below.
-    ohlcv = loadFixtureOhlcv();
-  });
-
-  const runGolden = (key: string, params: Record<string, unknown>) => {
-    const fixture = FIXTURES[key];
-    const result = service.calculate(
-      fixture['params']['type'] ?? inferType(key), params, ohlcv
-    ) as Record<string, (number | null)[]>;
-    return { fixture, result };
-  };
-
-  const expectGolden = (key: string, outputs: string[], params: Record<string, unknown>) => {
-    const { fixture, result } = runGolden(key, params);
+  const expectGolden = (
+    fixture: GoldenFixture, type: string, params: Record<string, unknown>, bars: OHLCV[], outputs: string[],
+  ) => {
+    const result = service.calculate(type, params, bars);
     for (const out of outputs) {
       const golden = fixture.outputs[out];
       const actual = result[out];
-      expect(actual, `${key}.${out} missing from result`).toBeTruthy();
-      expect(actual!.length, `${key}.${out} length`).toBe(fixture.n);
-      let mismatches = 0;
+      expect(actual, `${type}.${out} missing from result`).toBeTruthy();
+      expect(actual.length, `${type}.${out} length`).toBe(fixture.n);
+      const bad: string[] = [];
       for (let i = 0; i < fixture.n; i++) {
         const g = golden[i];
         const a = actual[i];
-        if (g === null || a === null || a === undefined || !isFinite(a)) {
-          if (g !== null || a !== null) mismatches++;
-          continue;
+        if (g === null || a === null) {
+          if (g !== a) bad.push(`[${i}] golden=${g} actual=${a}`);
+        } else if (Math.abs(g - a) > TOL) {
+          bad.push(`[${i}] golden=${g} actual=${a}`);
         }
-        if (Math.abs((g as number) - a) > TOL) mismatches++;
       }
-      expect(mismatches, `${key}.${out}: ${mismatches} values diverge from Python golden (tol ${TOL})`).toBe(0);
+      expect(bad, `${type}.${out} diverges from Python golden (tol ${TOL})`).toEqual([]);
     }
   };
 
+  it('fixture input is the 120-bar slice', () => {
+    expect(ohlcv.length).toBe(120);
+  });
+
   it('moving_average: SMA/EMA/WMA/RMA match Python within 1e-6', () => {
-    expectGolden('moving_average_sma50', ['ma'], { method: 'SMA', source: 'close', length: 50, offset: 0 });
-    expectGolden('moving_average_ema21', ['ma'], { method: 'EMA', source: 'close', length: 21, offset: 0 });
-    expectGolden('moving_average_wma10', ['ma'], { method: 'WMA', source: 'close', length: 10, offset: 0 });
-    expectGolden('moving_average_rma14', ['ma'], { method: 'RMA', source: 'close', length: 14, offset: 0 });
+    const run = (f: unknown, method: string, length: number) =>
+      expectGolden(G(f), 'moving_average', { method, source: 'close', length, offset: 0 }, ohlcv, ['ma']);
+    run(moving_average_sma50, 'SMA', 50);
+    run(moving_average_ema21, 'EMA', 21);
+    run(moving_average_wma10, 'WMA', 10);
+    run(moving_average_rma14, 'RMA', 14);
   });
 
   it('rsi: Wilder ewm semantics match Python; flat→50, no-loss→100', () => {
-    expectGolden('rsi14', ['rsi', 'overbought', 'oversold'], { source: 'close', length: 14, overbought: 70, oversold: 30 });
-    expectGolden('rsi_flat', ['rsi'], { source: 'close', length: 14, overbought: 70, oversold: 30 });
-    expectGolden('rsi_noloss', ['rsi'], { source: 'close', length: 14, overbought: 70, oversold: 30 });
-    // flat → exactly 50.0 (Python rsi.loc[flat] = 50.0)
-    const flat = FIXTURES['rsi_flat'].outputs['rsi'].filter((v): v is number => v !== null);
-    expect(flat.every((v) => Math.abs(v - 50.0) < TOL)).toBeTrue();
-    const noloss = FIXTURES['rsi_noloss'].outputs['rsi'].filter((v): v is number => v !== null);
-    expect(noloss.every((v) => Math.abs(v - 100.0) < TOL)).toBeTrue();
+    expectGolden(G(rsi14), 'rsi', RSI_PARAMS, ohlcv, ['rsi', 'overbought', 'oversold']);
+    expectGolden(G(rsi_flat), 'rsi', RSI_PARAMS, flatBars, ['rsi']);
+    expectGolden(G(rsi_noloss), 'rsi', RSI_PARAMS, risingBars, ['rsi']);
+    const flat = service.calculate('rsi', RSI_PARAMS, flatBars)['rsi'].filter((v): v is number => v !== null);
+    expect(flat.length).toBeGreaterThan(0);
+    expect(flat.every((v) => Math.abs(v - 50) < TOL)).toBe(true);
+    const rising = service.calculate('rsi', RSI_PARAMS, risingBars)['rsi'].filter((v): v is number => v !== null);
+    expect(rising.length).toBeGreaterThan(0);
+    expect(rising.every((v) => Math.abs(v - 100) < TOL)).toBe(true);
   });
 
   it('atr: true range + RMA/SMA smoothing match Python within 1e-6', () => {
-    expectGolden('atr14_rma', ['atr'], { length: 14, smoothing: 'RMA' });
-    expectGolden('atr14_sma', ['atr'], { length: 14, smoothing: 'SMA' });
+    expectGolden(G(atr14_rma), 'atr', { length: 14, smoothing: 'RMA' }, ohlcv, ['atr']);
+    expectGolden(G(atr14_sma), 'atr', { length: 14, smoothing: 'SMA' }, ohlcv, ['atr']);
   });
 
   it('webby_rsi: 5.150 + Original modes match Python within 1e-6', () => {
-    expectGolden('webby_rsi_5150', ['above_21', 'below_21', 'sma_extension', 'stretched'],
-      { mode: '5.150', ema_length: 21, sma_length: 10, atr_length: 50, stretched_level: 3 });
-    expectGolden('webby_rsi_original', ['webby', 'signal', 'level_0', 'level_05', 'level_2', 'level_4', 'level_6'],
-      { mode: 'Original', ema_length: 21, signal_length: 10, positive_only: true });
+    expectGolden(G(webby_rsi_5150), 'webby_rsi',
+      { mode: '5.150', ema_length: 21, sma_length: 10, atr_length: 50, stretched_level: 3 }, ohlcv,
+      ['above_21', 'below_21', 'sma_extension', 'stretched']);
+    expectGolden(G(webby_rsi_original), 'webby_rsi',
+      { mode: 'Original', ema_length: 21, signal_length: 10, positive_only: true }, ohlcv,
+      ['webby', 'signal', 'level_0', 'level_05', 'level_2', 'level_4', 'level_6']);
   });
 
   it('bob_marley: off-high ATR zones match Python within 1e-6', () => {
-    expectGolden('bob_marley_52w', ['green', 'yellow', 'red', 'green_boundary', 'red_boundary'],
-      { high_reference: '52_week', source: 'low', atr_length: 21, green_max: 4, yellow_max: 8 });
+    expectGolden(G(bob_marley_52w), 'bob_marley',
+      { high_reference: '52_week', source: 'low', atr_length: 21, green_max: 4, yellow_max: 8 }, ohlcv,
+      ['green', 'yellow', 'red', 'green_boundary', 'red_boundary']);
   });
 
-  it('EDGE: SMA window > data length → empty output (warmup guard)', () => {
-    const short = ohlcv.slice(0, 10);
-    const result = service.calculate('moving_average', { method: 'SMA', source: 'close', length: 50, offset: 0 }, short) as Record<string, (number | null)[]>;
-    expect(result['ma'].filter((v) => v !== null && isFinite(v as number)).length).toBe(0);
+  it('EDGE: SMA window > data length → no values (warmup guard)', () => {
+    const r = service.calculate('moving_average', { method: 'SMA', length: 50 }, ohlcv.slice(0, 10));
+    expect(r['ma'].length).toBe(10);
+    expect(r['ma'].every((v) => v === null)).toBe(true);
   });
 
-  it('EDGE: insufficient bars for RSI warmup → all null until length bars', () => {
-    const result = service.calculate('rsi', { source: 'close', length: 14, overbought: 70, oversold: 30 }, ohlcv.slice(0, 10)) as Record<string, (number | null)[]>;
-    expect(result['rsi'].every((v) => v === null)).toBeTrue();
+  it('EDGE: insufficient bars for RSI warmup → RSI all null', () => {
+    const r = service.calculate('rsi', RSI_PARAMS, ohlcv.slice(0, 10));
+    expect(r['rsi'].every((v) => v === null)).toBe(true);
   });
 
-  it('EDGE: empty input → empty outputs (no crash)', () => {
-    const result = service.calculate('moving_average', { method: 'SMA', source: 'close', length: 50, offset: 0 }, []) as Record<string, (number | null)[]>;
-    expect(result['ma'].length).toBe(0);
+  it('EDGE: empty input → empty outputs for every indicator (no crash)', () => {
+    for (const def of service.supportedIndicators()) {
+      const r: IndicatorOutputs = service.calculate(def.id, {}, []);
+      for (const series of Object.values(r)) expect(series.length).toBe(0);
+    }
+  });
+
+  it('EDGE: MA offset shifts forward and yields nulls at the head', () => {
+    const base = service.calculate('moving_average', { method: 'SMA', length: 5 }, ohlcv)['ma'];
+    const shifted = service.calculate('moving_average', { method: 'SMA', length: 5, offset: 3 }, ohlcv)['ma'];
+    expect(shifted.slice(0, 7).every((v) => v === null)).toBe(true);
+    expect(shifted[10]).toBeCloseTo(base[7] as number, 9);
+  });
+
+  it('EDGE: volume source works (MA of volume)', () => {
+    const r = service.calculate('moving_average', { method: 'SMA', source: 'volume', length: 2 }, ohlcv);
+    expect(r['ma'][1]).toBeCloseTo((ohlcv[0].volume + ohlcv[1].volume) / 2, 3);
+  });
+
+  it('ERRORS: unknown indicator / source / method throw', () => {
+    expect(() => service.calculate('nope', {}, ohlcv)).toThrowError(/Unknown indicator/);
+    expect(() => service.calculate('rsi', { source: 'bogus' }, ohlcv)).toThrowError(/Unsupported indicator source/);
+    expect(() => service.calculate('moving_average', { method: 'XMA' }, ohlcv)).toThrowError(/Unsupported moving average/);
   });
 
   it('REGISTRY: supportedIndicators mirrors registry.py (sorted by category,name)', () => {
-    const list = service.supportedIndicators() as { id: string; name: string; category: string }[];
-    const ids = list.map((i) => i.id);
-    expect(ids).toEqual(jasmine.arrayContaining(['moving_average', 'atr', 'rsi', 'webby_rsi', 'bob_marley']));
-    // sorted by (category, name) like Python's registry.definitions()
+    const list = service.supportedIndicators();
+    expect(list.map((i) => i.id)).toEqual(expect.arrayContaining(['moving_average', 'atr', 'rsi', 'webby_rsi', 'bob_marley']));
     const sorted = [...list].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
     expect(list.map((i) => i.id)).toEqual(sorted.map((i) => i.id));
   });
-});
 
-/** Loads the SAME 120-bar msft.us.txt slice the Python fixtures were generated
- *  over (via the Karma-served test-data dir; matches input_hash verified below). */
-function loadFixtureOhlcv(): OHLCV[] {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const raw = require('../indicators/__fixtures__/fixture_input.json');
-  return raw as OHLCV[];
-}
+  it('REGISTRY: normalizeParams fills defaults without overwriting; displayName uses template', () => {
+    expect(service.normalizeParams('moving_average', { length: 20 })).toEqual({ method: 'SMA', source: 'close', length: 20, offset: 0 });
+    expect(service.displayName('moving_average', { length: 20, method: 'EMA' })).toBe('EMA 20 close');
+    expect(service.displayName('rsi')).toBe('RSI 14');
+  });
+});

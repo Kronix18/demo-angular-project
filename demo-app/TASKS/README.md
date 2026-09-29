@@ -53,14 +53,14 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 1.3 | phase-1-auth-navbar/1.3-guards-and-login-page.md | DONE (see task file) | authGuard live on /screener,/profile,/stock/:symbol with returnUrl; login page links fixed; verify-1-3.cjs 13/13 |
 | 2.1 | phase-2-chart-data/2.1-test-data-pipeline.md | DONE (data layer ONLY — /charts page still shows stuck Loading until 2.2) | 8 Stooq files served from public/test-data; URL+epoch-ms fixed; 26/26 specs; verify-2-1.cjs 15/15 (data assertions only) |
 | 2.2 | phase-2-chart-data/2.2-chartjs-registration.md | DONE (pixel-verified: candles render on msft+qqq) | chart-setup module, canvas-in-DOM, zoneless markForCheck; 32/32 suite |
-| 2.3 | phase-2-chart-data/2.3-toolbar-integration-redo.md | NOT STARTED | previous "completed" claim was false |
-| 3.1 | phase-3-panes-interaction/3.1-volume-pane.md | NOT STARTED | verify dual-axis actually renders |
-| 3.2 | phase-3-panes-interaction/3.2-zoom-pan.md | NOT STARTED | plugin installed, never registered |
-| 3.3 | phase-3-panes-interaction/3.3-crosshair-tooltip.md | NOT STARTED | |
-| 4.1 | phase-4-state-toolbar/4.1-chart-state-service.md | NOT STARTED | moved BEFORE toolbar (old plan had it after) |
-| 4.2 | phase-4-state-toolbar/4.2-toolbar-state-refactor.md | NOT STARTED | |
-| 4.3 | phase-4-state-toolbar/4.3-time-range-presets.md | NOT STARTED | old duplicate-numbered "3.2" |
-| 5.1 | phase-5-indicators/5.1-indicator-calculations.md | NOT STARTED | ports real Python calculators |
+| 2.3 | phase-2-chart-data/2.3-toolbar-integration-redo.md | DONE | toolbar integration (see task file / git log) (status synced from git history 2026-09-29) |
+| 3.1 | phase-3-panes-interaction/3.1-volume-pane.md | DONE | volume pane, aligned y-axes (status synced from git history 2026-09-29) |
+| 3.2 | phase-3-panes-interaction/3.2-zoom-pan.md | DONE | zoom/pan (chartjs-plugin-zoom) (status synced from git history 2026-09-29) |
+| 3.3 | phase-3-panes-interaction/3.3-crosshair-tooltip.md | DONE | crosshair through both panes (status synced from git history 2026-09-29) |
+| 4.1 | phase-4-state-toolbar/4.1-chart-state-service.md | DONE | chart state store + sessionStorage (status synced from git history 2026-09-29) |
+| 4.2 | phase-4-state-toolbar/4.2-toolbar-state-refactor.md | DONE | toolbar writes to state store (status synced from git history 2026-09-29) |
+| 4.3 | phase-4-state-toolbar/4.3-time-range-presets.md | DONE | range presets, W-FRI weekly, linear index axis (status synced from git history 2026-09-29) |
+| 5.1 | phase-5-indicators/5.1-indicator-calculations.md | DONE (unit-verified; golden values vs Python, 14 specs) | `core/indicators/*` + `IndicatorCalculationService`; UI render is 5.2 |
 | 5.2 | phase-5-indicators/5.2-indicator-panel.md | NOT STARTED | |
 | 5.3 | phase-5-indicators/5.3-indicator-management.md | NOT STARTED | |
 | 6.1 | phase-6-integration/6.1-routing-navigation.md | NOT STARTED | charts route exists; navbar link missing |

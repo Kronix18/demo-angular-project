@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { ChartViewerComponent } from './chart-viewer.component';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { provideHttpClient, withFetch } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { Chart } from 'chart.js';
@@ -65,6 +65,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
         // emission, so the component's ngOnInit subscription does NOT leak
         // across tests (a Subject would stay live and re-fire).
         { provide: ActivatedRoute, useValue: { params: of({ symbol: 'MSFT' }) } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
         provideHttpClient(withFetch()),
         provideHttpClientTesting(),
       ],
