@@ -116,3 +116,18 @@ describe('errorInterceptor + ApiErrorService (12.3)', () => {
     expect(svc.toast()).toBeNull();
   });
 });
+
+describe('SILENT_ERRORS context (12.8 needs optional discovery calls that never toast)', () => {
+  it('a request marked silent is not reported even on 500', async () => {
+    const { HttpContext } = await import('@angular/common/http');
+    const { SILENT_ERRORS } = await import('./errors');
+    TestBed.configureTestingModule({ providers: [provideHttpClient(withInterceptors([errorInterceptor])), provideHttpClientTesting()] });
+    const http = TestBed.inject(HttpClient);
+    const ctl = TestBed.inject(HttpTestingController);
+    const svc = TestBed.inject(ApiErrorService);
+    http.get('http://h/api/meta', { context: new HttpContext().set(SILENT_ERRORS, true) }).subscribe({ error: () => undefined });
+    ctl.expectOne('http://h/api/meta').flush({}, { status: 500, statusText: 'x' });
+    expect(svc.toast()).toBeNull();
+    expect(svc.lastError()).toBeNull();
+  });
+});
