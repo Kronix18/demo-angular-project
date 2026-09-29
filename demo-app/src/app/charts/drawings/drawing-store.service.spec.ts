@@ -5,7 +5,7 @@ import { Drawing } from './drawing-geometry';
 const d = (id: string, extra: Partial<Drawing> = {}): Drawing => ({ id, type: 'trend', a: { t: 1, p: 10 }, b: { t: 2, p: 20 }, ...extra });
 
 describe('DrawingStore (10.3)', () => {
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
   const make = () => TestBed.inject(DrawingStore);
 
   it('keeps drawings per symbol (case-insensitive) and persists them in sessionStorage', () => {

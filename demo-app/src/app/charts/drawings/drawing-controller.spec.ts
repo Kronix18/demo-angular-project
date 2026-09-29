@@ -18,6 +18,10 @@ describe('DrawingController (10.3)', () => {
   let tool: Tool;
   let changes: number;
   let ctl: DrawingController;
+  let zooms: any[];
+  let edits: string[];
+  let committed: string[];
+  let magnet: boolean;
 
   beforeEach(() => {
     sessionStorage.clear();
@@ -25,7 +29,12 @@ describe('DrawingController (10.3)', () => {
     chart = fakeChart();
     tool = 'cursor';
     changes = 0;
-    ctl = new DrawingController({ chart: () => chart, bars: () => bars, store, symbol: () => 'msft', tool: () => tool, changed: () => changes++ });
+    zooms = []; edits = []; committed = []; magnet = false;
+    localStorage.clear();
+    ctl = new DrawingController({
+      chart: () => chart, bars: () => bars, store, symbol: () => 'msft', tool: () => tool, changed: () => changes++,
+      magnet: () => magnet, zoomTo: (r) => zooms.push(r), editText: (id) => edits.push(id), committed: (d) => committed.push(d.type),
+    });
   });
 
   it('trend tool: drag from A to B creates a trend line at the right time/price anchors', () => {
@@ -138,5 +147,152 @@ describe('DrawingController (10.3)', () => {
     ctl.pointerDown(120, 80); ctl.pointerUp(120, 80);
     expect(ctl.view().drawings.length).toBe(1);
     expect(changes).toBeGreaterThan(0);
+  });
+
+  describe('more tools (11.5)', () => {
+    const drag = (a: [number, number], b: [number, number], mid?: [number, number]) => {
+      ctl.pointerDown(...a);
+      if (mid) ctl.pointerMove(...mid);
+      ctl.pointerMove(...b);
+      ctl.pointerUp(...b);
+    };
+
+    it('hline / vline: one click; hline keeps the price, vline the time', () => {
+      tool = 'hline';
+      ctl.pointerDown(120, 80); ctl.pointerUp(120, 80);
+      tool = 'vline';
+      ctl.pointerDown(200, 80); ctl.pointerUp(200, 80);
+      const [h, v] = store.list('msft');
+      expect([h.type, h.a.p]).toEqual(['hline', 120]);
+      expect([v.type, v.a.t]).toEqual(['vline', bars[20].timestamp]);
+      expect(committed).toEqual(['hline', 'vline']);
+    });
+
+    it('two-point shapes (arrow, rect, ellipse, fib) are created by dragging', () => {
+      for (const t of ['arrow', 'rect', 'ellipse', 'fib'] as const) {
+        tool = t;
+        drag([100, 100], [300, 40], [200, 70]);
+      }
+      expect(store.list('msft').map((d) => d.type)).toEqual(['arrow', 'rect', 'ellipse', 'fib']);
+      const rect = store.list('msft')[1];
+      expect(rect.a).toEqual({ t: bars[10].timestamp, p: 100 });
+      expect(rect.b).toEqual({ t: bars[30].timestamp, p: 160 });
+    });
+
+    it('brush collects the dragged path (thinned) and needs at least two points', () => {
+      tool = 'brush';
+      ctl.pointerDown(100, 100);
+      for (let x = 105; x <= 200; x += 5) ctl.pointerMove(x, 100 - (x - 100) / 5);
+      ctl.pointerUp(200, 80);
+      const [b] = store.list('msft');
+      expect(b.type).toBe('brush');
+      expect(b.pts!.length).toBeGreaterThan(5);
+      expect(b.pts![0].p).toBe(100);
+      ctl.pointerDown(100, 100); ctl.pointerUp(100, 100); // a click is not a stroke
+      expect(store.list('msft').length).toBe(1);
+    });
+
+    it('text: a click creates an empty label and asks the viewer to edit it; empty text is discarded by removeIfEmpty', () => {
+      tool = 'text';
+      ctl.pointerDown(150, 60); ctl.pointerUp(150, 60);
+      const [t] = store.list('msft');
+      expect(t.type).toBe('text');
+      expect(edits).toEqual([t.id]);
+      ctl.setText(t.id, 'support');
+      expect(store.list('msft')[0].text).toBe('support');
+      ctl.setText(t.id, '   ');
+      expect(store.list('msft')).toEqual([]); // blank text removes the label
+    });
+
+    it('measure: transient readout that is never stored; the next press clears it', () => {
+      tool = 'measure';
+      drag([100, 100], [300, 60]);
+      expect(store.list('msft')).toEqual([]);
+      const m = ctl.view().measure!;
+      expect(m.a.p).toBe(100);
+      expect(m.b.p).toBe(140);
+      ctl.pointerDown(50, 50);
+      expect(ctl.view().measure).toBeNull();
+    });
+
+    it('zoom tool: dragging a rectangle asks the viewer to zoom to that (ordered) region and stores nothing', () => {
+      tool = 'zoom';
+      drag([300, 60], [100, 120]);
+      expect(store.list('msft')).toEqual([]);
+      expect(zooms.length).toBe(1);
+      expect(zooms[0].x0).toBeCloseTo(10);
+      expect(zooms[0].x1).toBeCloseTo(30);
+      expect(zooms[0].p0).toBe(80);
+      expect(zooms[0].p1).toBe(140);
+    });
+
+    it('a rectangle smaller than a few pixels does not zoom', () => {
+      tool = 'zoom';
+      drag([300, 60], [301, 61]);
+      expect(zooms).toEqual([]);
+    });
+
+    it('magnet snaps drawing anchors to the nearest open/high/low/close of the bar', () => {
+      magnet = true;
+      tool = 'trend';
+      drag([100, 100], [300, 60]);
+      const [d] = store.list('msft');
+      expect([0.5, 1, 1.5, 2]).toContain(d.a.p);
+      expect([0.5, 1, 1.5, 2]).toContain(d.b!.p);
+    });
+
+    it('cursor selects the new shapes by their outline: rect edge, hline, vline, brush, text box', () => {
+      store.add('msft', { id: 'r', type: 'rect', a: { t: bars[10].timestamp, p: 100 }, b: { t: bars[30].timestamp, p: 150 } });
+      store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 } });
+      store.add('msft', { id: 'v', type: 'vline', a: { t: bars[40].timestamp, p: 30 } });
+      store.add('msft', { id: 'b', type: 'brush', a: { t: bars[2].timestamp, p: 10 }, pts: [{ t: bars[2].timestamp, p: 10 }, { t: bars[4].timestamp, p: 20 }] });
+      store.add('msft', { id: 't', type: 'text', a: { t: bars[44].timestamp, p: 180 }, text: 'hi' });
+      const pick = (x: number, y: number) => { ctl.pointerDown(x, y); ctl.pointerUp(x, y); return ctl.view().selectedId; };
+      expect(pick(200, 100)).toBe('r');          // top edge of the rectangle (price 100 -> y 100)
+      expect(pick(200, 170)).toBe('h');          // hline at price 30 -> y 170
+      expect(pick(400, 20)).toBe('v');           // vline at bar 40
+      expect(pick(30, 185)).toBe('b');           // on the brush segment (bar 2..4, price 10..20)
+      expect(pick(440, 22)).toBe('t');           // inside the text box
+      expect(pick(250, 250)).toBeNull();
+    });
+
+    it('lock all: nothing can be selected, moved or deleted; hide all: nothing can be picked either', () => {
+      store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 } });
+      store.toggleLocked();
+      ctl.pointerDown(200, 170); ctl.pointerUp(200, 170);
+      expect(ctl.view().selectedId).toBeNull();
+      ctl.key('Delete');
+      expect(store.list('msft').length).toBe(1);
+      store.toggleLocked();
+      store.setHidden(true);
+      ctl.pointerDown(200, 170); ctl.pointerUp(200, 170);
+      expect(ctl.view().selectedId).toBeNull();
+    });
+
+    it('creating a drawing while hidden un-hides them (so you see what you draw)', () => {
+      store.setHidden(true);
+      tool = 'hline';
+      ctl.pointerDown(120, 80); ctl.pointerUp(120, 80);
+      expect(store.hidden()).toBe(false);
+    });
+
+    it('setStyle merges colour / width / dash into the selected drawing', () => {
+      store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 } });
+      ctl.setStyle('h', { color: '#ff0000' });
+      ctl.setStyle('h', { width: 3, dash: 'dot' });
+      expect(store.list('msft')[0].style).toEqual({ color: '#ff0000', width: 3, dash: 'dot' });
+      ctl.setStyle('missing', { width: 2 }); // unknown id is ignored
+    });
+
+    it('body drag moves brush points and single-anchor drawings too', () => {
+      store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 } });
+      ctl.pointerDown(200, 170); ctl.pointerMove(200, 150); ctl.pointerUp(200, 150);
+      expect(store.list('msft')[0].a.p).toBe(50);
+      store.add('msft', { id: 'b', type: 'brush', a: { t: bars[2].timestamp, p: 10 }, pts: [{ t: bars[2].timestamp, p: 10 }, { t: bars[4].timestamp, p: 20 }] });
+      ctl.pointerDown(30, 185); ctl.pointerMove(30, 175); ctl.pointerUp(30, 175);
+      const b = store.list('msft')[1];
+      expect(b.pts![0].p).toBe(20);
+      expect(b.pts![1].p).toBe(30);
+    });
   });
 });

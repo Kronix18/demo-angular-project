@@ -2,13 +2,25 @@ import { Injectable, signal } from '@angular/core';
 import { Drawing } from './drawing-geometry';
 
 const KEY = 'chart-drawings';
-const TYPES = ['trend', 'ray', 'channel'];
+const TYPES = ['trend', 'arrow', 'ray', 'hline', 'vline', 'channel', 'rect', 'ellipse', 'fib', 'brush', 'text'];
+const DASHES = ['solid', 'dash', 'dot'];
 const EMPTY: Drawing[] = [];
 
 const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
 const anchor = (v: any) => v && num(v.t) && num(v.p);
 const valid = (d: any): d is Drawing =>
-  !!d && typeof d.id === 'string' && TYPES.includes(d.type) && anchor(d.a) && (d.b === undefined || anchor(d.b)) && (d.offset === undefined || num(d.offset));
+  !!d && typeof d.id === 'string' && TYPES.includes(d.type) && anchor(d.a) && (d.b === undefined || anchor(d.b)) && (d.offset === undefined || num(d.offset))
+  && (d.text === undefined || typeof d.text === 'string') && (d.pts === undefined || (Array.isArray(d.pts) && d.pts.every(anchor)));
+
+/** Keeps only the known style keys (persisted data is never trusted). */
+function cleanStyle(s: any): Drawing['style'] | undefined {
+  if (!s || typeof s !== 'object') return undefined;
+  const out: NonNullable<Drawing['style']> = {};
+  if (typeof s.color === 'string') out.color = s.color;
+  if (typeof s.width === 'number') out.width = s.width;
+  if (DASHES.includes(s.dash)) out.dash = s.dash;
+  return out;
+}
 
 /**
  * Chart drawings, kept per symbol in sessionStorage (like the rest of the chart
@@ -19,6 +31,23 @@ const valid = (d: any): d is Drawing =>
 export class DrawingStore {
   private data: Record<string, Drawing[]> = this.read();
   readonly revision = signal(0);
+  /** Lock all: existing drawings cannot be selected, moved or deleted. Hide all: nothing is drawn. Both persist. */
+  readonly locked = signal(this.readFlag('locked'));
+  readonly hidden = signal(this.readFlag('hidden'));
+
+  toggleLocked(): void { this.setFlag('locked', !this.locked()); }
+  toggleHidden(): void { this.setFlag('hidden', !this.hidden()); }
+  setHidden(v: boolean): void { this.setFlag('hidden', v); }
+
+  private setFlag(name: 'locked' | 'hidden', v: boolean): void {
+    (name === 'locked' ? this.locked : this.hidden).set(v);
+    this.revision.update((r) => r + 1);
+    try { localStorage.setItem(`drawings-${name}`, v ? '1' : '0'); } catch { /* per-session only */ }
+  }
+
+  private readFlag(name: string): boolean {
+    try { return localStorage.getItem(`drawings-${name}`) === '1'; } catch { return false; }
+  }
 
   list(symbol: string): Drawing[] {
     return this.data[symbol.toLowerCase()] ?? EMPTY;
@@ -56,7 +85,9 @@ export class DrawingStore {
     try {
       const raw = JSON.parse(sessionStorage.getItem(KEY) ?? '{}');
       const out: Record<string, Drawing[]> = {};
-      for (const [sym, list] of Object.entries(raw ?? {})) if (Array.isArray(list)) out[sym] = list.filter(valid);
+      for (const [sym, list] of Object.entries(raw ?? {})) {
+        if (Array.isArray(list)) out[sym] = list.filter(valid).map((d) => (d.style ? { ...d, style: cleanStyle(d.style) } : d));
+      }
       return out;
     } catch {
       return {};
