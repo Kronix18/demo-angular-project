@@ -299,7 +299,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
         (keepToggle)="keepDrawing.set(!keepDrawing())" (lockToggle)="drawingStore.toggleLocked()"
         (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" (removeIndicators)="chartState.clearIndicators()"
-        (removeAll)="clearDrawings(); chartState.clearIndicators()" />
+        (removeAll)="clearDrawings(); chartState.clearIndicators()" (emojiPick)="pickEmoji($event)" />
       <div class="chart-col">
       <div class="chart-panel" data-pane="panel">
         <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="!isSelectTool(tool())" (dblclick)="onDblClick($event)"
@@ -312,6 +312,11 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             </select>
             <select data-draw-dash aria-label="Line style" (change)="setDrawStyle(sd.id, { dash: $any($event.target).value })">
               @for (d of dashes; track d) { <option [value]="d" [selected]="(sd.style?.dash ?? 'solid') === d">{{ d }}</option> }
+            </select>
+            <button type="button" data-draw-lock [attr.aria-pressed]="!!sd.locked" aria-label="Lock this drawing" title="Lock this drawing" (click)="setDrawFlag(sd.id, 'locked', !sd.locked)">🔒</button>
+            <button type="button" data-draw-hide aria-label="Hide this drawing" title="Hide this drawing" (click)="setDrawFlag(sd.id, 'hidden', true)">👁</button>
+            <select data-draw-order aria-label="Order" title="Bring to front / send to back" (change)="reorder(sd.id, $any($event.target).value); $any($event.target).value = ''">
+              <option value="">Order…</option><option value="front">Bring to front</option><option value="forward">Bring forward</option><option value="backward">Send backward</option><option value="back">Send to back</option>
             </select>
             <button type="button" data-draw-clone aria-label="Clone drawing (Ctrl+D)" title="Clone (Ctrl+D)" [disabled]="drawingStore.locked()" (click)="cloneSelected()">⧉</button>
             <button type="button" data-draw-delete aria-label="Delete drawing" title="Delete drawing" [disabled]="drawingStore.locked()" (click)="deleteSelected()">🗑</button>
@@ -514,6 +519,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     magnet: () => this.magnetOn,
     zoomTo: (r) => this.zoomToRegion(r),
     editText: (id) => this.openTextEditor(id),
+    emoji: () => this.emoji(),
     committed: () => { if (!this.keepDrawing()) { this.tool.set(this.cursorMode); this.drawings.syncPan(); this.applyCursorStyle(); } },
   });
 
@@ -535,6 +541,13 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   redraw(): void { this.chart?.draw(); }
+
+  readonly emoji = signal('🙂');
+  pickEmoji(e: string): void { this.emoji.set(e); this.setTool('emoji'); }
+  setDrawFlag(id: string, flag: 'locked' | 'hidden', on: boolean): void { this.drawings.setFlag(id, flag, on); }
+  reorder(id: string, how: string): void {
+    if (['front', 'back', 'forward', 'backward'].includes(how)) { this.drawingStore.move(this.currentSymbol, id, how as 'front'); this.chart?.draw(); }
+  }
 
   undo(): void { if (this.drawingStore.undo(this.currentSymbol)) this.afterHistory(); }
   redo(): void { if (this.drawingStore.redo(this.currentSymbol)) this.afterHistory(); }

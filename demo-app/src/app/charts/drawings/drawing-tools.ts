@@ -14,6 +14,8 @@ export interface ToolDef {
   points: number | 'poly' | 'free';
   /** the viewer opens the inline text editor right after the drawing is placed */
   text?: boolean;
+  /** text the editor starts with */
+  defaultText?: string;
 }
 
 export const TOOL_GROUPS: { id: ToolGroup; label: string; icon: string }[] = [
@@ -27,8 +29,8 @@ export const TOOL_GROUPS: { id: ToolGroup; label: string; icon: string }[] = [
   { id: 'icons', label: 'Icons', icon: '★' },
 ];
 
-const t = <I extends string>(id: I, label: string, icon: string, group: ToolGroup, points: ToolDef['points'], text?: boolean) =>
-  ({ id, label, icon, group, points, ...(text ? { text } : {}) }) as ToolDef & { id: I };
+const t = <I extends string>(id: I, label: string, icon: string, group: ToolGroup, points: ToolDef['points'], text?: boolean, defaultText?: string) =>
+  ({ id, label, icon, group, points, ...(text ? { text } : {}), ...(defaultText ? { defaultText } : {}) }) as ToolDef & { id: I };
 
 export const TOOL_DEFS = [
   // trend lines
@@ -91,6 +93,8 @@ export const TOOL_DEFS = [
   t('barspattern', 'Bars pattern', '▮▮', 'projection', 3),
   t('volprofile', 'Fixed range volume profile', '▥', 'projection', 2),
   t('avwap', 'Anchored VWAP', 'VW', 'projection', 1),
+  t('avp', 'Anchored volume profile', '▤', 'projection', 1),
+  t('ghostfeed', 'Ghost feed', '👻', 'projection', 2),
   // brushes & shapes
   t('brush', 'Brush', '✎', 'shapes', 'free'),
   t('highlighter', 'Highlighter', '🖍', 'shapes', 'free'),
@@ -113,6 +117,8 @@ export const TOOL_DEFS = [
   t('pin', 'Pin', '📍', 'text', 1, true),
   t('comment', 'Comment', '🗨', 'text', 1, true),
   t('signpost', 'Signpost', '🚏', 'text', 1, true),
+  t('anchoredtext', 'Anchored text', 'T⚓', 'text', 1, true),
+  t('table', 'Table', '▦', 'text', 1, true, 'Label|Value;Item|0'),
   // icons
   t('iconup', 'Arrow up', '▲', 'icons', 1),
   t('icondown', 'Arrow down', '▼', 'icons', 1),
@@ -128,6 +134,7 @@ export const TOOL_DEFS = [
   t('iconbulb', 'Idea', '💡', 'icons', 1),
   t('iconbell', 'Bell', '🔔', 'icons', 1),
   t('icondollar', 'Dollar', '$', 'icons', 1),
+  t('emoji', 'Emoji', '🙂', 'icons', 1),
 ] as const;
 
 export type DrawingType = (typeof TOOL_DEFS)[number]['id'];

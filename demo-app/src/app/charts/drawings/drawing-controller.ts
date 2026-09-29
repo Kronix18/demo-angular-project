@@ -31,11 +31,13 @@ interface Deps {
   /** a freshly created text label wants its text edited */
   editText?: (id: string) => void;
   committed?: (d: Drawing) => void;
+  /** the emoji the emoji tool stamps */
+  emoji?: () => string;
 }
 
 type Drag =
   | { mode: 'handle'; id: string; index: number }
-  | { mode: 'body'; id: string; idx0: number; p0: number; orig: Drawing }
+  | { mode: 'body'; id: string; idx0: number; p0: number; orig: Drawing; x0: number; y0: number }
   | null;
 
 const HIT = 6;      // px: line pick tolerance
@@ -129,13 +131,24 @@ export class DrawingController {
     return null;
   }
 
+  /** Per-drawing lock / hide. Hiding also deselects. */
+  setFlag(id: string, flag: 'locked' | 'hidden', on: boolean): void {
+    const d = this.find(id);
+    if (!d) return;
+    const { [flag]: _old, ...rest } = d;
+    this.deps.store.update(this.deps.symbol(), on ? { ...rest, [flag]: true } : rest);
+    if (flag === 'hidden' && on && this.selectedId === id) this.selectedId = null;
+    this.deps.changed();
+  }
+
   /** Ctrl+D: a copy of the selection, a few bars to the right; the copy becomes the selection. */
   clone(): string | null {
     const d = this.selectedId ? this.find(this.selectedId) : undefined;
     if (!d || this.deps.store.locked()) return null;
     const bars = this.deps.bars();
     const shift = (a: Anchor): Anchor => ({ t: timeForIndex(bars, indexForTime(bars, a.t) + 3), p: a.p });
-    const copy: Drawing = { ...d, id: this.newId(), a: shift(d.a), ...(d.b ? { b: shift(d.b) } : {}), ...(d.pts ? { pts: d.pts.map(shift) } : {}) };
+    const copy: Drawing = { ...d, id: this.newId(), a: shift(d.a), ...(d.b ? { b: shift(d.b) } : {}), ...(d.pts ? { pts: d.pts.map(shift) } : {}), ...(d.view ? { view: { x: d.view.x + 0.03, y: d.view.y + 0.03 } } : {}) };
+    delete copy.locked;
     this.deps.store.add(this.deps.symbol(), copy);
     this.selectedId = copy.id;
     this.deps.changed();
@@ -175,9 +188,18 @@ export class DrawingController {
     this.selectedId = null;
     const k = kind(tool);
     if (k === 'one') {
-      const d: Drawing = { id: this.newId(), type: tool as DrawingType, a: pt, ...(toolDef(tool)?.text ? { text: '' } : {}) };
+      const def = toolDef(tool);
+      const s = this.scales()!;
+      const view = tool === 'anchoredtext'
+        ? { view: { x: (x - s.area.left) / (s.area.right - s.area.left || 1), y: (y - s.y.top) / (s.y.bottom - s.y.top || 1) } }
+        : {};
+      const d: Drawing = {
+        id: this.newId(), type: tool as DrawingType, a: pt, ...view,
+        ...(def?.text ? { text: def.defaultText ?? '' } : {}),
+        ...(tool === 'emoji' ? { text: this.deps.emoji?.() ?? '⭐' } : {}),
+      };
       this.commit(d);
-      if (toolDef(tool)?.text) this.deps.editText?.(d.id);
+      if (def?.text) this.deps.editText?.(d.id);
       return;
     }
     this.start = { x, y };
@@ -294,7 +316,7 @@ export class DrawingController {
   }
 
   key(k: string): void {
-    if ((k === 'Delete' || k === 'Backspace') && this.selectedId && !this.deps.store.locked()) {
+    if ((k === 'Delete' || k === 'Backspace') && this.selectedId && !this.deps.store.locked() && !this.find(this.selectedId)?.locked) {
       this.deps.store.remove(this.deps.symbol(), this.selectedId);
       this.selectedId = null;
       this.deps.changed();
@@ -412,6 +434,7 @@ export class DrawingController {
     let hit: Drawing | null = null;
     let best = HIT;
     for (const d of this.deps.store.list(this.deps.symbol())) {
+      if (d.hidden) continue;
       const dist = this.distance(d, x, y);
       if (dist <= best) { best = dist; hit = d; }
     }
@@ -429,7 +452,7 @@ export class DrawingController {
     const list = this.deps.store.list(this.deps.symbol());
     const sel = list.find((d) => d.id === this.selectedId);
     const env = this.env();
-    if (sel && env) {
+    if (sel && env && !sel.locked) {
       const hs = handlePoints(sel, env);
       for (let index = 0; index < hs.length; index++) {
         if (Math.hypot(hs[index].x - x, hs[index].y - y) <= HANDLE) {
@@ -441,13 +464,14 @@ export class DrawingController {
     let hit: Drawing | null = null;
     let best = HIT;
     for (const d of list) {
+      if (d.hidden) continue;
       const dist = this.distance(d, x, y);
       if (dist <= best) { best = dist; hit = d; }
     }
     this.selectedId = hit?.id ?? null;
-    if (hit) {
+    if (hit && !hit.locked) {
       const s = this.scales()!;
-      this.drag = { mode: 'body', id: hit.id, idx0: s.x.getValueForPixel(x) as number, p0: s.y.getValueForPixel(y) as number, orig: hit };
+      this.drag = { mode: 'body', id: hit.id, idx0: s.x.getValueForPixel(x) as number, p0: s.y.getValueForPixel(y) as number, orig: hit, x0: x, y0: y };
     }
     this.deps.changed();
   }
@@ -467,6 +491,11 @@ export class DrawingController {
       const dP = (s.y.getValueForPixel(y) as number) - drag.p0;
       const move = (a: Anchor): Anchor => ({ t: timeForIndex(bars, indexForTime(bars, a.t) + dIdx), p: a.p + dP });
       const o = drag.orig;
+      if (o.view) {
+        const w = s.area.right - s.area.left || 1, h = s.y.bottom - s.y.top || 1;
+        this.deps.store.update(sym, { ...o, view: { x: o.view.x + (x - drag.x0) / w, y: o.view.y + (y - drag.y0) / h } });
+        return this.deps.changed();
+      }
       this.deps.store.update(sym, { ...o, a: move(o.a), ...(o.b ? { b: move(o.b) } : {}), ...(o.pts ? { pts: o.pts.map(move) } : {}) });
     }
     this.deps.changed();

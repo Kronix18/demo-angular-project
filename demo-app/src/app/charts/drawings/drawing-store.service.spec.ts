@@ -167,8 +167,8 @@ describe('DrawingStore (10.3)', () => {
       st.move('msft', 'c', 'forward');
       expect(order()).toEqual(['b', 'c', 'a']);
       st.move('msft', 'a', 'front'); // already there: no-op, no history entry
-      st.undo('msft');
-      expect(order()).toEqual(['b', 'a', 'c']);
+      st.undo('msft'); // reverts the last real move (c forward); the no-op left no history entry
+      expect(order()).toEqual(['c', 'b', 'a']);
     });
 
     it('exportAll / importAll round-trip every symbol (used by layouts)', () => {

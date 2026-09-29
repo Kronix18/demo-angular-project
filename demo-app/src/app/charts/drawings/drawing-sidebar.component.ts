@@ -52,6 +52,11 @@ import { TOOL_GROUPS, ToolDef, ToolGroup, anyToolDef, toolsInGroup } from './dra
     } @else if (open(); as g) {
       <div class="flyout" role="menu" [attr.data-flyout-menu]="g" [style.top.px]="flyoutPos().top" [style.left.px]="flyoutPos().left">
         <div class="flyout-title">{{ groupLabel(g) }}</div>
+        @if (g === 'icons') {
+          <div class="emoji-grid" data-emoji-grid>
+            @for (e of emojis; track e) { <button type="button" class="emoji" [attr.data-emoji]="e" [attr.aria-label]="'Stamp ' + e" (click)="pickEmoji(e)">{{ e }}</button> }
+          </div>
+        }
         @for (t of toolsOf(g); track t.id) {
           <button type="button" role="menuitem" class="fly-item" [attr.data-flyout-tool]="t.id" [attr.aria-current]="tool() === t.id" (click)="choose(t.id)">
             <span class="fly-icon" aria-hidden="true">{{ t.icon }}</span>{{ t.label }}
@@ -88,6 +93,9 @@ import { TOOL_GROUPS, ToolDef, ToolGroup, anyToolDef, toolsInGroup } from './dra
       }
       .fly-item:hover { background: var(--c-primary-tint); color: var(--c-primary); }
       .fly-item[aria-current='true'] { font-weight: 600; color: var(--c-primary); }
+      .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 2px 4px 6px; }
+      .emoji { padding: 2px; border: none; border-radius: var(--border-radius-sm); background: transparent; cursor: pointer; font-size: 1.1rem; }
+      .emoji:hover { background: var(--c-primary-tint); }
       .fly-icon { width: 1.6rem; text-align: center; }
     `,
   ],
@@ -106,6 +114,8 @@ export class DrawingSidebarComponent {
   readonly clear = output<void>();
   readonly removeIndicators = output<void>();
   readonly removeAll = output<void>();
+  readonly emojiPick = output<string>();
+  readonly emojis = ['😀', '😂', '😍', '🤔', '😎', '😱', '😡', '😭', '👍', '👎', '👏', '🙏', '💪', '🤝', '👀', '🧠', '❤', '💔', '🔥', '⭐', '✨', '💡', '🚀', '🎯', '🏆', '💰', '💵', '📈', '📉', '📊', '🐂', '🐻', '🦄', '🐳', '🦈', '🚩', '⚠', '⛔', '✅', '❌', '❓', '❗', '💎', '🕐', '📌', '🔔', '🎉', '🌙', '☀'];
 
   readonly groups = TOOL_GROUPS;
   readonly open = signal<ToolGroup | 'remove' | null>(null);
@@ -129,6 +139,11 @@ export class DrawingSidebarComponent {
     const r = (e?.currentTarget as HTMLElement | undefined)?.getBoundingClientRect();
     if (r) this.flyoutPos.set({ top: Math.max(4, Math.min(r.top - 4, window.innerHeight - 320)), left: r.right + 6 });
     this.open.set(g);
+  }
+
+  pickEmoji(e: string): void {
+    this.open.set(null);
+    this.emojiPick.emit(e);
   }
 
   remove(what: 'drawings' | 'indicators' | 'all'): void {

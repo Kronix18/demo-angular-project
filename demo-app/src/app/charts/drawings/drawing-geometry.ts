@@ -25,6 +25,11 @@ export interface Drawing {
   /** every anchor of a 3+ point tool, or the freehand / polyline points */
   pts?: Anchor[];
   style?: DrawingStyle;
+  /** this drawing alone cannot be moved / deleted, or is not shown */
+  locked?: boolean;
+  hidden?: boolean;
+  /** anchored text: position in the price pane as fractions (independent of the data) */
+  view?: { x: number; y: number };
 }
 
 /** Fractional bar index for a timestamp (linear between neighbouring bars, clamped to the data). */

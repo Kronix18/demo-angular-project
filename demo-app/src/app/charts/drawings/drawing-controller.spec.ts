@@ -25,6 +25,7 @@ describe('DrawingController (10.3)', () => {
 
   beforeEach(() => {
     sessionStorage.clear();
+    localStorage.clear(); // the lock / hide flags persist there
     store = new DrawingStore();
     chart = fakeChart();
     tool = 'cursor';
@@ -491,7 +492,7 @@ describe('DrawingController (10.3)', () => {
       tool = 'cursor';
       ctl.pointerDown(250, 100); ctl.pointerMove(300, 120); ctl.pointerUp(300, 120);
       const moved = store.list('msft')[0].view!;
-      expect(moved.x).toBeCloseTo(0.5 + 55 / 490, 5);
+      expect(moved.x).toBeCloseTo(0.5 + 50 / 490, 5);
       expect(moved.y).toBeCloseTo(0.5 + 20 / 200, 5);
     });
 

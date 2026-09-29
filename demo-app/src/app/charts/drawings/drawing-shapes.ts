@@ -21,7 +21,7 @@ interface Common { role?: Role; dash?: number[]; /** line-width multiplier */ wm
 export type Shape =
   | (Common & { k: 'line'; x1: number; y1: number; x2: number; y2: number; ext?: 'right' | 'both'; /** span the whole chart, not just the price pane */ chart?: boolean })
   | (Common & { k: 'poly'; pts: Pt[]; closed?: boolean; fill?: number })
-  | (Common & { k: 'rect'; x: number; y: number; w: number; h: number; fill?: number; stroke?: boolean })
+  | (Common & { k: 'rect'; x: number; y: number; w: number; h: number; fill?: number; stroke?: boolean; /** opaque chart-background fill (table cells) */ surface?: boolean })
   | (Common & { k: 'ellipse'; cx: number; cy: number; rx: number; ry: number; fill?: number })
   | (Common & { k: 'arrow'; x1: number; y1: number; x2: number; y2: number })
   | (Common & { k: 'curve'; pts: [Pt, Pt, Pt] })
@@ -117,6 +117,45 @@ function regressionFit(bars: OHLCV[], a: Anchor, b: Anchor): { i0: number; i1: n
   let ss = 0;
   for (let k = 0; k < n; k++) ss += (bars[i0 + k].close - (icpt + slope * k)) ** 2;
   return { i0, i1, c0: icpt, c1: icpt + slope * (n - 1), sigma: Math.sqrt(ss / n) };
+}
+
+/** Bars i0..i1 copied to start at pixel x0, shifted so the first close lands on `price` (ghost feed / bars pattern). */
+function pasteBars(env: Env, a: Anchor, b: Anchor, x0: number, price: number, alpha: number, _pad: number): Shape[] {
+  const bars = env.bars;
+  if (!bars.length) return [];
+  let i0 = Math.round(indexForTime(bars, a.t)), i1 = Math.round(indexForTime(bars, b.t));
+  if (i0 > i1) [i0, i1] = [i1, i0];
+  i1 = Math.min(i1, i0 + 150);
+  const dp = price - bars[i0].close;
+  const xs0 = env.px({ t: bars[i0].timestamp, p: 0 }).x;
+  const out: Shape[] = [];
+  for (let i = i0; i <= i1; i++) {
+    const bar = bars[i];
+    const y = (p: number) => env.px({ t: bar.timestamp, p: p + dp }).y;
+    const x = x0 + (env.px({ t: bar.timestamp, p: 0 }).x - xs0);
+    const role: Role = bar.close >= bar.open ? 'up' : 'down';
+    out.push(seg({ x, y: y(bar.high) }, { x, y: y(bar.low) }, { role, alpha }), seg({ x: x - 3, y: y(bar.open) }, { x, y: y(bar.open) }, { role, alpha }), seg({ x, y: y(bar.close) }, { x: x + 3, y: y(bar.close) }, { role, alpha }));
+  }
+  return out;
+}
+
+/** Volume-by-price histogram of bars i0..i1 between two prices (24 bins), growing right from `left`. */
+function profileRects(env: Env, i0: number, i1: number, lo: number, hi: number, left: number, width: number): Shape[] {
+  const bars = env.bars;
+  const N = 24, step = (hi - lo) / N || 1;
+  const vol = new Array<number>(N).fill(0);
+  for (let i = i0; i <= i1 && i < bars.length; i++) {
+    const tp = (bars[i].high + bars[i].low + bars[i].close) / 3;
+    if (tp >= lo && tp <= hi) vol[Math.min(N - 1, Math.floor((tp - lo) / step))] += bars[i].volume;
+  }
+  const max = Math.max(...vol, 1);
+  const out: Shape[] = [];
+  vol.forEach((v, k) => {
+    if (!v) return;
+    const yTop = env.px({ t: bars[i0].timestamp, p: lo + step * (k + 1) }).y, yBot = env.px({ t: bars[i0].timestamp, p: lo + step * k }).y;
+    out.push({ k: 'rect', x: left, y: Math.min(yTop, yBot) + 0.5, w: (v / max) * width, h: Math.max(1, Math.abs(yBot - yTop) - 1), fill: 0.45, stroke: false, alpha: 0 });
+  });
+  return out;
 }
 
 const BUILDERS: Record<string, Builder> = {
@@ -391,44 +430,32 @@ const BUILDERS: Record<string, Builder> = {
     const v = { x: P[1].x - P[0].x, y: P[1].y - P[0].y };
     return [{ k: 'arrow', x1: P[0].x, y1: P[0].y, x2: P[1].x, y2: P[1].y }, { k: 'arrow', x1: P[2].x, y1: P[2].y, x2: P[2].x + v.x, y2: P[2].y + v.y, dash: [6, 4] }];
   },
-  barspattern: ({ A, P, env }) => {
-    const bars = env.bars;
-    if (!bars.length) return [];
-    let i0 = Math.round(indexForTime(bars, A[0].t)), i1 = Math.round(indexForTime(bars, A[1].t));
-    if (i0 > i1) [i0, i1] = [i1, i0];
-    i1 = Math.min(i1, i0 + 150);
-    const dp = A[2].p - bars[i0].close;
-    const x0 = env.px({ t: bars[i0].timestamp, p: 0 }).x;
-    const out: Shape[] = [];
-    for (let i = i0; i <= i1; i++) {
-      const b = bars[i];
-      const y = (price: number) => env.px({ t: b.timestamp, p: price + dp }).y;
-      const x = P[2].x + (env.px({ t: b.timestamp, p: 0 }).x - x0);
-      out.push(seg({ x, y: y(b.high) }, { x, y: y(b.low) }, { role: b.close >= b.open ? 'up' : 'down' }), seg({ x: x - 3, y: y(b.open) }, { x, y: y(b.open) }, { role: b.close >= b.open ? 'up' : 'down' }), seg({ x, y: y(b.close) }, { x: x + 3, y: y(b.close) }, { role: b.close >= b.open ? 'up' : 'down' }));
-    }
-    return out;
-  },
+  barspattern: ({ A, P, env }) => pasteBars(env, A[0], A[1], P[2].x, A[2].p, 1, 0),
+  ghostfeed: ({ A, P, env }) => pasteBars(env, A[0], A[1], P[1].x + 6, A[1].p, 0.55, 0),
   volprofile: ({ A, P, env }) => {
     const bars = env.bars;
     if (!bars.length) return [];
     let i0 = Math.round(indexForTime(bars, A[0].t)), i1 = Math.round(indexForTime(bars, A[1].t));
     if (i0 > i1) [i0, i1] = [i1, i0];
     const lo = Math.min(A[0].p, A[1].p), hi = Math.max(A[0].p, A[1].p);
-    const N = 24, step = (hi - lo) / N || 1;
-    const vol = new Array<number>(N).fill(0);
-    for (let i = i0; i <= i1; i++) {
-      const tp = (bars[i].high + bars[i].low + bars[i].close) / 3;
-      if (tp >= lo && tp <= hi) vol[Math.min(N - 1, Math.floor((tp - lo) / step))] += bars[i].volume;
-    }
-    const max = Math.max(...vol, 1);
-    const left = Math.min(P[0].x, P[1].x), width = Math.abs(P[1].x - P[0].x) * 0.6;
-    const out: Shape[] = [{ k: 'rect', x: left, y: Math.min(P[0].y, P[1].y), w: Math.abs(P[1].x - P[0].x), h: Math.abs(P[1].y - P[0].y), fill: 0.05 }];
-    vol.forEach((v, k) => {
-      if (!v) return;
-      const yTop = env.px({ t: A[0].t, p: lo + step * (k + 1) }).y, yBot = env.px({ t: A[0].t, p: lo + step * k }).y;
-      out.push({ k: 'rect', x: left, y: Math.min(yTop, yBot) + 0.5, w: (v / max) * width, h: Math.max(1, Math.abs(yBot - yTop) - 1), fill: 0.45, stroke: false, alpha: 0 });
-    });
-    return out;
+    const left = Math.min(P[0].x, P[1].x), w = Math.abs(P[1].x - P[0].x);
+    return [
+      { k: 'rect', x: left, y: Math.min(P[0].y, P[1].y), w, h: Math.abs(P[1].y - P[0].y), fill: 0.05 },
+      ...profileRects(env, i0, i1, lo, hi, left, w * 0.6),
+    ];
+  },
+  avp: ({ A, P, env }) => {
+    const bars = env.bars;
+    if (!bars.length) return [];
+    const i0 = Math.max(0, Math.round(indexForTime(bars, A[0].t)));
+    const i1 = bars.length - 1;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = i0; i <= i1; i++) { lo = Math.min(lo, bars[i].low); hi = Math.max(hi, bars[i].high); }
+    if (!(hi > lo)) return [];
+    const left = P[0].x;
+    const w = Math.max(20, Math.min(160, env.area.right - left));
+    const yLo = env.px({ t: A[0].t, p: lo }).y, yHi = env.px({ t: A[0].t, p: hi }).y;
+    return [{ k: 'rect', x: left, y: Math.min(yLo, yHi), w, h: Math.abs(yLo - yHi), fill: 0.05 }, ...profileRects(env, i0, i1, lo, hi, left, w)];
   },
   avwap: ({ A, env }) => {
     const bars = env.bars;
@@ -492,6 +519,28 @@ const BUILDERS: Record<string, Builder> = {
   pin: ({ d, P }) => [seg(P[0], { x: P[0].x, y: P[0].y - 14 }), { k: 'ellipse', cx: P[0].x, cy: P[0].y, rx: 3, ry: 3, fill: 1 }, label({ x: P[0].x, y: P[0].y - 26 }, d.text ?? '', { box: 'note', role: 'text', align: 'center' })],
   comment: ({ d, P }) => [{ k: 'poly', pts: [P[0], { x: P[0].x - 6, y: P[0].y - 12 }, { x: P[0].x + 6, y: P[0].y - 12 }], closed: true, fill: 0.5 }, label({ x: P[0].x, y: P[0].y - 22 }, d.text ?? '', { box: 'note', role: 'text', align: 'center' })],
   signpost: ({ d, P }) => [seg(P[0], { x: P[0].x, y: P[0].y - 40 }, { wm: 1.5 }), label({ x: P[0].x, y: P[0].y - 52 }, d.text ?? '', { box: 'note', role: 'text', align: 'center' })],
+  anchoredtext: ({ d, env }) => {
+    const v = d.view ?? { x: 0.5, y: 0.5 };
+    return [label({ x: env.area.left + v.x * (env.area.right - env.area.left), y: env.area.top + v.y * (env.area.bottom - env.area.top) }, d.text ?? '', { box: 'surface' })];
+  },
+  table: ({ d, P }) => {
+    const rows = (d.text || 'Label|Value').split(';').map((r) => r.split('|'));
+    const cols = Math.max(...rows.map((r) => r.length));
+    const colW = Array.from({ length: cols }, (_, c) => Math.max(40, ...rows.map((r) => textWidth(r[c] ?? '') + 8)));
+    const H = 22;
+    const out: Shape[] = [];
+    let y = P[0].y;
+    for (const r of rows) {
+      let x = P[0].x;
+      for (let c = 0; c < cols; c++) {
+        out.push({ k: 'rect', x, y, w: colW[c], h: H, fill: 1, surface: true }, label({ x: x + 6, y: y + H / 2 }, r[c] ?? '', { role: 'text' }));
+        x += colW[c];
+      }
+      y += H;
+    }
+    return out;
+  },
+  emoji: ({ d, P }) => [label(P[0], d.text || '⭐', { align: 'center', size: 24 })],
   pricelabel: ({ A, P, env }) => [label({ x: P[0].x + 4, y: P[0].y }, env.fmt(A[0].p), { box: 'surface' })],
 };
 
@@ -537,6 +586,7 @@ export function shapesFor(d: Drawing, env: Env): Shape[] {
 export function handlePoints(d: Drawing, env: Env): Pt[] {
   const def = toolDef(d.type as string);
   if (def?.points === 'free') return [];
+  if (d.type === 'anchoredtext') return [];
   if (d.type === 'channel' || def?.points === 'poly' || typeof def?.points === 'number') return anchorsOf(d).map((a) => env.px(a));
   return [];
 }

@@ -81,7 +81,8 @@ export const drawingsPlugin = {
             break;
           case 'rect':
             ctx.beginPath(); ctx.rect(s.x, s.y, s.w, s.h);
-            if (s.fill) fillOf(s.fill);
+            if (s.surface) { ctx.fillStyle = surface; ctx.fill(); ctx.fillStyle = color; }
+            else if (s.fill) fillOf(s.fill);
             if (s.stroke !== false && (s.alpha ?? 1) > 0) ctx.stroke();
             break;
           case 'ellipse':
@@ -132,7 +133,7 @@ export const drawingsPlugin = {
     };
 
     const items: { d: Drawing; shapes: Shape[]; draft: boolean }[] = [];
-    if (!hidden) for (const d of v.drawings) items.push({ d, shapes: shapesFor(d, env), draft: false });
+    if (!hidden) for (const d of v.drawings.filter((x) => !x.hidden)) items.push({ d, shapes: shapesFor(d, env), draft: false });
     const transientDraft = v.draft && (v.draft.type === 'measure' || v.draft.type === 'zoom') ? v.draft : null;
     if (draft && !transientDraft) items.push({ d: draft, shapes: shapesFor(draft, env), draft: true });
 
@@ -150,7 +151,7 @@ export const drawingsPlugin = {
         // selection handles + the anchors already placed by a draft
         const sel = v.drawings.find((d) => d.id === v.selectedId);
         const handleSets: { pts: { x: number; y: number }[]; color: string }[] = [];
-        if (sel && !hidden) handleSets.push({ pts: handlePoints(sel, env), color: sel.style?.color ?? base });
+        if (sel && !hidden && !sel.locked && !sel.hidden) handleSets.push({ pts: handlePoints(sel, env), color: sel.style?.color ?? base });
         if (draft && !transientDraft) handleSets.push({ pts: (draft.pts ?? [draft.a]).slice(0, -1).map((a) => env.px(a)), color: base });
         for (const hs of handleSets) {
           ctx.setLineDash([]);

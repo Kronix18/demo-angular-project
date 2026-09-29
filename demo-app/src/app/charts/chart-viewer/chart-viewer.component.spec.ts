@@ -1109,6 +1109,69 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('per-drawing controls and emoji (11.12)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const ctl = () => (component as any).drawings;
+    let store: any;
+    beforeEach(async () => {
+      const { DrawingStore } = await import('../drawings/drawing-store.service');
+      store = TestBed.inject(DrawingStore);
+    });
+    const ready = async () => {
+      sessionStorage.clear(); localStorage.clear();
+      TestBed.inject(ChartStateService).reset();
+      if (store.locked()) store.toggleLocked();
+      store.setHidden(false);
+      store.clear('msft');
+      await loaded();
+      const c = Chart.getChart(component.chartCanvas!.nativeElement) as any;
+      const mock = () => {
+        c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
+        c.scales.y.top = 0; c.scales.y.bottom = 300;
+        c.scales.x.getPixelForValue = (v: number) => v * 10;
+        c.scales.x.getValueForPixel = (px: number) => px / 10;
+        c.scales.y.getPixelForValue = (v: number) => 300 - v;
+        c.scales.y.getValueForPixel = (px: number) => 300 - px;
+      };
+      mock();
+      return () => { mock(); };
+    };
+
+    it('the style toolbar locks, hides and reorders the selected drawing', async () => {
+      const remock = await ready();
+      store.add('msft', { id: 'a', type: 'hline', a: { t: 1, p: 100 } });
+      store.add('msft', { id: 'b', type: 'hline', a: { t: 1, p: 150 } });
+      component.setTool('cursor'); remock();
+      ctl().pointerDown(50, 200); ctl().pointerUp(50, 200); // price 100 -> y 200: selects 'a'
+      fixture.detectChanges();
+      expect(ctl().view().selectedId).toBe('a');
+      const order = q('[data-draw-order]') as HTMLSelectElement;
+      order.value = 'front'; order.dispatchEvent(new Event('change'));
+      expect(store.list('msft').map((d: any) => d.id)).toEqual(['b', 'a']);
+      (q('[data-draw-lock]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(store.list('msft')[1].locked).toBe(true);
+      expect(q('[data-draw-lock]')!.getAttribute('aria-pressed')).toBe('true');
+      (q('[data-draw-hide]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(store.list('msft')[1].hidden).toBe(true);
+      expect(q('[data-draw-style]')).toBeNull(); // hidden -> deselected
+    });
+
+    it('the icons flyout has an emoji picker; picking one arms the emoji tool and the click stamps it', async () => {
+      const remock = await ready();
+      (q('[data-flyout="icons"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelectorAll('[data-emoji]').length).toBeGreaterThan(30);
+      (Array.from(fixture.nativeElement.querySelectorAll('[data-emoji]')) as HTMLElement[]).find((b) => b.dataset['emoji'] === '🚀')!.click();
+      fixture.detectChanges();
+      expect(component.tool()).toBe('emoji');
+      remock();
+      ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
+      expect(store.list('msft')[0]).toMatchObject({ type: 'emoji', text: '🚀' });
+    });
+  });
+
   describe('chart settings, context menu, keyboard navigation (11.11)', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const fresh = () => { sessionStorage.clear(); localStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };

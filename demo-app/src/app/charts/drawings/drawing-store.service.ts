@@ -12,6 +12,16 @@ const valid = (d: any): d is Drawing =>
   !!d && typeof d.id === 'string' && isDrawingType(d.type) && anchor(d.a) && (d.b === undefined || anchor(d.b)) && (d.offset === undefined || num(d.offset))
   && (d.text === undefined || typeof d.text === 'string') && (d.pts === undefined || (Array.isArray(d.pts) && d.pts.every(anchor)));
 
+/** Drops invalid per-drawing extras (persisted data is never trusted). */
+function cleanDrawing(d: Drawing): Drawing {
+  const { locked, hidden, view, ...rest } = d as Drawing & Record<string, unknown>;
+  const out: Drawing = { ...(rest as Drawing) };
+  if (locked === true) out.locked = true;
+  if (hidden === true) out.hidden = true;
+  if (view && typeof view === 'object' && num((view as any).x) && num((view as any).y)) out.view = { x: (view as any).x, y: (view as any).y };
+  return out;
+}
+
 /** Keeps only the known style keys (persisted data is never trusted). */
 function cleanStyle(s: any): Drawing['style'] | undefined {
   if (!s || typeof s !== 'object') return undefined;
@@ -69,6 +79,30 @@ export class DrawingStore {
     this.set(symbol, cur.filter((x) => x.id !== id));
   }
 
+  /** Z-order: the list order is the paint order (last = on top). */
+  move(symbol: string, id: string, how: 'front' | 'back' | 'forward' | 'backward'): void {
+    const cur = this.list(symbol);
+    const i = cur.findIndex((d) => d.id === id);
+    if (i < 0) return;
+    const j = how === 'front' ? cur.length - 1 : how === 'back' ? 0 : how === 'forward' ? Math.min(cur.length - 1, i + 1) : Math.max(0, i - 1);
+    if (j === i) return;
+    const next = cur.filter((_, k) => k !== i);
+    next.splice(j, 0, cur[i]);
+    this.set(symbol, next);
+  }
+
+  /** Every symbol's drawings (layouts save and restore them). */
+  exportAll(): Record<string, Drawing[]> { return JSON.parse(JSON.stringify(this.data)); }
+
+  importAll(all: Record<string, unknown>): void {
+    const next: Record<string, Drawing[]> = {};
+    for (const [sym, list] of Object.entries(all ?? {})) if (Array.isArray(list)) next[sym.toLowerCase()] = list.filter(valid).map((d) => cleanDrawing(d.style ? { ...d, style: cleanStyle(d.style) } : d));
+    this.past = {}; this.future = {}; this.lastEdit = null;
+    this.data = next;
+    this.revision.update((r) => r + 1);
+    try { sessionStorage.setItem(KEY, JSON.stringify(this.data)); } catch { /* per-page only */ }
+  }
+
   clear(symbol: string): void {
     if (this.list(symbol).length) this.set(symbol, []);
   }
@@ -122,7 +156,7 @@ export class DrawingStore {
       const raw = JSON.parse(sessionStorage.getItem(KEY) ?? '{}');
       const out: Record<string, Drawing[]> = {};
       for (const [sym, list] of Object.entries(raw ?? {})) {
-        if (Array.isArray(list)) out[sym] = list.filter(valid).map((d) => (d.style ? { ...d, style: cleanStyle(d.style) } : d));
+        if (Array.isArray(list)) out[sym] = list.filter(valid).map((d) => cleanDrawing(d.style ? { ...d, style: cleanStyle(d.style) } : d));
       }
       return out;
     } catch {
