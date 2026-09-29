@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError, of } from 'rxjs';
-import { catchError, retry, timeout, retryWhen, delayWhen, take } from 'rxjs/operators';
+import { catchError, retry, timeout } from 'rxjs/operators';
 import { timer } from 'rxjs';
 
 @Injectable({
@@ -20,19 +20,15 @@ export class ApiService {
     const headers = { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` };
     return this.http.get<T>(url, { headers }).pipe(
       timeout(this.timeoutMs),
-      retryWhen(errors =>
-        errors.pipe(
-          delayWhen((error, index) => {
-            if (index >= this.maxRetries) {
-              return throwError(() => error);
-            }
-            const delayMs = Math.pow(2, index) * 1000;
-            console.warn(`Retry attempt ${index + 1} after ${delayMs}ms`, error);
-            return timer(delayMs);
-          }),
-          take(this.maxRetries)
-        )
-      ),
+      // exponential backoff (1s, 2s, 4s); the error surfaces once retries are used up
+      retry({
+        count: this.maxRetries,
+        delay: (error, retryCount) => {
+          const delayMs = Math.pow(2, retryCount - 1) * 1000;
+          console.warn(`Retry attempt ${retryCount} after ${delayMs}ms`, error);
+          return timer(delayMs);
+        },
+      }),
       catchError(error => this.handleError(error, url))
     );
   }
@@ -40,7 +36,6 @@ export class ApiService {
   post<T>(endpoint: string, data: any, customTimeoutMs?: number): Observable<T> {
     const url = `${this.apiUrl}/${endpoint}`;
     console.log('ApiService POST request to:', url);
-    console.log('Request body:', JSON.stringify(data, null, 2));
 
     const toMs = customTimeoutMs ?? this.timeoutMs;
     console.log(`Request timeout: ${toMs}ms`);

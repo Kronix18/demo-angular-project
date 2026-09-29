@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "test:coverage": "ng test --watch=false --coverage --coverage-reporters=text --coverage-reporters=json-summary --coverage-include=src/app/core/** --coverage-include=src/app/charts/** --coverage-include=src/app/app.ts --coverage-exclude=**/*.spec.ts --coverage-exclude=**/__fixtures__/** && node scripts/check-coverage.cjs"
   },
   "prettier": {
     "printWidth": 100,
@@ -43,6 +44,7 @@
     "@angular/build": "^21.0.5",
     "@angular/cli": "^21.0.5",
     "@angular/compiler-cli": "^21.0.0",
+    "@vitest/coverage-v8": "^4.0.17",
     "jsdom": "^27.1.0",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"

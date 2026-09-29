@@ -68,7 +68,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 6.2 | phase-6-integration/6.2-design-token-compliance.md | DONE for shell + chart (browser-verified, `verify-6-2.cjs` 9/9); feature pages grandfathered by a ratchet | theme.scss, guard spec, opt-in dark theme |
 | 6.3 | phase-6-integration/6.3-error-loading-states.md | DONE (browser-verified 13/13) | skeleton, error card (unknown symbol / no data / failed) + symbol picker + Retry |
 | 6.4 | phase-6-integration/6.4-performance.md | NOT STARTED | MSFT has ~40y of daily bars |
-| 7.1 | phase-7-testing/7.1-coverage-gate.md | NOT STARTED | |
+| 7.1 | phase-7-testing/7.1-coverage-gate.md | DONE | `npm run test:coverage`: 97.8% stmts / 89.3% branches over core+charts+app.ts, gate at 80% |
 | 7.2 | phase-7-testing/7.2-e2e-playwright.md | NOT STARTED | replaces stray gen-baselines scripts |
 | 7.3 | phase-7-testing/7.3-manual-matrix.md | NOT STARTED | |
 | 8.1 | phase-8-cleanup-docs/8.1-dead-file-removal.md | DONE | 20 dead files removed; build + 14 spec files + browser scripts green |

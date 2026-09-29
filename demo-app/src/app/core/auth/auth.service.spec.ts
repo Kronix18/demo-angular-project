@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth.service';
+import { firstValueFrom } from 'rxjs';
 
 describe('AuthService', () => {
   beforeEach(() => {
@@ -77,5 +78,36 @@ describe('AuthService', () => {
     expect(emissions[emissions.length - 1]).toBe(false);
     expect(sessionStorage.getItem('isLoggedIn')).toBeNull();
     expect(sessionStorage.getItem('userEmail')).toBeNull();
+  });
+
+  describe('session helpers + demo register/verify (coverage gate 7.1)', () => {
+    const ADMIN = { email: 'admin@demo.angular-project.local', password: 'changeme' };
+
+    it('tokens and current user exist only while logged in', async () => {
+      const svc = TestBed.inject(AuthService);
+      expect(svc.getAccessToken()).toBeNull();
+      expect(svc.getRefreshToken()).toBeNull();
+      expect(svc.getCurrentUser()).toBeNull();
+      expect(svc.isAuthenticated()).toBe(false);
+      await firstValueFrom(svc.login(ADMIN));
+      expect(svc.isAuthenticated()).toBe(true);
+      expect(svc.getAccessToken()).toBe('demo-access-token');
+      expect(svc.getRefreshToken()).toBe('demo-refresh-token');
+      expect(svc.getCurrentUser()).toEqual({ email: ADMIN.email, username: 'admin', accessToken: 'demo-access-token' });
+    });
+
+    it('register: only the demo admin succeeds (and logs in); everyone else is rejected', async () => {
+      const svc = TestBed.inject(AuthService);
+      expect(await firstValueFrom(svc.register({ name: 'x', username: 'x', email: 'x@y.z', password: 'pw' }))).toBe(false);
+      expect(svc.isLoggedIn()).toBe(false);
+      expect(await firstValueFrom(svc.register({ name: 'a', username: 'admin', ...ADMIN }))).toBe(true);
+      expect(svc.isLoggedIn()).toBe(true);
+    });
+
+    it('login accepts username too, rejects wrong passwords; verifyEmail always resolves', async () => {
+      const svc = TestBed.inject(AuthService);
+      expect(await firstValueFrom(svc.login({ email: ADMIN.email, password: 'wrong' }))).toBe(false);
+      expect(await firstValueFrom(svc.verifyEmail('tok'))).toBeUndefined();
+    });
   });
 });

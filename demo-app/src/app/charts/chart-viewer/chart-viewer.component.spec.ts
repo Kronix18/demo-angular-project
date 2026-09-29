@@ -314,6 +314,120 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(errEl).toBeTruthy();
   });
 
+  describe('plugins, weekly view and edge paths (coverage gate 7.1)', () => {
+    const fakeChart = (extra: Record<string, unknown> = {}): any => {
+      const calls: string[] = [];
+      const ctx = new Proxy({}, { get: (_t, p) => (..._a: unknown[]) => { calls.push(String(p)); }, set: () => true });
+      return { calls, ctx, chartArea: { left: 0, right: 100, top: 0, bottom: 50 }, tooltip: { getActiveElements: () => [] }, scales: {}, ...extra };
+    };
+    const plugin = (id: string) => Chart.registry.getPlugin(id) as any;
+
+    it('crosshair: tracks mousemove/mouseout and draws only inside the chart area', () => {
+      const p = plugin('crosshair');
+      const c = fakeChart();
+      p.afterEvent(c, { event: { type: 'mousemove', x: 40 } });
+      expect(c.$crosshairX).toBe(40);
+      p.afterDatasetsDraw(c);
+      expect(c.calls).toContain('stroke');
+      p.afterEvent(c, { event: { type: 'mouseout' } });
+      expect(c.$crosshairX).toBeNull();
+      const drawn = c.calls.length;
+      p.afterDatasetsDraw(c); // nothing hovered -> nothing drawn
+      expect(c.calls.length).toBe(drawn);
+      p.afterEvent(c, { event: { type: 'mousemove', x: 500 } }); // outside the area
+      p.afterDatasetsDraw(c);
+      expect(c.calls.length).toBe(drawn);
+      const snapped = fakeChart({ tooltip: { getActiveElements: () => [{ element: { x: 25 } }] } });
+      p.afterDatasetsDraw(snapped);
+      expect(snapped.calls).toContain('moveTo');
+    });
+
+    it('paneDecor: separators above every pane but the first, plus pane labels', () => {
+      const p = plugin('paneDecor');
+      const texts: string[] = [];
+      const c = fakeChart({
+        ctx: new Proxy({}, { get: (_t, prop) => (...a: unknown[]) => { if (prop === 'fillText') texts.push(String(a[0])); }, set: () => true }),
+        scales: {
+          x: { top: 0, options: {} },
+          y: { top: 0, options: { paneLabel: 'MSFT' } },
+          yVol: { top: 30, options: { paneLabel: 'Volume' } },
+          yInd0: { top: 40, options: {} },
+        },
+      });
+      p.afterDraw(c);
+      expect(texts).toEqual(['MSFT', 'Volume']);
+      p.afterDraw({ ...c, ctx: null }); // no context: no crash
+    });
+
+    it('tooltip: title is the bar date, dashed guide lines are filtered out', async () => {
+      const chart: any = await loaded();
+      const tt = chart.options.plugins.tooltip;
+      expect(tt.callbacks.title([{ parsed: { x: 0 } }])).toMatch(/Jan 10, 24/);
+      expect(tt.callbacks.title([])).toBeTruthy();
+      expect(tt.filter({ dataset: { borderDash: [6, 4] } })).toBe(false);
+      expect(tt.filter({ dataset: { borderDash: [] } })).toBe(true);
+      expect(tt.filter({ dataset: {} })).toBe(true);
+    });
+
+    it('weekly interval aggregates the whole file into W-FRI bars', async () => {
+      stubCanvas();
+      const rows = ['<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>'];
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(Date.UTC(2024, 0, 1 + i));
+        if (d.getUTCDay() === 0 || d.getUTCDay() === 6) continue;
+        rows.push(`MSFT.US,D,${d.toISOString().slice(0, 10).replace(/-/g, '')},000000,100,110,95,105,1000,0`);
+      }
+      const st = TestBed.inject(ChartStateService);
+      st.setRange('ALL');
+      st.setInterval('1w');
+      // the initial load and the interval-change reload are both in flight
+      const reqs = httpMock.match('test-data/msft.us.txt');
+      expect(reqs.length).toBe(2);
+      reqs.forEach((r) => r.flush(rows.join('\r\n')));
+      await fixture.whenStable();
+      const chart: any = Chart.getChart(component.chartCanvas!.nativeElement);
+      const pts = chart.data.datasets[0].data;
+      expect(pts.length).toBeGreaterThan(5);
+      expect(pts.length).toBeLessThan(15); // ~9 weeks, not ~43 days
+      expect(chart.data.datasets[1].data[0].y).toBeGreaterThan(1000); // summed weekly volume
+    });
+
+    it('resetZoom survives a throwing plugin; syncView ignores a chart with no bars loaded', async () => {
+      const chart: any = await loaded();
+      vi.spyOn(chart, 'resetZoom').mockImplementation(() => { throw new Error('boom'); });
+      const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      expect(() => component.resetZoom()).not.toThrow();
+      expect(err).toHaveBeenCalled();
+      err.mockRestore();
+      (component as any).bars = [];
+      expect(() => (component as any).syncView(chart)).not.toThrow();
+    });
+
+    it('a failing request (HTTP error path of the service) surfaces the failed state', async () => {
+      stubCanvas();
+      httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+      await fixture.whenStable();
+      vi.spyOn((component as any).chartDataService, 'getOHLCV').mockReturnValue(throwError(() => new Error('x')));
+      const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      component.loadChartData('msft', '1d');
+      expect(component.errorKind).toBe('failed');
+      expect(component.loading).toBe(false);
+      err.mockRestore();
+    });
+
+    it('rehydrated unknown indicator types are skipped, not fatal', async () => {
+      sessionStorage.clear();
+      const st = TestBed.inject(ChartStateService);
+      st.addIndicator({ type: 'sma', period: 5 });
+      st.addIndicator({ type: 'bogus', period: 3 });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const chart: any = await loaded();
+      expect(chart.data.datasets.map((d: any) => d.label)).toEqual(expect.arrayContaining(['SMA 5']));
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
+    });
+  });
+
   describe('error & loading states (6.3)', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
 
