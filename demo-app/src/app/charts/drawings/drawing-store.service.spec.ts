@@ -49,4 +49,38 @@ describe('DrawingStore (10.3)', () => {
     sessionStorage.setItem('chart-drawings', JSON.stringify({ msft: [{ id: 'x' }, d('ok'), null] }));
     expect(make().list('msft').map((x) => x.id)).toEqual(['ok']);
   });
+
+  it('accepts the new drawing types with their payloads and drops malformed ones', () => {
+    sessionStorage.setItem('chart-drawings', JSON.stringify({ msft: [
+      { id: '1', type: 'hline', a: { t: 1, p: 5 } },
+      { id: '2', type: 'text', a: { t: 1, p: 5 }, text: 'hello', style: { color: '#fff', width: 2, dash: 'dot', junk: 1 } },
+      { id: '3', type: 'brush', a: { t: 1, p: 1 }, pts: [{ t: 1, p: 1 }, { t: 2, p: 2 }] },
+      { id: '4', type: 'brush', a: { t: 1, p: 1 }, pts: [{ t: 'x' }] },
+      { id: '5', type: 'fib', a: { t: 1, p: 1 }, b: { t: 2, p: 2 } },
+      { id: '6', type: 'wat', a: { t: 1, p: 1 } },
+      { id: '7', type: 'rect', a: { t: 1, p: 1 }, b: { t: 2, p: 2 }, text: 5 },
+    ] }));
+    const list = make().list('msft');
+    expect(list.map((d) => d.id)).toEqual(['1', '2', '3', '5']);
+    expect(list[1].text).toBe('hello');
+    expect(list[1].style).toEqual({ color: '#fff', width: 2, dash: 'dot' });
+    expect(list[2].pts!.length).toBe(2);
+  });
+
+  it('lock + hide flags persist, default off, and are independent of symbol', () => {
+    const s = make();
+    expect(s.locked()).toBe(false);
+    expect(s.hidden()).toBe(false);
+    s.toggleLocked();
+    s.toggleHidden();
+    expect(s.locked()).toBe(true);
+    expect(s.hidden()).toBe(true);
+    TestBed.resetTestingModule();
+    const again = make();
+    expect(again.locked()).toBe(true);
+    expect(again.hidden()).toBe(true);
+    again.setHidden(false);
+    expect(again.hidden()).toBe(false);
+    expect(again.revision()).toBeGreaterThan(0);
+  });
 });
