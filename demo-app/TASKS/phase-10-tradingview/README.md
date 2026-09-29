@@ -40,7 +40,7 @@ row per instance, visibility eye, label template).
 **Verify:** hover a bar → legend OHLC values update live (screenshot sequence);
 eye toggle hides/shows the indicator series; pixel-verified.
 
-### 10.3 — Drawing Tools (trendlines, horizontal rays, channels)
+### 10.3 — Drawing Tools (trendlines, horizontal rays, channels) — DONE 2026-09-29
 **Files:** new `chart-drawings` component + drawing store service (sessionStorage
 persistence), chartjs-plugin-annotation (ADD dependency).
 **Spec:** v2 scope per original inventory (drawings/*): trendline (2-point),
@@ -49,7 +49,7 @@ select, Del to remove; persisted per symbol in sessionStorage.
 **Verify:** draw a trendline → appears + survives refresh; remove works;
 annotations don't break zoom/pan (3.2) — annotation plugin scales with the chart.
 
-### 10.4 — Multi-Pane Layout (true panes, per-pane Y)
+### 10.4 — Multi-Pane Layout (true panes, per-pane Y) — DONE (delivered in 5.4)
 **Files:** chart-viewer template (panes stacked), pane layout service.
 **Spec:** upgrade the v1 dual-axis single canvas to TradingView's true pane model:
 price pane (~70%), volume pane (~15%, own scale), indicator panes (~15% each);
@@ -90,3 +90,17 @@ render (pixel-verified different signature per type).
 - Timeframe buttons with active state already existed (4.3); the interval select keeps the demo's disabled intraday options.
 - Deferred: the symbol quick-search *dialog* (port of `ui/quick_search_dialog.py`) — the symbol input with datalist covers the demo's 8 symbols; a dialog only pays off with a real symbol universe (9.1).
 - Tests: state spec (+2), viewer "chart types + tools" (9), e2e `tools (10.5)` (four types paint four different pixel signatures, area > line, persistence, magnet, real download event, wheel-zoom then dblclick reset, fullscreen click safe). Screenshot `docs/screenshots/10.5-area-magnet-dark.png`. e2e 24 passed; coverage gate PASS.
+
+## 10.3 results (DONE)
+- **Tools** (vertical strip on the chart's left edge, like TradingView): cursor, trend line (drag A→B), horizontal ray (click a price), parallel channel (drag the base line, then click for the offset; shaded), Clear-all. Draft previews are dashed; a bare click with a tool creates nothing; Escape cancels.
+- **Cursor tool**: click selects the nearest drawing (handles appear), drag a handle moves that endpoint, drag the body moves the whole drawing, Delete/Backspace removes it (ignored while typing in an input/select). Pan is disabled while a drawing tool is active (zoom plugin option toggled + updated) and restored for the cursor; wheel zoom always works.
+- **Data model**: anchors are `(timestamp, price)`, so drawings stay on their date across daily/weekly switches, zoom/pan and the LOD windowing. Stored per symbol in sessionStorage (`chart-drawings`), validated on load. Drawn on the price pane only, clipped to it.
+- **Code**: `charts/drawings/` — `drawing-geometry.ts` (time↔index, hit-test distances), `drawing-store.service.ts`, `drawing-controller.ts` (pointer/keyboard state machine, DOM-free, unit-tested with a fake chart), `drawings` canvas plugin in the viewer. Tokens `--c-drawing`, `--c-drawing-fill` (light + dark).
+- **Deviation:** implemented as our own canvas plugin instead of adding `chartjs-plugin-annotation`: index-based annotation coordinates fight the bar-index/LOD x-scale (they'd need re-mapping on every window change), interactive placement/dragging needs custom pointer handling anyway, and it avoids a dependency. Bug found by the e2e: the controller was attached after the chart's first render, so a rebuilt chart (interval switch) didn't show drawings until the next update — now redrawn on attach.
+- Tests: geometry (5), store (4), controller (11), viewer drawing specs (5), e2e `drawings.spec` (3: trend draw/render/refresh/select/drag/delete/pan-off/zoom, ray + channel + per-symbol isolation + Clear, daily→weekly anchoring in dark mode). Screenshot `docs/screenshots/10.3-drawings-dark.png`.
+
+## 10.4 results (DONE via 5.4)
+Price / volume / indicator panes are stacked y-scales of ONE chart (`stack:'panel'`, weights 6 : 1.5 : 2 per indicator), each with its own y-axis (indicator panes auto-fit or fixed, e.g. RSI 0–100), one shared x-axis, thin separators, zoom/pan/crosshair spanning every pane; verified pixel-level in `e2e/layout.spec` (4 viewport sizes: panes contiguous, axes aligned) and `e2e/chart.spec`. Not done (stretch in the task text): dragging pane borders to resize.
+
+## Phase 10 summary
+10.1 dark theme · 10.2 legend rows · 10.3 drawings · 10.4 panes · 10.5 chart types/tools — all DONE; open items: symbol quick-search dialog (10.5), pane-border resizing (10.4), side-by-side comparison against live TradingView screenshots (no access from this environment).

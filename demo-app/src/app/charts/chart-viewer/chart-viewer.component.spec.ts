@@ -428,6 +428,87 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('drawing tools (10.3)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); TestBed.inject(ChartStateService).reset(); };
+
+    it('tool buttons select the active tool (aria-pressed) and only the cursor tool leaves pan enabled', async () => {
+      fresh();
+      const chart: any = await loaded();
+      expect(q('[data-tool="cursor"]')!.getAttribute('aria-pressed')).toBe('true');
+      expect(chart.options.plugins.zoom.pan.enabled).toBe(true);
+      (q('[data-tool="trend"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('[data-tool="trend"]')!.getAttribute('aria-pressed')).toBe('true');
+      expect(q('[data-tool="cursor"]')!.getAttribute('aria-pressed')).toBe('false');
+      expect(chart.options.plugins.zoom.pan.enabled).toBe(false);
+      (q('[data-tool="cursor"]') as HTMLButtonElement).click();
+      expect(chart.options.plugins.zoom.pan.enabled).toBe(true);
+    });
+
+    it('a chart rebuild (e.g. indicator toggle) keeps pan disabled while a drawing tool is active', async () => {
+      fresh();
+      await loaded();
+      component.setTool('ray');
+      TestBed.inject(ChartStateService).addIndicator({ type: 'sma', period: 2 });
+      await fixture.whenStable();
+      expect((Chart.getChart(component.chartCanvas!.nativeElement) as any).options.plugins.zoom.pan.enabled).toBe(false);
+    });
+
+    it('canvas mouse events reach the controller with canvas-relative coordinates; Clear empties the symbol\'s drawings', async () => {
+      fresh();
+      await loaded();
+      const store = TestBed.inject((await import('../drawings/drawing-store.service')).DrawingStore);
+      store.add('msft', { id: 'x', type: 'ray', a: { t: 1, p: 1 } });
+      component.setTool('trend');
+      const ctl: any = (component as any).drawings;
+      const down = vi.spyOn(ctl, 'pointerDown').mockImplementation(() => undefined);
+      const move = vi.spyOn(ctl, 'pointerMove').mockImplementation(() => undefined);
+      const up = vi.spyOn(ctl, 'pointerUp').mockImplementation(() => undefined);
+      Object.defineProperty(MouseEvent.prototype, 'offsetX', { get: () => 12, configurable: true });
+      Object.defineProperty(MouseEvent.prototype, 'offsetY', { get: () => 34, configurable: true });
+      const canvas = component.chartCanvas!.nativeElement;
+      canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      canvas.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, buttons: 1 }));
+      canvas.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      delete (MouseEvent.prototype as any).offsetX;
+      delete (MouseEvent.prototype as any).offsetY;
+      expect(down).toHaveBeenCalledWith(12, 34);
+      expect(move).toHaveBeenCalledWith(12, 34);
+      expect(up).toHaveBeenCalledWith(12, 34);
+      down.mockRestore(); move.mockRestore(); up.mockRestore();
+      (q('[data-tool-clear]') as HTMLButtonElement).click();
+      expect(store.list('msft')).toEqual([]);
+    });
+
+    it('drawings render without breaking the chart draw cycle (plugin handles rays, trends, channels, drafts)', async () => {
+      fresh();
+      const chart: any = await loaded();
+      const store = TestBed.inject((await import('../drawings/drawing-store.service')).DrawingStore);
+      const t0 = chart.data.datasets[0].data[0].t;
+      const t1 = chart.data.datasets[0].data[2].t;
+      store.add('msft', { id: 'r', type: 'ray', a: { t: t0, p: 100 } });
+      store.add('msft', { id: 't', type: 'trend', a: { t: t0, p: 100 }, b: { t: t1, p: 120 } });
+      store.add('msft', { id: 'c', type: 'channel', a: { t: t0, p: 100 }, b: { t: t1, p: 120 }, offset: 5 });
+      expect(() => chart.draw()).not.toThrow();
+      (component as any).drawings.pointerDown(chart.chartArea.left + 5, (chart.scales.y.top + chart.scales.y.bottom) / 2);
+      expect(() => chart.draw()).not.toThrow(); // draft path
+    });
+
+    it('key handling ignores form fields (Delete in the symbol box must not delete a drawing)', async () => {
+      fresh();
+      await loaded();
+      const spy = vi.spyOn((component as any).drawings, 'key');
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+      expect(spy).not.toHaveBeenCalled();
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+      expect(spy).toHaveBeenCalledWith('Delete');
+      input.remove();
+    });
+  });
+
   describe('chart types + tools (10.5)', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const fresh = () => { sessionStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };

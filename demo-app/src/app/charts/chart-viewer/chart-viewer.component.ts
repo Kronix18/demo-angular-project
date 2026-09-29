@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef, signal, computed } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef, signal, computed } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService, AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
@@ -15,6 +15,8 @@ import { OutputSpec } from '../../core/indicators/indicator-definitions';
 import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
+import { DrawingController, Tool } from '../drawings/drawing-controller';
+import { DrawingStore } from '../drawings/drawing-store.service';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
 // anywhere — it registers registerables + adapter + zoom + the financial
@@ -120,6 +122,64 @@ const paneDecorPlugin = {
 };
 Chart.register(paneDecorPlugin);
 
+/**
+ * Drawing renderer (10.3): trend lines, horizontal rays and parallel channels
+ * from the DrawingController's view, clipped to the price pane. Anchors are
+ * (time, price), so drawings follow zoom/pan/LOD/interval changes.
+ */
+const drawingsPlugin = {
+  id: 'drawings',
+  afterDatasetsDraw(chart: any): void {
+    const ctl: DrawingController | undefined = chart.$drawings;
+    const { ctx, chartArea } = chart;
+    const ys = chart.scales?.y;
+    if (!ctl || !ctx || !chartArea || !ys) return;
+    const v = ctl.view();
+    if (!v.drawings.length && !v.draft) return;
+    const color = cssVar('--c-drawing');
+    const fill = cssVar('--c-drawing-fill');
+    const surface = cssVar('--c-chart-bg');
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chartArea.left, ys.top, chartArea.right - chartArea.left, ys.bottom - ys.top);
+    ctx.clip();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = color;
+    const line = (x1: number, y1: number, x2: number, y2: number) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+    const draw = (d: any, selected: boolean, draft: boolean) => {
+      const a = ctl.pixel(d.a);
+      if (!a) return;
+      ctx.setLineDash(draft ? [5, 4] : []);
+      if (d.type === 'ray') {
+        line(a.x, a.y, chartArea.right, a.y);
+      } else {
+        const b = ctl.pixel(d.b);
+        if (!b) return;
+        line(a.x, a.y, b.x, b.y);
+        if (d.type === 'channel' && d.offset !== undefined) {
+          const a2 = ctl.pixel({ t: d.a.t, p: d.a.p + d.offset })!;
+          const b2 = ctl.pixel({ t: d.b.t, p: d.b.p + d.offset })!;
+          line(a2.x, a2.y, b2.x, b2.y);
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(b2.x, b2.y); ctx.lineTo(a2.x, a2.y); ctx.closePath();
+          ctx.fillStyle = fill;
+          ctx.fill();
+        }
+      }
+      if (selected) {
+        ctx.setLineDash([]);
+        ctx.fillStyle = surface;
+        const pts = [a, d.b ? ctl.pixel(d.b) : null].filter(Boolean) as { x: number; y: number }[];
+        for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      }
+    };
+    for (const d of v.drawings) draw(d, d.id === v.selectedId, false);
+    if (v.draft) draw(v.draft, false, true);
+    ctx.restore();
+  },
+};
+Chart.register(drawingsPlugin);
+
 /** Compact volume formatting (Kevin): 1,000,000 → 1M, 100,000 → 100K,
  *  1,000,000,000 → 1B, 1,500 → 1.5K, 1,000 → 1K (no trailing .0). */
 function compactVolume(v: number): string {
@@ -194,7 +254,16 @@ type DataBuilder = (pts: LodPoint[]) => any[];
       </header>
 
       <div class="chart-panel" data-pane="panel">
-        <canvas #chartCanvas [attr.hidden]="error ? '' : null" (dblclick)="resetZoom()"></canvas>
+        <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="tool() !== 'cursor'" (dblclick)="resetZoom()"
+          (mousedown)="pointer('down', $event)" (mousemove)="pointer('move', $event)" (mouseup)="pointer('up', $event)"></canvas>
+        <div class="draw-tools" role="group" aria-label="Drawing tools">
+          @for (t of drawTools; track t.id) {
+            <button type="button" class="draw-btn" [attr.data-tool]="t.id" [attr.aria-pressed]="tool() === t.id"
+              [attr.aria-label]="t.title" [title]="t.title" (click)="setTool(t.id)">{{ t.icon }}</button>
+          }
+          <button type="button" class="draw-btn" data-tool-clear aria-label="Delete all drawings on this symbol"
+            title="Delete all drawings on this symbol" (click)="clearDrawings()">⌫</button>
+        </div>
         @if (!error) {
           <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" />
         }
@@ -255,6 +324,7 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         overflow: hidden;
         background: var(--c-chart-bg);
       }
+      canvas.drawing { cursor: crosshair; }
       canvas {
         position: absolute;
         inset: 0;
@@ -315,6 +385,17 @@ type DataBuilder = (pts: LodPoint[]) => any[];
       }
       .retry-btn { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
       .symbol-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
+      .draw-tools {
+        position: absolute; left: 4px; top: 50%; transform: translateY(-50%); z-index: 4;
+        display: flex; flex-direction: column; gap: 2px; padding: 2px;
+        background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius);
+      }
+      .draw-btn {
+        width: 28px; height: 28px; padding: 0; border: none; border-radius: var(--border-radius-sm);
+        background: transparent; color: var(--c-text); cursor: pointer; font-size: 1rem; line-height: 1;
+      }
+      .draw-btn:hover { background: var(--c-primary-tint); color: var(--c-primary); }
+      .draw-btn[aria-pressed='true'] { background: var(--c-primary); color: var(--c-on-primary); }
       .chart-tools { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
       .chart-tools select, .tool-btn {
         padding: 0.25rem 0.5rem;
@@ -371,6 +452,58 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private allData: OHLCV[] = [];
   /** Bars the chart indexes into (weekly-aggregated when interval = 1w). */
   private bars: OHLCV[] = [];
+  // ---- drawings (10.3) ---------------------------------------------------------------
+  private drawingStore = inject(DrawingStore);
+  readonly tool = signal<Tool>('cursor');
+  readonly drawTools: { id: Tool; icon: string; title: string }[] = [
+    { id: 'cursor', icon: '↖', title: 'Cursor: select / move drawings, pan the chart' },
+    { id: 'trend', icon: '⟋', title: 'Trend line: drag from point A to B' },
+    { id: 'ray', icon: '⟶', title: 'Horizontal ray: click a price level' },
+    { id: 'channel', icon: '⫽', title: 'Parallel channel: drag the base line, then click the offset' },
+  ];
+  private drawings = new DrawingController({
+    chart: () => this.chart,
+    bars: () => this.bars,
+    store: this.drawingStore,
+    symbol: () => this.currentSymbol,
+    tool: () => this.tool(),
+    changed: () => this.chart?.draw(),
+  });
+
+  setTool(t: Tool): void {
+    this.tool.set(t);
+    this.drawings.cancel();
+    this.drawings.syncPan();
+  }
+
+  clearDrawings(): void {
+    this.drawingStore.clear(this.currentSymbol);
+    this.drawings.cancel();
+  }
+
+  pointer(kind: 'down' | 'move' | 'up', e: MouseEvent): void {
+    if (this.tool() === 'cursor' && kind === 'move' && !e.buttons) return; // hover: nothing to do
+    if (kind === 'down') this.drawings.pointerDown(e.offsetX, e.offsetY);
+    else if (kind === 'move') this.drawings.pointerMove(e.offsetX, e.offsetY);
+    else this.drawings.pointerUp(e.offsetX, e.offsetY);
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKey(e: KeyboardEvent): void {
+    const t = e.target as HTMLElement | null;
+    if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    this.drawings.key(e.key);
+  }
+
+  @HostListener('window:mouseup', ['$event'])
+  onWindowMouseUp(e: MouseEvent): void {
+    // finish a drag that ended outside the canvas
+    if (e.target !== this.chartCanvas?.nativeElement) {
+      const r = this.chartCanvas?.nativeElement.getBoundingClientRect();
+      if (r) this.drawings.pointerUp(e.clientX - r.left, e.clientY - r.top);
+    }
+  }
+
   // ---- tools (10.5) --------------------------------------------------------------
   readonly chartTypes = CHART_TYPES;
   readonly typeLabels: Record<ChartType, string> = { candles: 'Candles', ohlc: 'Bars (OHLC)', line: 'Line', area: 'Area' };
@@ -828,6 +961,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     });
 
     (this.chart as any).$magnet = this.chartState.snapshot().magnet;
+    (this.chart as any).$drawings = this.drawings;
+    this.drawings.syncPan();
+    this.chart.draw(); // the constructor's first render ran before the controller was attached
     this.legendSource.set({ series: legendSeries, paneKeys: panes.length });
     this.hoverIndex.set(null);
     // Dev-only test handle for the Playwright verification scripts.
