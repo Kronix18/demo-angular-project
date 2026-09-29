@@ -948,6 +948,75 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('layout, scale bar, cursors (11.8)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const qa = (sel: string) => Array.from(fixture.nativeElement.querySelectorAll(sel)) as HTMLElement[];
+    const fresh = () => { sessionStorage.clear(); localStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+
+    it('the drawing sidebar is a fixed column beside the chart panel (not floating inside it)', async () => {
+      fresh();
+      await loaded();
+      expect(q('.chart-body > app-drawing-sidebar')).toBeTruthy();
+      expect(q('.chart-body > .chart-panel')).toBeTruthy();
+      expect(q('.chart-panel app-drawing-sidebar')).toBeNull();
+    });
+
+    it('percent scale: the price axis reads % change from the first visible bar (and the state persists)', async () => {
+      const st = fresh();
+      await loaded();
+      (q('[data-percent]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().percentScale).toBe(true);
+      expect(q('[data-percent]')!.getAttribute('aria-pressed')).toBe('true');
+      const bars = (component as any).bars as { close: number }[];
+      const cb = chartOf().options.scales.y.ticks.callback;
+      const base = bars[Math.max(0, Math.round(chartOf().scales.x.min))].close;
+      expect(cb(base)).toBe('0.00%');
+      expect(cb(base * 1.1)).toBe('+10.00%');
+      expect(cb(base * 0.95)).toBe('-5.00%');
+    });
+
+    it('invert scale flips the price axis', async () => {
+      const st = fresh();
+      await loaded();
+      expect(chartOf().options.scales.y.reverse).toBeFalsy();
+      (q('[data-invert]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      expect(st.snapshot().invertScale).toBe(true);
+      expect(chartOf().options.scales.y.reverse).toBe(true);
+    });
+
+    it('zoom in / out buttons change the visible span; "reset" restores the framing', async () => {
+      fresh();
+      await loaded();
+      const span = () => chartOf().scales.x.max - chartOf().scales.x.min;
+      const s0 = span();
+      (q('[data-zoom-in]') as HTMLButtonElement).click();
+      expect(span()).toBeLessThan(s0);
+      (q('[data-zoom-out]') as HTMLButtonElement).click();
+      (q('[data-zoom-out]') as HTMLButtonElement).click();
+      expect(span()).toBeGreaterThanOrEqual(s0 * 0.99);
+    });
+
+    it('cursor group: cross, dot, arrow, eraser — the crosshair follows the choice', async () => {
+      fresh();
+      await loaded();
+      (q('[data-flyout="cursors"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(qa('[data-flyout-tool]').map((b) => b.dataset['flyoutTool'])).toEqual(['cursor', 'dot', 'pointer', 'eraser']);
+      (q('[data-flyout-tool="dot"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(component.tool()).toBe('dot');
+      expect(chartOf().$cursorStyle).toBe('dot');
+      component.setTool('pointer');
+      expect(chartOf().$cursorStyle).toBe('pointer');
+      component.setTool('trend');
+      expect(chartOf().$cursorStyle).toBe('cross');
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>

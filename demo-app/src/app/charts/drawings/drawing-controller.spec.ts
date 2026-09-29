@@ -393,4 +393,32 @@ describe('DrawingController (10.3)', () => {
       expect(store.list('msft')[0].pts!.map((p) => p.p)).toEqual([60, 100, 70]);
     });
   });
+
+  describe('cursors and eraser (11.8)', () => {
+    it('dot and pointer cursors select / move like the cross cursor', () => {
+      store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 } });
+      for (const t of ['dot', 'pointer'] as const) {
+        tool = t;
+        ctl.pointerDown(200, 170); ctl.pointerUp(200, 170);
+        expect(ctl.view().selectedId, t).toBe('h');
+        ctl.pointerDown(400, 20); ctl.pointerUp(400, 20);
+        expect(ctl.view().selectedId, t).toBeNull();
+      }
+    });
+
+    it('eraser deletes the drawing under the pointer (nothing elsewhere; nothing while locked)', () => {
+      store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 } });
+      store.add('msft', { id: 'v', type: 'vline', a: { t: bars[40].timestamp, p: 30 } });
+      tool = 'eraser';
+      ctl.pointerDown(300, 20); ctl.pointerUp(300, 20);
+      expect(store.list('msft').length).toBe(2);
+      store.toggleLocked();
+      ctl.pointerDown(200, 170); ctl.pointerUp(200, 170);
+      expect(store.list('msft').length).toBe(2);
+      store.toggleLocked();
+      ctl.pointerDown(200, 170); ctl.pointerUp(200, 170);
+      expect(store.list('msft').map((d) => d.id)).toEqual(['v']);
+      expect(tool).toBe('eraser'); // the eraser stays active
+    });
+  });
 });

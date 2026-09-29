@@ -197,4 +197,19 @@ describe('ChartStateService (task 4.1)', () => {
     expect(svc.snapshot().price).toEqual({ up: '#112233', byPrevClose: true });
     expect(svc.snapshot().volume).toEqual({});
   });
+
+  it('percent + invert scale (11.8): default off, toggle, persist', () => {
+    const svc = TestBed.inject(ChartStateService);
+    expect(svc.snapshot().percentScale).toBe(false);
+    expect(svc.snapshot().invertScale).toBe(false);
+    svc.togglePercentScale();
+    svc.toggleInvertScale();
+    expect(svc.snapshot().percentScale).toBe(true);
+    expect(svc.snapshot().invertScale).toBe(true);
+    expect(JSON.parse(sessionStorage.getItem('chart-state')!)).toMatchObject({ percentScale: true, invertScale: true });
+    sessionStorage.setItem('chart-state', JSON.stringify({ percentScale: 'yes', invertScale: true }));
+    const again = new ChartStateService();
+    expect(again.snapshot().percentScale).toBe(false);
+    expect(again.snapshot().invertScale).toBe(true);
+  });
 });
