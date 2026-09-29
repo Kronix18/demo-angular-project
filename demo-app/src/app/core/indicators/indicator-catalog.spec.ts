@@ -38,4 +38,28 @@ describe('indicator catalog (5.2) — state entry → calculation + placement', 
     expect(resolveEntry({ type: 'wma', period: 10 }).params).toEqual({ method: 'WMA', source: 'close', length: 10 });
     expect(resolveEntry({ type: 'rma', period: 14 }).kind).toBe('overlay');
   });
+
+  it('entry params override the catalog defaults and drive the label (SMA switched to EMA reads "EMA 34")', () => {
+    const r = resolveEntry({ type: 'sma', period: 20, params: { method: 'EMA', length: 34, source: 'hl2' } });
+    expect(r.params).toMatchObject({ method: 'EMA', length: 34, source: 'hl2' });
+    expect(r.label).toBe('EMA 34');
+    expect(resolveEntry({ type: 'rsi', period: 14, params: { length: 9 } }).label).toBe('RSI 9');
+  });
+
+  it('carries per-output styles and per-interval visibility through', () => {
+    const r = resolveEntry({ type: 'rsi', period: 14, styles: { rsi: { color: '#ff0000', width: 3, dash: 'dot', visible: true } }, intervals: ['1d'] });
+    expect(r.styles['rsi']).toEqual({ color: '#ff0000', width: 3, dash: 'dot', visible: true });
+    expect(r.visibleOn('1d')).toBe(true);
+    expect(r.visibleOn('1w')).toBe(false);
+    expect(resolveEntry({ type: 'rsi', period: 14 }).visibleOn('1w')).toBe(true); // no restriction = every timeframe
+  });
+
+  it('catalog items know their category and a description for the picker', () => {
+    for (const c of INDICATOR_CATALOG) {
+      expect(c.category.length).toBeGreaterThan(0);
+      expect(c.description.length).toBeGreaterThan(10);
+    }
+    expect(catalogItem('rsi')!.category).toBe('Momentum');
+    expect(catalogItem('sma')!.category).toBe('Trend');
+  });
 });
