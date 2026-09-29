@@ -421,4 +421,28 @@ describe('DrawingController (10.3)', () => {
       expect(tool).toBe('eraser'); // the eraser stays active
     });
   });
+
+  describe('clone (11.10)', () => {
+    it('clone duplicates the selected drawing a few bars to the right and selects the copy', () => {
+      store.add('msft', { id: 'h', type: 'trend', a: { t: bars[5].timestamp, p: 30 }, b: { t: bars[10].timestamp, p: 60 }, style: { color: '#ff0000' } });
+      ctl.pointerDown(75, 155); ctl.pointerUp(75, 155);
+      expect(ctl.view().selectedId).toBe('h');
+      const id = ctl.clone();
+      expect(id).toBeTruthy();
+      const list = store.list('msft');
+      expect(list.length).toBe(2);
+      expect(list[1].a.t).toBe(bars[8].timestamp);
+      expect(list[1].b!.t).toBe(bars[13].timestamp);
+      expect(list[1].style).toEqual({ color: '#ff0000' });
+      expect(ctl.view().selectedId).toBe(id);
+    });
+
+    it('nothing to clone without a selection, or while locked', () => {
+      expect(ctl.clone()).toBeNull();
+      store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 } });
+      ctl.pointerDown(200, 170); ctl.pointerUp(200, 170);
+      store.toggleLocked();
+      expect(ctl.clone()).toBeNull();
+    });
+  });
 });

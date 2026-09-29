@@ -83,10 +83,22 @@ function labelled(P: Pt[], names: string[]): Shape[] {
 const dist = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.y - q.y);
 const ratio = (a: number, b: number) => (b ? Math.abs(a / b).toFixed(3) : '–');
 
+const mid = (p: Pt, q: Pt): Pt => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
+
+/** Andrews pitchfork: median from `start` through the middle of b–c, parallels through b and c. */
+function pitchfork(P: Pt[], start: Pt): Shape[] {
+  const m = mid(P[1], P[2]);
+  const v = { x: m.x - start.x, y: m.y - start.y };
+  const par = (p: Pt) => seg(p, { x: p.x + v.x, y: p.y + v.y }, { ext: 'right' });
+  return [seg(start, m, { ext: 'right' }), par(P[1]), par(P[2]), seg(P[1], P[2], { dash: DOT, role: 'muted' })];
+}
+
 const FIB_TIME = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144];
 const GANN = [[8, '1x8'], [4, '1x4'], [3, '1x3'], [2, '1x2'], [1, '1x1'], [1 / 2, '2x1'], [1 / 3, '3x1'], [1 / 4, '4x1'], [1 / 8, '8x1']] as const;
 const ICON: Record<string, [string, Role | undefined]> = {
   iconup: ['▲', 'up'], icondown: ['▼', 'down'], iconcheck: ['✔', 'up'], iconcross: ['✖', 'down'], iconstar: ['★', undefined], iconflag: ['⚑', undefined],
+  iconheart: ['❤', 'down'], iconthumb: ['👍', undefined], iconfire: ['🔥', undefined], iconrocket: ['🚀', undefined],
+  iconwarn: ['⚠', undefined], iconbulb: ['💡', undefined], iconbell: ['🔔', undefined], icondollar: ['$', 'up'],
 };
 
 /** Least-squares line through the closes between two anchors: fitted end prices and the residual σ. */
@@ -218,11 +230,83 @@ const BUILDERS: Record<string, Builder> = {
       return [seg(P[0], q, { ext: 'right', wm: s === 1 ? 1.2 : 0.8 }), label({ x: q.x + 4, y: q.y }, name, { role: 'text' })];
     });
   },
-  pitchfork: ({ P }) => {
-    const m = { x: (P[1].x + P[2].x) / 2, y: (P[1].y + P[2].y) / 2 };
+  pitchfork: ({ P }) => pitchfork(P, P[0]),
+  schiff: ({ P }) => pitchfork(P, { x: P[0].x, y: (P[0].y + P[1].y) / 2 }),
+  modschiff: ({ P }) => pitchfork(P, { x: (P[0].x + P[1].x) / 2, y: (P[0].y + P[1].y) / 2 }),
+  insidepitchfork: ({ P }) => {
+    const m = mid(P[1], P[2]);
     const v = { x: m.x - P[0].x, y: m.y - P[0].y };
-    const par = (p: Pt) => seg(p, { x: p.x + v.x, y: p.y + v.y }, { ext: 'right' });
-    return [seg(P[0], m, { ext: 'right' }), par(P[1]), par(P[2]), seg(P[1], P[2], { dash: DOT, role: 'muted' })];
+    const inner = (p: Pt) => seg(p, { x: p.x + v.x, y: p.y + v.y }, { ext: 'right', dash: DOT, wm: 0.8 });
+    return [...pitchfork(P, P[0]), inner(mid(P[1], m)), inner(mid(m, P[2]))];
+  },
+  pitchfan: ({ P }) => [0, 0.25, 0.382, 0.5, 0.618, 0.75, 1].map((f) =>
+    seg(P[0], { x: P[1].x + (P[2].x - P[1].x) * f, y: P[1].y + (P[2].y - P[1].y) * f }, { ext: 'right', wm: f === 0.5 ? 1.2 : 0.8 })),
+  fibarcs: ({ P }) => {
+    const R = dist(P[0], P[1]);
+    const dir = Math.atan2(P[0].y - P[1].y, P[0].x - P[1].x);
+    return [seg(P[0], P[1], { dash: DOT }), ...[0.236, 0.382, 0.5, 0.618, 0.786, 1].flatMap((lv): Shape[] => {
+      const pts = Array.from({ length: 33 }, (_, i) => { const a = dir - Math.PI / 2 + (Math.PI * i) / 32; return { x: P[1].x + R * lv * Math.cos(a), y: P[1].y + R * lv * Math.sin(a) }; });
+      return [{ k: 'poly', pts, wm: 0.8 }, label({ x: pts[16].x + 4, y: pts[16].y }, String(lv), { role: 'text' })];
+    })];
+  },
+  fibspiral: ({ P }) => {
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const d = dist(P[0], P[1]);
+    const a0 = Math.atan2(P[1].y - P[0].y, P[1].x - P[0].x);
+    const pts = Array.from({ length: 97 }, (_, i) => { const th = (3 * Math.PI * i) / 96; const r = (d / phi ** 3) * phi ** (th / (Math.PI / 2)); return { x: P[0].x + r * Math.cos(a0 + th), y: P[0].y + r * Math.sin(a0 + th) }; });
+    return [{ k: 'poly', pts }, seg(P[0], P[1], { dash: DOT, role: 'muted' })];
+  },
+  fibwedge: ({ P }) => {
+    const R = dist(P[0], P[1]);
+    const a1 = Math.atan2(P[1].y - P[0].y, P[1].x - P[0].x);
+    let a2 = Math.atan2(P[2].y - P[0].y, P[2].x - P[0].x);
+    while (a2 - a1 > Math.PI) a2 -= 2 * Math.PI;
+    while (a2 - a1 < -Math.PI) a2 += 2 * Math.PI;
+    return [seg(P[0], P[1], { ext: 'right' }), seg(P[0], P[2], { ext: 'right' }), ...[0.236, 0.382, 0.5, 0.618, 0.786, 1].map((lv): Shape => ({
+      k: 'poly', wm: 0.7, pts: Array.from({ length: 25 }, (_, i) => { const a = a1 + ((a2 - a1) * i) / 24; return { x: P[0].x + R * lv * Math.cos(a), y: P[0].y + R * lv * Math.sin(a) }; }),
+    }))];
+  },
+  fibtimetrend: ({ P, env }) => {
+    const dx = P[1].x - P[0].x;
+    if (Math.abs(dx) < 1e-6) return [];
+    const out: Shape[] = [];
+    for (const m of FIB_TIME) {
+      const x = P[2].x + dx * m;
+      if (x > env.area.right + 1 || x < env.area.left - 1) continue;
+      out.push(seg({ x, y: env.full.top }, { x, y: env.full.bottom }, { chart: true, wm: 0.7 }), label({ x: x + 3, y: env.full.top + 10 }, String(m), { role: 'text', chart: true }));
+    }
+    return [...out, seg(P[0], P[1], { dash: DOT, role: 'muted' }), seg(P[1], P[2], { dash: DOT, role: 'muted' })];
+  },
+  gannsquare: ({ P }) => {
+    const l = Math.min(P[0].x, P[1].x), r = Math.max(P[0].x, P[1].x), t = Math.min(P[0].y, P[1].y), b = Math.max(P[0].y, P[1].y);
+    const out: Shape[] = [{ k: 'rect', x: l, y: t, w: r - l, h: b - t, fill: 0.06 }];
+    for (let i = 1; i < 8; i++) out.push(seg({ x: l, y: t + ((b - t) * i) / 8 }, { x: r, y: t + ((b - t) * i) / 8 }, { dash: DOT, wm: 0.6 }), seg({ x: l + ((r - l) * i) / 8, y: t }, { x: l + ((r - l) * i) / 8, y: b }, { dash: DOT, wm: 0.6 }));
+    out.push(seg({ x: l, y: t }, { x: r, y: b }), seg({ x: l, y: b }, { x: r, y: t }));
+    return out;
+  },
+  flat: ({ P }) => [
+    seg(P[0], P[1]), seg({ x: P[0].x, y: P[2].y }, { x: P[1].x, y: P[2].y }),
+    { k: 'poly', pts: [P[0], P[1], { x: P[1].x, y: P[2].y }, { x: P[0].x, y: P[2].y }], closed: true, fill: 0.1, alpha: 0 },
+  ],
+  cyclic: ({ P, env }) => {
+    const dx = P[1].x - P[0].x;
+    if (Math.abs(dx) < 2) return [];
+    const out: Shape[] = [];
+    for (let k = 0, x = P[0].x; k < 300 && x <= env.area.right + 1 && x >= env.area.left - 1; k++, x += dx) out.push(seg({ x, y: env.full.top }, { x, y: env.full.bottom }, { chart: true, wm: 0.7 }));
+    return out;
+  },
+  timecycles: ({ P, env }) => {
+    const dx = P[1].x - P[0].x;
+    if (Math.abs(dx) < 2) return [];
+    const out: Shape[] = [];
+    for (let k = 0, x = P[0].x; k < 60 && x <= env.area.right + 1 && x >= env.area.left - Math.abs(dx); k++, x += dx) {
+      out.push({ k: 'poly', wm: 0.8, pts: Array.from({ length: 25 }, (_, i) => { const u = i / 24; return { x: x + dx * u, y: P[0].y - Math.sin(Math.PI * u) * (Math.abs(dx) / 2) }; }) });
+    }
+    return out;
+  },
+  sine: ({ P }) => {
+    const m = (P[0].y + P[1].y) / 2, amp = P[0].y - m;
+    return [{ k: 'poly', pts: Array.from({ length: 65 }, (_, i) => { const u = i / 64; return { x: P[0].x + (P[1].x - P[0].x) * u, y: m + amp * Math.cos(2 * Math.PI * u) }; }) }];
   },
 
   xabcd: ({ P }) => {
@@ -299,6 +383,68 @@ const BUILDERS: Record<string, Builder> = {
     ];
   },
 
+  cypher: (c) => BUILDERS['xabcd'](c),
+  elliottdouble: ({ P }) => labelled(P, ['0', 'W', 'X', 'Y']),
+  elliotttriple: ({ P }) => labelled(P, ['0', 'W', 'X', 'Y', 'X', 'Z']),
+
+  projection: ({ P }) => {
+    const v = { x: P[1].x - P[0].x, y: P[1].y - P[0].y };
+    return [{ k: 'arrow', x1: P[0].x, y1: P[0].y, x2: P[1].x, y2: P[1].y }, { k: 'arrow', x1: P[2].x, y1: P[2].y, x2: P[2].x + v.x, y2: P[2].y + v.y, dash: [6, 4] }];
+  },
+  barspattern: ({ A, P, env }) => {
+    const bars = env.bars;
+    if (!bars.length) return [];
+    let i0 = Math.round(indexForTime(bars, A[0].t)), i1 = Math.round(indexForTime(bars, A[1].t));
+    if (i0 > i1) [i0, i1] = [i1, i0];
+    i1 = Math.min(i1, i0 + 150);
+    const dp = A[2].p - bars[i0].close;
+    const x0 = env.px({ t: bars[i0].timestamp, p: 0 }).x;
+    const out: Shape[] = [];
+    for (let i = i0; i <= i1; i++) {
+      const b = bars[i];
+      const y = (price: number) => env.px({ t: b.timestamp, p: price + dp }).y;
+      const x = P[2].x + (env.px({ t: b.timestamp, p: 0 }).x - x0);
+      out.push(seg({ x, y: y(b.high) }, { x, y: y(b.low) }, { role: b.close >= b.open ? 'up' : 'down' }), seg({ x: x - 3, y: y(b.open) }, { x, y: y(b.open) }, { role: b.close >= b.open ? 'up' : 'down' }), seg({ x, y: y(b.close) }, { x: x + 3, y: y(b.close) }, { role: b.close >= b.open ? 'up' : 'down' }));
+    }
+    return out;
+  },
+  volprofile: ({ A, P, env }) => {
+    const bars = env.bars;
+    if (!bars.length) return [];
+    let i0 = Math.round(indexForTime(bars, A[0].t)), i1 = Math.round(indexForTime(bars, A[1].t));
+    if (i0 > i1) [i0, i1] = [i1, i0];
+    const lo = Math.min(A[0].p, A[1].p), hi = Math.max(A[0].p, A[1].p);
+    const N = 24, step = (hi - lo) / N || 1;
+    const vol = new Array<number>(N).fill(0);
+    for (let i = i0; i <= i1; i++) {
+      const tp = (bars[i].high + bars[i].low + bars[i].close) / 3;
+      if (tp >= lo && tp <= hi) vol[Math.min(N - 1, Math.floor((tp - lo) / step))] += bars[i].volume;
+    }
+    const max = Math.max(...vol, 1);
+    const left = Math.min(P[0].x, P[1].x), width = Math.abs(P[1].x - P[0].x) * 0.6;
+    const out: Shape[] = [{ k: 'rect', x: left, y: Math.min(P[0].y, P[1].y), w: Math.abs(P[1].x - P[0].x), h: Math.abs(P[1].y - P[0].y), fill: 0.05 }];
+    vol.forEach((v, k) => {
+      if (!v) return;
+      const yTop = env.px({ t: A[0].t, p: lo + step * (k + 1) }).y, yBot = env.px({ t: A[0].t, p: lo + step * k }).y;
+      out.push({ k: 'rect', x: left, y: Math.min(yTop, yBot) + 0.5, w: (v / max) * width, h: Math.max(1, Math.abs(yBot - yTop) - 1), fill: 0.45, stroke: false, alpha: 0 });
+    });
+    return out;
+  },
+  avwap: ({ A, env }) => {
+    const bars = env.bars;
+    if (!bars.length) return [];
+    const i0 = Math.max(0, Math.round(indexForTime(bars, A[0].t)));
+    let pv = 0, v = 0;
+    const pts: Pt[] = [];
+    for (let i = i0; i < bars.length; i++) {
+      const b = bars[i];
+      pv += ((b.high + b.low + b.close) / 3) * b.volume;
+      v += b.volume;
+      if (v > 0) pts.push(env.px({ t: b.timestamp, p: pv / v }));
+    }
+    return pts.length > 1 ? [{ k: 'poly', pts }, label({ x: pts[pts.length - 1].x - 30, y: pts[pts.length - 1].y - 10 }, 'VWAP', { role: 'text' })] : [];
+  },
+
   brush: ({ P }) => [{ k: 'poly', pts: P }],
   highlighter: ({ P }) => [{ k: 'poly', pts: P, wm: 8, alpha: 0.3 }],
   rect: ({ P }) => [{ k: 'rect', x: Math.min(P[0].x, P[1].x), y: Math.min(P[0].y, P[1].y), w: Math.abs(P[1].x - P[0].x), h: Math.abs(P[1].y - P[0].y), fill: 0.12 }],
@@ -319,10 +465,33 @@ const BUILDERS: Record<string, Builder> = {
   polyline: ({ P }) => [{ k: 'poly', pts: P }],
   path: ({ P }) => [{ k: 'poly', pts: P.slice(0, -1).concat([]), }, { k: 'arrow', x1: P[P.length - 2].x, y1: P[P.length - 2].y, x2: P[P.length - 1].x, y2: P[P.length - 1].y }],
   curve: ({ P }) => [{ k: 'curve', pts: [P[0], P[1], P[2]] }],
+  arc: ({ P }) => {
+    const [p, q, r] = P;
+    const D = 2 * (p.x * (q.y - r.y) + q.x * (r.y - p.y) + r.x * (p.y - q.y));
+    if (Math.abs(D) < 1e-6) return [{ k: 'poly', pts: [p, q, r] }];
+    const sq = (v: Pt) => v.x * v.x + v.y * v.y;
+    const cx = (sq(p) * (q.y - r.y) + sq(q) * (r.y - p.y) + sq(r) * (p.y - q.y)) / D;
+    const cy = (sq(p) * (r.x - q.x) + sq(q) * (p.x - r.x) + sq(r) * (q.x - p.x)) / D;
+    const R = Math.hypot(p.x - cx, p.y - cy);
+    const ang = (v: Pt) => Math.atan2(v.y - cy, v.x - cx);
+    const a0 = ang(p), a1 = ang(q), a2 = ang(r);
+    const norm = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const ccw = norm(a1 - a0) < norm(a2 - a0);
+    const sweep = ccw ? norm(a2 - a0) : -norm(a0 - a2);
+    return [{ k: 'poly', pts: Array.from({ length: 49 }, (_, i) => { const a = a0 + (sweep * i) / 48; return i === 0 ? p : i === 48 ? r : { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }; }) }];
+  },
+  doublecurve: ({ P }) => [{ k: 'poly', pts: Array.from({ length: 41 }, (_, i) => {
+    const t = i / 40, u = 1 - t;
+    return { x: u ** 3 * P[0].x + 3 * u * u * t * P[1].x + 3 * u * t * t * P[2].x + t ** 3 * P[3].x, y: u ** 3 * P[0].y + 3 * u * u * t * P[1].y + 3 * u * t * t * P[2].y + t ** 3 * P[3].y };
+  }) }],
 
   text: ({ d, P }) => [label(P[0], d.text ?? '', { box: 'surface' })],
   note: ({ d, P }) => [label(P[0], d.text ?? '', { box: 'note', role: 'text' })],
   callout: ({ d, P }) => [seg(P[0], P[1], { dash: DOT }), label(P[1], d.text ?? '', { box: 'note', role: 'text' })],
+  pricenote: ({ A, P, env }) => [seg(P[0], P[1], { dash: DOT }), label(P[1], env.fmt(A[0].p), { box: 'surface', align: 'center' })],
+  pin: ({ d, P }) => [seg(P[0], { x: P[0].x, y: P[0].y - 14 }), { k: 'ellipse', cx: P[0].x, cy: P[0].y, rx: 3, ry: 3, fill: 1 }, label({ x: P[0].x, y: P[0].y - 26 }, d.text ?? '', { box: 'note', role: 'text', align: 'center' })],
+  comment: ({ d, P }) => [{ k: 'poly', pts: [P[0], { x: P[0].x - 6, y: P[0].y - 12 }, { x: P[0].x + 6, y: P[0].y - 12 }], closed: true, fill: 0.5 }, label({ x: P[0].x, y: P[0].y - 22 }, d.text ?? '', { box: 'note', role: 'text', align: 'center' })],
+  signpost: ({ d, P }) => [seg(P[0], { x: P[0].x, y: P[0].y - 40 }, { wm: 1.5 }), label({ x: P[0].x, y: P[0].y - 52 }, d.text ?? '', { box: 'note', role: 'text', align: 'center' })],
   pricelabel: ({ A, P, env }) => [label({ x: P[0].x + 4, y: P[0].y }, env.fmt(A[0].p), { box: 'surface' })],
 };
 

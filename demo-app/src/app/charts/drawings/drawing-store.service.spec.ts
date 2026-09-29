@@ -83,4 +83,58 @@ describe('DrawingStore (10.3)', () => {
     expect(again.hidden()).toBe(false);
     expect(again.revision()).toBeGreaterThan(0);
   });
+
+  describe('undo / redo (11.10)', () => {
+    const h = (id: string, price = 10) => ({ id, type: 'hline' as const, a: { t: 1, p: price } });
+
+    it('undo steps back through add / remove / clear and redo replays them, per symbol', () => {
+      const st = new DrawingStore();
+      expect(st.canUndo('msft')).toBe(false);
+      st.add('msft', h('a'));
+      st.add('msft', h('b'));
+      st.add('aapl', h('z'));
+      st.remove('msft', 'a');
+      expect(st.list('msft').map((d) => d.id)).toEqual(['b']);
+      expect(st.undo('msft')).toBe(true);
+      expect(st.list('msft').map((d) => d.id)).toEqual(['a', 'b']);
+      expect(st.undo('msft')).toBe(true);
+      expect(st.list('msft').map((d) => d.id)).toEqual(['a']);
+      expect(st.list('aapl').map((d) => d.id)).toEqual(['z']); // other symbols are untouched
+      expect(st.canRedo('msft')).toBe(true);
+      expect(st.redo('msft')).toBe(true);
+      expect(st.list('msft').map((d) => d.id)).toEqual(['a', 'b']);
+      st.clear('msft');
+      expect(st.undo('msft')).toBe(true);
+      expect(st.list('msft').length).toBe(2);
+    });
+
+    it('a new change clears the redo stack; undo / redo on an empty history do nothing', () => {
+      const st = new DrawingStore();
+      expect(st.undo('msft')).toBe(false);
+      expect(st.redo('msft')).toBe(false);
+      st.add('msft', h('a'));
+      st.undo('msft');
+      st.add('msft', h('b'));
+      expect(st.canRedo('msft')).toBe(false);
+    });
+
+    it('a drag (many quick updates of one drawing) is one undo step', () => {
+      const st = new DrawingStore();
+      st.add('msft', h('a', 10));
+      for (let p = 11; p <= 20; p++) st.update('msft', h('a', p));
+      expect(st.list('msft')[0].a.p).toBe(20);
+      st.undo('msft');
+      expect(st.list('msft')[0].a.p).toBe(10);
+      st.undo('msft');
+      expect(st.list('msft')).toEqual([]);
+    });
+
+    it('history is capped', () => {
+      const st = new DrawingStore();
+      for (let i = 0; i < 300; i++) st.add('msft', h(`d${i}`));
+      let n = 0;
+      while (st.undo('msft')) n++;
+      expect(n).toBe(100);
+    });
+  });
 });

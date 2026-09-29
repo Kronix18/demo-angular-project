@@ -1014,6 +1014,93 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('undo / redo, clone, shortcuts, remove menu (11.10)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); localStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const ctl = () => (component as any).drawings;
+    let store: any;
+    const key = (k: string, init: KeyboardEventInit = {}) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, ...init }));
+    beforeEach(async () => {
+      const { DrawingStore } = await import('../drawings/drawing-store.service');
+      store = TestBed.inject(DrawingStore);
+    });
+    const draw = async () => {
+      fresh();
+      if (store.locked()) store.toggleLocked();
+      store.setHidden(false);
+      await loaded();
+      const c = Chart.getChart(component.chartCanvas!.nativeElement) as any;
+      c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
+      c.scales.y.top = 0; c.scales.y.bottom = 300;
+      c.scales.x.getPixelForValue = (v: number) => v * 10;
+      c.scales.x.getValueForPixel = (px: number) => px / 10;
+      c.scales.y.getPixelForValue = (v: number) => 300 - v;
+      c.scales.y.getValueForPixel = (px: number) => 300 - px;
+    };
+
+    it('Ctrl+Z / Ctrl+Y (and the header buttons) undo and redo drawing changes', async () => {
+      await draw();
+      component.setTool('hline');
+      ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
+      fixture.detectChanges();
+      expect(store.list('msft').length).toBe(1);
+      expect((q('[data-undo]') as HTMLButtonElement).disabled).toBe(false);
+      expect((q('[data-redo]') as HTMLButtonElement).disabled).toBe(true);
+      key('z', { ctrlKey: true });
+      fixture.detectChanges();
+      expect(store.list('msft').length).toBe(0);
+      expect((q('[data-redo]') as HTMLButtonElement).disabled).toBe(false);
+      key('y', { ctrlKey: true });
+      expect(store.list('msft').length).toBe(1);
+      key('z', { ctrlKey: true });
+      (q('[data-redo]') as HTMLButtonElement).click();
+      expect(store.list('msft').length).toBe(1);
+      (q('[data-undo]') as HTMLButtonElement).click();
+      expect(store.list('msft').length).toBe(0);
+      key('z', { ctrlKey: true, shiftKey: true }); // Ctrl+Shift+Z is redo too
+      expect(store.list('msft').length).toBe(1);
+    });
+
+    it('Ctrl+D clones the selection; the style toolbar has a clone button', async () => {
+      await draw();
+      component.setTool('hline');
+      ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
+      fixture.detectChanges();
+      key('d', { ctrlKey: true });
+      expect(store.list('msft').length).toBe(2);
+      (q('[data-draw-clone]') as HTMLButtonElement).click();
+      expect(store.list('msft').length).toBe(3);
+    });
+
+    it('TradingView Alt shortcuts pick tools: T trend, H horizontal line, V vertical line, C cross, F fib', async () => {
+      await draw();
+      for (const [code, tool] of [['KeyT', 'trend'], ['KeyH', 'hline'], ['KeyV', 'vline'], ['KeyC', 'cross'], ['KeyF', 'fib']] as const) {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code, altKey: true, bubbles: true }));
+        expect(component.tool(), code).toBe(tool);
+      }
+      expect(q('app-symbol-search-dialog')).toBeNull(); // Alt+letter never opens type-to-search
+    });
+
+    it('the trash menu removes drawings, indicators or everything', async () => {
+      const st = fresh();
+      st.addIndicator({ type: 'sma', period: 5 });
+      await loaded();
+      store.add('msft', { id: 'a', type: 'hline', a: { t: 1, p: 10 } });
+      (q('[data-flyout="remove"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (q('[data-remove="indicators"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(st.snapshot().indicators).toEqual([]);
+      expect(store.list('msft').length).toBe(1);
+      st.addIndicator({ type: 'sma', period: 5 });
+      (q('[data-flyout="remove"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (q('[data-remove="all"]') as HTMLButtonElement).click();
+      expect(st.snapshot().indicators).toEqual([]);
+      expect(store.list('msft')).toEqual([]);
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>
