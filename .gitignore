@@ -13,3 +13,4 @@ playwright-report/
 test-results/
 .superpowers/
 graphify-*.log
+demo-app/docs/screenshots/
