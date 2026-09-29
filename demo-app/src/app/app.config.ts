@@ -5,6 +5,7 @@ import { errorInterceptor } from './core/api/errors';
 import { authInterceptor } from './core/api/auth-interceptor';
 import { etagCacheInterceptor } from './core/api/etag-cache';
 import { retryInterceptor } from './core/api/retry-interceptor';
+import { entitlementInterceptor } from './core/api/upgrade';
 import { ChartDataService } from './core/services/chart-data.service';
 
 import { routes } from './app.routes';
@@ -13,7 +14,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([errorInterceptor, retryInterceptor, etagCacheInterceptor, authInterceptor])),
+    provideHttpClient(withInterceptors([errorInterceptor, entitlementInterceptor, retryInterceptor, etagCacheInterceptor, authInterceptor])),
     ChartDataService
   ]
 };
