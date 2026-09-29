@@ -61,6 +61,18 @@ Routes with `data.fullscreen` make the shell exactly viewport-sized (compact nav
   `src/styles/theme.scss` (light + opt-in dark). `src/styles.spec.ts` fails on new literals (legacy pages capped by a ratchet).
   (`e2e/states-and-theme.spec` light + dark.)
 
+## Theme, legend, tools, drawings (Phase 10)
+
+- **Theme** (`core/theme/theme.service.ts`): mode `system | light | dark`, applied as `<html data-theme>`; palette in `styles/theme.scss`
+  (`:root[data-theme='dark']` = TradingView-style). A pre-paint script in `index.html` prevents a flash. `styles.spec.ts` allows NO colour
+  literals in app code and requires the dark palette to cover every theme-dependent token. (`e2e/states-and-theme.spec`.)
+- **Legend** (`charts/chart-legend`): HTML overlay, one group per pane; the viewer feeds hovered-bar index (`legendFeed` plugin) and pane
+  tops; the eye toggle is a persisted `hidden` flag on the indicator state entry. (`chart-legend.component.spec`, `e2e/chart.spec` legend test.)
+- **Chart types / tools**: `chartType` + `magnet` in the chart state; crosshair plugin draws the horizontal line, axis price label and magnet snap;
+  snapshot = canvas PNG download; fullscreen; double-click resets zoom.
+- **Drawings** (`charts/drawings`): anchors are (timestamp, price) so they survive interval/zoom/LOD changes; `DrawingController` is a DOM-free
+  pointer/keyboard state machine; a canvas plugin renders them clipped to the price pane; pan is disabled while a drawing tool is active.
+
 ## Indicators (`src/app/core/indicators`)
 
 `indicator-math.ts` reproduces pandas semantics (ewm `adjust=False`/`min_periods`, rolling) — not textbook formulas;
@@ -73,9 +85,9 @@ real Python calculators (`scripts/gen_indicator_fixtures.py`), matched within 1e
 
 | Gate | Command | Evidence |
 |---|---|---|
-| Unit | `npm test` | 156 specs |
-| Coverage | `npm run test:coverage` | 97.8% stmts / 89.3% branches (gate 80%) |
-| Browser e2e (dev) | `npm run e2e` | 19 Playwright tests |
+| Unit | `npm test` | 208 specs |
+| Coverage | `npm run test:coverage` | 93.8% stmts / 84.5% branches (gate 80%) |
+| Browser e2e (dev) | `npm run e2e` | 27 Playwright tests |
 | Production bundle | `npm run e2e:prod` | build without warnings + smoke, `docs/screenshots/8.3-prod-*.png` |
 | Token guard | part of `npm test` | `src/styles.spec.ts` |
 

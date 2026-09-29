@@ -8,7 +8,7 @@ candlesticks, volume and technical indicators in one zoomable panel — ported f
 ```bash
 npm ci
 npm start                 # ng serve → http://localhost:4200
-npm test                  # unit tests (Vitest via ng test), 156 specs
+npm test                  # unit tests (Vitest via ng test), 208 specs
 npm run test:coverage     # unit tests + 80% coverage gate on core/, charts/, app.ts
 npm run e2e               # Playwright suite (starts ng serve itself)
 npm run e2e:prod          # production build + smoke tests against the static bundle (:4300)
@@ -29,11 +29,15 @@ The Playwright runner uses its own Chromium. If that isn't installed, point it a
 
 - `/charts/:symbol` fills the whole viewport (compact navbar, no footer, no page scroll).
 - Price, volume and indicator panes are **one Chart.js chart** with stacked y-scales: one x-axis, grid, zoom and crosshair.
-- Wheel/pinch zoom, drag pan, range presets (1M…ALL), daily/weekly bars, Reset zoom.
+- Wheel/pinch zoom, drag pan, double-click to reset, range presets (1M…ALL), daily/weekly bars.
+- Chart types (candles, OHLC bars, line, area), crosshair with axis price label + magnet mode, PNG snapshot, fullscreen.
+- TradingView-style legend per pane (hovered-bar OHLC, indicator values, eye toggle, remove) and drawing tools
+  (trend line, horizontal ray, parallel channel — select/drag/delete, kept per symbol).
 - Indicators (SMA, EMA, WMA, RMA overlays; RSI, ATR, Webby RSI, Bob Marley in their own panes) — golden-value
   tested against the Python calculators.
 - Smooth on 10k+ bars: only a window around the visible range is handed to Chart.js, aggregated into ≤ ~500 candles.
-- Light theme by default; dark theme is opt-in via `<html data-theme="dark">`.
+- Light and dark themes (TradingView-style dark palette): navbar toggle cycles system → light → dark; `system` follows the OS.
+  Every colour lives in `src/styles/theme.scss`; a guard spec fails on any hardcoded colour anywhere in `src/app`.
 
 ## Project layout
 
