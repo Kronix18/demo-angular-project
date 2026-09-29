@@ -81,7 +81,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 10.2 | phase-10-tradingview/README.md#102 | DONE (browser-verified) | HTML legend per pane: OHLC of hovered bar, indicator values, eye toggle (persisted), remove |
 | 10.3 | phase-10-tradingview/README.md#103 | NOT STARTED | drawing tools (chartjs-plugin-annotation) |
 | 10.4 | phase-10-tradingview/README.md#104 | NOT STARTED | multi-pane layout, per-pane Y |
-| 10.5 | phase-10-tradingview/README.md#105 | NOT STARTED | bottom toolbar + chart-type switcher |
+| 10.5 | phase-10-tradingview/README.md#105 | DONE (browser-verified; symbol search dialog deferred) | chart types candles/OHLC/line/area, magnet crosshair + price label, snapshot PNG, fullscreen, dblclick reset |
 
 ## Re-audit of previously "completed" work (old Phase 1-2 claims)
 

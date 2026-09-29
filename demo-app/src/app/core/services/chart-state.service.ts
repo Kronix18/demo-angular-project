@@ -3,11 +3,18 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
 /** Chart state shape (4.1). Indicators: {type, period, hidden?} entries (hidden = eye toggle, 10.2). */
+export type ChartType = 'candles' | 'ohlc' | 'line' | 'area';
+export const CHART_TYPES: ChartType[] = ['candles', 'ohlc', 'line', 'area'];
+
 export interface ChartState {
   symbol: string;
   interval: string;
   range: string;
   indicators: Array<{ type: string; period: number; hidden?: boolean }>;
+  /** price series rendering (10.5) */
+  chartType: ChartType;
+  /** crosshair magnet: snap the horizontal line to the hovered bar's close (10.5) */
+  magnet: boolean;
 }
 
 const STORAGE_KEY = 'chart-state';
@@ -17,6 +24,8 @@ const DEFAULTS: ChartState = {
   interval: '1d',
   range: '6M', // matches the RANGE_PRESETS constant case (4.3 buttons)
   indicators: [],
+  chartType: 'candles',
+  magnet: false,
 };
 
 /**
@@ -68,6 +77,14 @@ export class ChartStateService {
     return true;
   }
 
+  setChartType(chartType: ChartType): void {
+    if (CHART_TYPES.includes(chartType)) this.update({ chartType });
+  }
+
+  toggleMagnet(): void {
+    this.update({ magnet: !this.subject.value.magnet });
+  }
+
   /** Eye toggle (10.2): flips visibility, keeps the indicator and its pane. */
   toggleHidden(index: number): void {
     const list = this.subject.value.indicators;
@@ -115,6 +132,8 @@ export class ChartStateService {
         symbol: typeof parsed.symbol === 'string' ? parsed.symbol : DEFAULTS.symbol,
         interval: typeof parsed.interval === 'string' ? parsed.interval : DEFAULTS.interval,
         range: typeof parsed.range === 'string' ? parsed.range : DEFAULTS.range,
+        chartType: CHART_TYPES.includes(parsed.chartType) ? parsed.chartType : DEFAULTS.chartType,
+        magnet: parsed.magnet === true,
         indicators: Array.isArray(parsed.indicators)
           ? parsed.indicators
               .filter((i: any) => i && typeof i.type === 'string' && typeof i.period === 'number' && Number.isFinite(i.period))

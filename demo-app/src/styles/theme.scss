@@ -146,6 +146,8 @@
   --c-up-strong: rgba(38, 166, 154, 0.8);
   --c-down-strong: rgba(239, 83, 80, 0.8);
   --c-chart-bg: #ffffff;
+  --c-price-line: #2962ff;
+  --c-price-area: rgba(41, 98, 255, 0.15);
   --c-chart-grid-faint: rgba(0, 0, 0, 0.05);
 }
 
@@ -200,6 +202,8 @@
 
   /* chart */
   --c-chart-bg: #131722;
+  --c-price-line: #4c8dff;
+  --c-price-area: rgba(76, 141, 255, 0.18);
   --c-chart-grid-faint: rgba(255, 255, 255, 0.05);
   --c-grid: #2a2e39;
   --c-pane-border: #2a2e39;

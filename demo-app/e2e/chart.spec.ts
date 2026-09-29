@@ -133,4 +133,51 @@ test.describe('chart panel (2.x–5.x)', () => {
     await expect(page.locator('[data-indicator-row]')).toHaveCount(1);
     expect(errors).toEqual([]);
   });
+
+  test('tools (10.5): chart types render different signatures, magnet, snapshot download, dblclick reset, fullscreen', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    const signature = async () => (await canvasPixels(page, { top: 0, height: 300 })).n;
+    const sigs: Record<string, number> = {};
+    for (const t of ['candles', 'ohlc', 'line', 'area']) {
+      await page.selectOption('select[name="chartType"]', t);
+      await page.waitForFunction((tt) => {
+        const d0 = (window as any).__charts.chart.data.datasets[0];
+        return tt === 'candles' ? d0.type === 'candlestick' : tt === 'ohlc' ? d0.type === 'ohlc' : d0.type === 'line';
+      }, t);
+      await page.waitForTimeout(200);
+      sigs[t] = await signature();
+      expect(sigs[t]).toBeGreaterThan(3000);
+    }
+    expect(new Set(Object.values(sigs)).size).toBe(4); // every type paints a different amount of pixels
+    expect(sigs['area']).toBeGreaterThan(sigs['line']); // filled area paints more than the bare line
+    // state persists across reload
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__charts?.chart);
+    await expect(page.locator('select[name="chartType"]')).toHaveValue('area');
+
+    // magnet: horizontal crosshair snaps to the bar's close instead of following the mouse
+    await page.click('[data-magnet]');
+    await expect(page.locator('[data-magnet]')).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => (window as any).__charts.chart.$magnet)).toBe(true);
+
+    // snapshot -> a real PNG download
+    const [download] = await Promise.all([page.waitForEvent('download'), page.click('[data-screenshot]')]);
+    expect(download.suggestedFilename()).toBe('msft-1d.png');
+
+    // double-click resets the zoom to the preset framing
+    const span = () => page.evaluate(() => { const x = (window as any).__charts.chart.scales.x; return x.max - x.min; });
+    const preset = await span();
+    const box = (await page.locator('canvas').boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.3);
+    for (let i = 0; i < 12; i++) await page.mouse.wheel(0, -300);
+    await expect.poll(span).toBeLessThan(preset * 0.7);
+    await page.mouse.dblclick(box.x + box.width * 0.5, box.y + box.height * 0.3);
+    await expect.poll(span).toBeGreaterThan(preset * 0.95);
+
+    await page.click('[data-fullscreen]');
+    await page.waitForTimeout(300);
+    // headless chromium may deny fullscreen; the click must never throw either way
+    expect(errors.filter((e) => !/fullscreen|Permissions check/i.test(e))).toEqual([]);
+  });
 });

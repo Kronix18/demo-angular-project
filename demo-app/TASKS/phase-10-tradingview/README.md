@@ -58,7 +58,7 @@ shared x-axis; per-pane separators; drag pane borders to resize (stretch goal).
 **Verify:** panes visually proportioned (screenshot vs TradingView multi-pane);
 each pane's y-axis independent; zoom/pan syncs all panes; pixel-verified.
 
-### 10.5 — TradingView Bottom Toolbar & Interactions Polish
+### 10.5 — TradingView Bottom Toolbar & Interactions Polish — DONE 2026-09-29 (except the symbol search dialog)
 **Files:** toolbar component, viewer.
 **Spec:** TradingView's bottom bar: symbol quick-search (magnifier, opens search
 dialog — port of ui/quick_search_dialog.py), timeframe buttons with active state,
@@ -82,3 +82,11 @@ render (pixel-verified different signature per type).
 - The header indicator list moved into the legend — `indicator-panel` is now only the add form (validation unchanged).
 - Tests: `chart-legend.component.spec` (5), `chart-state.service.spec` (+2), viewer "legend rows" (4), e2e `legend (10.2)` (hover changes OHLC, values, row inside its pane, eye persists over reload, ✕). Screenshot `docs/screenshots/10.2-legend-dark.png`. Full e2e 23 passed.
 - Deviation: no side-by-side against a TradingView reference screenshot (not available here).
+
+## 10.5 results (DONE, one item deferred)
+- **Chart types** (state `chartType`, persisted): candles, OHLC bars (`ohlc` controller), line (close), area (filled). Price series/tooltip/y-fit handle all four; view is kept on switch; volume/indicators unaffected. Select in the chart header. New tokens `--c-price-line/--c-price-area` (light + dark).
+- **Crosshair**: now horizontal + vertical, with the price/volume/indicator value label on the y axis of the pane under the cursor; **Magnet** toggle (state `magnet`, persisted, no chart rebuild) snaps the horizontal line to the hovered bar's close.
+- **Snapshot** button downloads `<symbol>-<interval>.png` (canvas `toBase64Image`); **Fullscreen** toggles `documentElement` fullscreen; **double-click** resets the zoom.
+- Timeframe buttons with active state already existed (4.3); the interval select keeps the demo's disabled intraday options.
+- Deferred: the symbol quick-search *dialog* (port of `ui/quick_search_dialog.py`) — the symbol input with datalist covers the demo's 8 symbols; a dialog only pays off with a real symbol universe (9.1).
+- Tests: state spec (+2), viewer "chart types + tools" (9), e2e `tools (10.5)` (four types paint four different pixel signatures, area > line, persistence, magnet, real download event, wheel-zoom then dblclick reset, fullscreen click safe). Screenshot `docs/screenshots/10.5-area-magnet-dark.png`. e2e 24 passed; coverage gate PASS.

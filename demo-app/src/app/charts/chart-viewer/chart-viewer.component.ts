@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef,
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService, AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
-import { ChartStateService } from '../../core/services/chart-state.service';
+import { ChartStateService, ChartType, CHART_TYPES } from '../../core/services/chart-state.service';
 import { filterByRange, aggregateWeeklyWFri } from '../../core/services/data-aggregation';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
@@ -32,8 +32,13 @@ const crosshairPlugin = {
   id: 'crosshair',
   afterEvent(chart: any, args: any): void {
     const e = args.event;
-    if (e?.type === 'mousemove' && typeof e.x === 'number') chart.$crosshairX = e.x;
-    else if (e?.type === 'mouseout') chart.$crosshairX = null;
+    if (e?.type === 'mousemove' && typeof e.x === 'number') {
+      chart.$crosshairX = e.x;
+      chart.$crosshairY = e.y;
+    } else if (e?.type === 'mouseout') {
+      chart.$crosshairX = null;
+      chart.$crosshairY = null;
+    }
   },
   afterDatasetsDraw(chart: any): void {
     const active = chart.tooltip?.getActiveElements?.() ?? [];
@@ -41,6 +46,15 @@ const crosshairPlugin = {
     const { ctx, chartArea } = chart;
     if (typeof x !== 'number' || !isFinite(x) || !ctx || !chartArea) return;
     if (x < chartArea.left || x > chartArea.right) return;
+
+    // Horizontal line: at the mouse y, or (magnet) snapped to the hovered bar's close.
+    let y: number | null = typeof chart.$crosshairY === 'number' ? chart.$crosshairY : null;
+    if (chart.$magnet && active.length && chart.scales?.y) {
+      const raw = chart.data?.datasets?.[0]?.data?.[active[0].index];
+      const v = typeof raw?.c === 'number' ? raw.c : raw?.y;
+      if (typeof v === 'number') y = chart.scales.y.getPixelForValue(v);
+    }
+
     ctx.save();
     ctx.beginPath();
     ctx.setLineDash([4, 4]);
@@ -48,8 +62,31 @@ const crosshairPlugin = {
     ctx.strokeStyle = cssVar('--c-crosshair');
     ctx.moveTo(x, chartArea.top);
     ctx.lineTo(x, chartArea.bottom);
+    if (y !== null && y >= chartArea.top && y <= chartArea.bottom) {
+      ctx.moveTo(chartArea.left, y);
+      ctx.lineTo(chartArea.right, y);
+    }
     ctx.stroke();
     ctx.restore();
+
+    // Price label on the y axis of the pane under the crosshair (TradingView style).
+    if (y !== null && y >= chartArea.top && y <= chartArea.bottom) {
+      const id = Object.keys(chart.scales).find((k) => k.startsWith('y') && y! >= chart.scales[k].top && y! <= chart.scales[k].bottom);
+      const scale = id ? chart.scales[id] : null;
+      if (scale) {
+        const v = scale.getValueForPixel(y);
+        const text = id === 'yVol' ? compactVolume(v) : v.toFixed(2);
+        ctx.save();
+        ctx.font = '11px sans-serif';
+        ctx.textBaseline = 'middle';
+        const w = 62;
+        ctx.fillStyle = cssVar('--c-tooltip-bg');
+        ctx.fillRect(chartArea.right, y - 9, w, 18);
+        ctx.fillStyle = cssVar('--c-tooltip-text');
+        ctx.fillText(text, chartArea.right + 6, y);
+        ctx.restore();
+      }
+    }
   },
 };
 Chart.register(crosshairPlugin);
@@ -99,7 +136,7 @@ function compactVolume(v: number): string {
 const tooltipLabel = (item: any): string => {
   const ds = item?.dataset ?? {};
   const raw = item?.raw ?? {};
-  if (ds.type === 'candlestick') {
+  if (ds.type === 'candlestick' || ds.type === 'ohlc') {
     const fmt = (v: unknown) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? '-'));
     return `O ${fmt(raw.o)}  H ${fmt(raw.h)}  L ${fmt(raw.l)}  C ${fmt(raw.c)}`;
   }
@@ -143,11 +180,21 @@ type DataBuilder = (pts: LodPoint[]) => any[];
       <header class="chart-header">
         <app-chart-toolbar />
         <app-indicator-panel />
-        <button type="button" class="reset-zoom-btn" (click)="resetZoom()">Reset zoom</button>
+        <div class="chart-tools" role="group" aria-label="Chart tools">
+          <select name="chartType" aria-label="Chart type" [value]="chartTypeValue" (change)="setChartType($any($event.target).value)">
+            @for (t of chartTypes; track t) {
+              <option [value]="t" [selected]="t === chartTypeValue">{{ typeLabels[t] }}</option>
+            }
+          </select>
+          <button type="button" class="tool-btn" data-magnet [attr.aria-pressed]="magnetOn" title="Magnet: snap the crosshair to the bar's close" (click)="toggleMagnet()">Magnet</button>
+          <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
+          <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
+          <button type="button" class="reset-zoom-btn" (click)="resetZoom()">Reset zoom</button>
+        </div>
       </header>
 
       <div class="chart-panel" data-pane="panel">
-        <canvas #chartCanvas [attr.hidden]="error ? '' : null"></canvas>
+        <canvas #chartCanvas [attr.hidden]="error ? '' : null" (dblclick)="resetZoom()"></canvas>
         @if (!error) {
           <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" />
         }
@@ -268,8 +315,19 @@ type DataBuilder = (pts: LodPoint[]) => any[];
       }
       .retry-btn { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
       .symbol-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
+      .chart-tools { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
+      .chart-tools select, .tool-btn {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid var(--c-border);
+        border-radius: var(--border-radius-sm);
+        background: var(--c-surface);
+        color: var(--c-text);
+        cursor: pointer;
+        font-size: 0.8125rem;
+      }
+      .tool-btn:hover, .chart-tools select:hover { border-color: var(--c-primary); color: var(--c-primary); }
+      .tool-btn[aria-pressed='true'] { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
       .reset-zoom-btn {
-        margin-left: auto;
         padding: 0.25rem 0.625rem;
         border: 1px solid var(--c-border);
         border-radius: var(--border-radius-sm);
@@ -313,6 +371,31 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private allData: OHLCV[] = [];
   /** Bars the chart indexes into (weekly-aggregated when interval = 1w). */
   private bars: OHLCV[] = [];
+  // ---- tools (10.5) --------------------------------------------------------------
+  readonly chartTypes = CHART_TYPES;
+  readonly typeLabels: Record<ChartType, string> = { candles: 'Candles', ohlc: 'Bars (OHLC)', line: 'Line', area: 'Area' };
+  chartTypeValue: ChartType = 'candles';
+  magnetOn = false;
+
+  setChartType(t: string): void { this.chartState.setChartType(t as ChartType); }
+  toggleMagnet(): void { this.chartState.toggleMagnet(); }
+
+  /** Downloads the chart canvas as `<symbol>-<interval>.png`. */
+  screenshot(): void {
+    if (!this.chart) return;
+    const a = document.createElement('a');
+    a.download = `${this.currentSymbol}-${this.currentInterval}.png`;
+    a.href = this.chart.toBase64Image('image/png', 1);
+    a.click();
+  }
+
+  toggleFullscreen(): void {
+    const doc = document as any;
+    const root = document.documentElement as any;
+    if (doc.fullscreenElement) doc.exitFullscreen?.();
+    else root.requestFullscreen?.();
+  }
+
   // ---- legend (10.2) ----------------------------------------------------------
   /** Bar under the crosshair (null = show the latest bar). */
   readonly hoverIndex = signal<number | null>(null);
@@ -380,6 +463,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   /** Per-dataset data builders + the window currently loaded into the chart. */
   private builders: DataBuilder[] = [];
+  private lastKey = '';
+  private keyOf(s: { magnet: boolean } & object): string { const { magnet, ...rest } = s as any; return JSON.stringify(rest); }
+  private sameExceptMagnet(s: { magnet: boolean } & object): boolean { return this.keyOf(s) === this.lastKey; }
   private loaded: { from: number; to: number; bucket: number } | null = null;
 
   constructor(
@@ -413,6 +499,12 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         const symbolChanged = s.symbol !== this.currentSymbol;
         const intervalChanged = s.interval !== this.currentInterval;
         const rangeChanged = s.range !== this.currentRange;
+        this.chartTypeValue = s.chartType;
+        const magnetOnly = s.magnet !== this.magnetOn && this.sameExceptMagnet(s);
+        this.magnetOn = s.magnet;
+        this.lastKey = this.keyOf(s);
+        if (this.chart) (this.chart as any).$magnet = s.magnet;
+        if (magnetOnly) { this.cdr.markForCheck(); return; }
         this.currentSymbol = s.symbol;
         this.currentInterval = s.interval;
         this.currentRange = s.range;
@@ -594,13 +686,20 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     this.builders = [];
     const add = (ds: any, b: DataBuilder) => { datasets.push(ds); this.builders.push(b); };
 
-    add({
-      type: 'candlestick', label: 'Price', yAxisID: 'y', data: [],
-      // token colours (the plugin's defaults are hardcoded rgba)
-      color: { up, down, unchanged: cssVar('--c-text-muted') },
-      borderColor: { up, down, unchanged: cssVar('--c-text-muted') },
-    },
-      (pts) => pts.map((p) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t })));
+    const ctype: ChartType = this.chartState.snapshot().chartType;
+    if (ctype === 'line' || ctype === 'area') {
+      add({
+        ...this.lineDataset('Price', 'y', cssVar('--c-price-line'), 2, []),
+        ...(ctype === 'area' ? { fill: 'origin', backgroundColor: cssVar('--c-price-area') } : {}),
+      }, (pts) => pts.map((p) => ({ x: p.x, y: p.c })));
+    } else {
+      add({
+        type: ctype === 'ohlc' ? 'ohlc' : 'candlestick', label: 'Price', yAxisID: 'y', data: [],
+        // token colours (the plugin's defaults are hardcoded rgba)
+        color: { up, down, unchanged: cssVar('--c-text-muted') },
+        borderColor: { up, down, unchanged: cssVar('--c-text-muted') },
+      }, (pts) => pts.map((p) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t })));
+    }
     const legendSeries: LegendSeries[] = [];
     overlays.forEach(({ index, resolved, outputs }, i) => {
       const color = cssVar(`--c-indicator-${(i % 4) + 1}`);
@@ -728,6 +827,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       } as any,
     });
 
+    (this.chart as any).$magnet = this.chartState.snapshot().magnet;
     this.legendSource.set({ series: legendSeries, paneKeys: panes.length });
     this.hoverIndex.set(null);
     // Dev-only test handle for the Playwright verification scripts.
@@ -778,7 +878,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       const e = (ext[id] ??= { min: Infinity, max: -Infinity });
       for (const p of ds.data) {
         if (p.x < lo || p.x > hi) continue;
-        if (ds.type === 'candlestick') {
+        if (ds.type === 'candlestick' || ds.type === 'ohlc') {
           if (p.l < e.min) e.min = p.l;
           if (p.h > e.max) e.max = p.h;
         } else if (typeof p.y === 'number') {
