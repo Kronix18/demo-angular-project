@@ -1468,6 +1468,94 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('bar replay (11.15)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const barsN = () => ((component as any).bars as unknown[]).length;
+    let alerts: any;
+    beforeEach(async () => {
+      localStorage.clear();
+      const { AlertService } = await import('../../core/services/alert.service');
+      alerts = TestBed.inject(AlertService);
+    });
+    const ready = async () => {
+      sessionStorage.clear(); localStorage.clear();
+      TestBed.inject(ChartStateService).reset();
+      alerts.list.set([]);
+      await loaded();
+    };
+    const open = async () => {
+      (q('[data-replay]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('Replay cuts the history at a start bar; step forward / back and the slider move it; Exit restores everything', async () => {
+      await ready();
+      expect(barsN()).toBe(3);
+      await open();
+      expect(q('[data-replay-bar]')).toBeTruthy();
+      expect(barsN()).toBe(1); // the demo file has only three bars: start at the first
+      const slider = q('[data-replay-slider]') as HTMLInputElement;
+      expect(slider.max).toBe('2');
+      (q('[data-replay-step]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      expect(barsN()).toBe(2);
+      expect(chartOf().data.datasets[0].data.length).toBe(2);
+      (q('[data-replay-back]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      expect(barsN()).toBe(1);
+      slider.value = '2'; slider.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+      expect(barsN()).toBe(3);
+      (q('[data-replay-exit]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(q('[data-replay-bar]')).toBeNull();
+      expect(barsN()).toBe(3);
+    });
+
+    it('Play steps forward on a timer at the chosen speed and pauses at the end', async () => {
+      await ready();
+      await open();
+      vi.useFakeTimers();
+      try {
+        (q('[data-replay-play]') as HTMLButtonElement).click();
+        expect(component.replay()!.playing).toBe(true);
+        vi.advanceTimersByTime(1000);
+        expect(barsN()).toBe(2);
+        vi.advanceTimersByTime(1000);
+        expect(barsN()).toBe(3);
+        vi.advanceTimersByTime(1000);
+        expect(component.replay()!.playing).toBe(false); // reached the last bar
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('a price alert fires when the replay crosses it: toast, triggered flag, pause', async () => {
+      await ready();
+      alerts.add('msft', 110); // closes are 105, 112, 118
+      await open();
+      vi.useFakeTimers();
+      try {
+        (q('[data-replay-play]') as HTMLButtonElement).click();
+        vi.advanceTimersByTime(1000);
+      } finally { vi.useRealTimers(); }
+      fixture.detectChanges();
+      expect(alerts.forSymbol('msft')[0].triggered).toBe(true);
+      expect(q('[data-toast]')!.textContent).toContain('110.00');
+      expect(component.replay()!.playing).toBe(false);
+    });
+
+    it('changing the symbol leaves replay', async () => {
+      const st = TestBed.inject(ChartStateService);
+      await ready();
+      await open();
+      st.setSymbol('nvda');
+      await fixture.whenStable();
+      expect(component.replay()).toBeNull();
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>
