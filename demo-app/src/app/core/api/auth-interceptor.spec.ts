@@ -114,4 +114,23 @@ describe('authInterceptor + TokenStore (task 12.4, docs/api/09-user-tiers.md §1
     ctl.expectNone(`${BASE}/api/auth/refresh`);
     expect(status).toBe(401);
   });
+
+  it('a request that was sent with a token which has since been refreshed is replayed with the current token, without a 2nd refresh', () => {
+    tokens.set({ access: 'old', refresh: 'r1' });
+    const results: unknown[] = [];
+    http.get(`${BASE}/api/a`).subscribe((v) => results.push(v));
+    http.get(`${BASE}/api/b`).subscribe((v) => results.push(v));
+    const a = ctl.expectOne(`${BASE}/api/a`);
+    const b = ctl.expectOne(`${BASE}/api/b`);
+    a.flush({ error: 'token_expired', message: 'x' }, { status: 401, statusText: 'x' });
+    ctl.expectOne(`${BASE}/api/auth/refresh`).flush({ access_token: 'new', refresh_token: 'r2', expires_in: 900 });
+    ctl.expectOne(`${BASE}/api/a`).flush('A');
+    // b was already in flight with the OLD token and only now comes back 401
+    b.flush({ error: 'token_expired', message: 'x' }, { status: 401, statusText: 'x' });
+    ctl.expectNone(`${BASE}/api/auth/refresh`);
+    const replay = ctl.expectOne(`${BASE}/api/b`);
+    expect(replay.request.headers.get('Authorization')).toBe('Bearer new');
+    replay.flush('B');
+    expect(results).toEqual(['A', 'B']);
+  });
 });

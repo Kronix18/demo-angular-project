@@ -1,4 +1,4 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { isApiErrorBody } from './types';
@@ -77,12 +77,15 @@ export class ApiErrorService {
   }
 }
 
+/** Optional discovery calls (e.g. /api/meta) set this so failures never toast. */
+export const SILENT_ERRORS = new HttpContextToken<boolean>(() => false);
+
 /** Maps HttpErrorResponse to ApiError for the toast, but rethrows the ORIGINAL error so existing callers are unaffected. */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const svc = inject(ApiErrorService);
   return next(req).pipe(
     catchError((err: unknown) => {
-      if (req.url.includes('/api/')) svc.report(toApiError(err));
+      if (req.url.includes('/api/') && !req.context.get(SILENT_ERRORS)) svc.report(toApiError(err));
       return throwError(() => err);
     }),
   );
