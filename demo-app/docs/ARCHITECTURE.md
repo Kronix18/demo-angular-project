@@ -72,6 +72,7 @@ Routes with `data.fullscreen` make the shell exactly viewport-sized (compact nav
   snapshot = canvas PNG download; fullscreen; double-click resets zoom.
 - **Drawings** (`charts/drawings`): anchors are (timestamp, price) so they survive interval/zoom/LOD changes; `DrawingController` is a DOM-free
   pointer/keyboard state machine; a canvas plugin renders them clipped to the price pane; pan is disabled while a drawing tool is active.
+  Since 11.7 every tool is a registry entry (`drawing-tools.ts`) whose anchors become pure shapes (`drawing-shapes.ts`); the same shapes are painted and hit-tested.
 
 ## Indicators (`src/app/core/indicators`)
 

@@ -714,14 +714,28 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     }
     const drawn = () => store.list('msft');
 
-    it('the sidebar offers every tool + magnet / stay-in-drawing / lock / hide / delete-all', async () => {
+    it('the sidebar has cursor, one button per tool group (with a flyout listing all its tools), measure, zoom + magnet / stay-in-drawing / lock / hide / delete-all', async () => {
       await ready();
-      expect(qa('[data-tool]').map((b) => b.dataset['tool'])).toEqual([
-        'cursor', 'trend', 'arrow', 'ray', 'hline', 'vline', 'channel', 'rect', 'ellipse', 'fib', 'brush', 'text', 'measure', 'zoom',
-      ]);
+      expect(qa('[data-group]').map((b) => b.dataset['group'])).toEqual(['lines', 'fib', 'patterns', 'projection', 'shapes', 'text', 'icons']);
+      expect(qa('.draw-tools > [data-tool], .draw-tools [data-tool]').map((b) => b.dataset['tool'])).toEqual(
+        ['cursor', 'trend', 'fib', 'xabcd', 'longpos', 'brush', 'text', 'iconup', 'measure', 'zoom']);
       for (const sel of ['[data-magnet]', '[data-keep]', '[data-lock]', '[data-hide]', '[data-tool-clear]']) expect(q(sel), sel).toBeTruthy();
       for (const b of qa('.draw-tools button')) expect(b.getAttribute('aria-label') || b.getAttribute('title'), b.outerHTML).toBeTruthy();
       expect(q('.chart-tools [data-magnet]')).toBeNull(); // magnet moved into the sidebar
+      expect(q('[data-flyout-menu]')).toBeNull();
+      (q('[data-flyout="lines"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const lines = qa('[data-flyout-tool]').map((b) => b.dataset['flyoutTool']);
+      expect(lines).toEqual(expect.arrayContaining(['trend', 'rayline', 'extended', 'info', 'angle', 'hline', 'ray', 'vline', 'cross', 'arrow', 'channel', 'regression']));
+      (q('[data-flyout-tool="extended"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(component.tool()).toBe('extended');
+      expect(q('[data-flyout-menu]')).toBeNull(); // picking closes the flyout
+      expect(q('[data-group="lines"]')!.dataset['tool']).toBe('extended'); // and the group button now stands for it
+      expect(q('[data-group="lines"]')!.getAttribute('aria-pressed')).toBe('true');
+      const all: string[] = [];
+      for (const g of qa('[data-flyout]')) { g.click(); fixture.detectChanges(); all.push(...qa('[data-flyout-tool]').map((b) => b.dataset['flyoutTool']!)); }
+      expect(all.length).toBeGreaterThanOrEqual(50);
     });
 
     it('after finishing a drawing the tool returns to the cursor — unless "stay in drawing mode" is on', async () => {
@@ -751,7 +765,9 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(store.hidden()).toBe(true);
       expect(q('[data-lock]')!.getAttribute('aria-pressed')).toBe('true');
       expect(q('[data-hide]')!.getAttribute('aria-pressed')).toBe('true');
-      (q('[data-tool="rect"]') as HTMLButtonElement).click();
+      (q('[data-flyout="shapes"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (q('[data-flyout-tool="rect"]') as HTMLButtonElement).click();
       expect(store.hidden()).toBe(false);
     });
 
@@ -830,21 +846,19 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(drawn()).toEqual([]);
     });
 
-    it('every drawing type renders without errors (incl. hidden and selected states)', async () => {
+    it('every drawing type renders without errors (incl. hidden, selected and draft states)', async () => {
       const c = await ready();
-      const t0 = c.data.datasets[0].data[0].t;
-      const t1 = c.data.datasets[0].data[2].t;
-      const a = { t: t0, p: 100 };
-      const b = { t: t1, p: 120 };
-      for (const d of [
-        { id: '1', type: 'trend', a, b }, { id: '2', type: 'arrow', a, b }, { id: '3', type: 'ray', a }, { id: '4', type: 'hline', a },
-        { id: '5', type: 'vline', a }, { id: '6', type: 'channel', a, b, offset: 5 }, { id: '7', type: 'rect', a, b },
-        { id: '8', type: 'ellipse', a, b }, { id: '9', type: 'fib', a, b }, { id: '10', type: 'brush', a, pts: [a, b] },
-        { id: '11', type: 'text', a, text: 'note', style: { color: '#00ff00', width: 2, dash: 'dash' } },
-      ]) store.add('msft', d);
+      const { TOOL_DEFS } = await import('../drawings/drawing-tools');
+      const barsNow = (component as any).bars as { timestamp: number }[];
+      const at = (i: number, p: number) => ({ t: barsNow[Math.min(i, barsNow.length - 1)].timestamp + i * 3600_000, p });
+      TOOL_DEFS.forEach((def, k) => {
+        const n = typeof def.points === 'number' ? def.points : 6;
+        const pts = Array.from({ length: n }, (_, j) => at(j, 100 + (j % 2 ? 25 : 0) + j * 3));
+        store.add('msft', { id: `t${k}`, type: def.id, a: pts[0], ...(n > 1 ? { b: pts[1] } : {}), ...(n > 2 || typeof def.points !== 'number' ? { pts } : {}), ...(def.id === 'channel' ? { offset: 5 } : {}), ...(def.text ? { text: 'note' } : {}) } as any);
+      });
+      expect(store.list('msft').length).toBe(TOOL_DEFS.length);
       expect(() => c.draw()).not.toThrow();
-      ctl().pointerDown(0, 100);
-      for (const id of ['1', '7', '9', '11']) { (ctl() as any).selectedId = id; expect(() => c.draw()).not.toThrow(); }
+      for (const d of store.list('msft')) { (ctl() as any).selectedId = d.id; expect(() => c.draw(), d.type).not.toThrow(); }
       store.setHidden(true);
       expect(() => c.draw()).not.toThrow();
     });
@@ -949,6 +963,16 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(q('app-symbol-search-dialog')).toBeTruthy();
       expect((q('input[type="search"]') as HTMLInputElement).value).toBe('n');
       expect(Array.from(fixture.nativeElement.querySelectorAll('[data-symbol-option]')).map((r: any) => r.dataset.symbolOption)).toEqual(['nvda']);
+    });
+
+    it('characters typed before the dialog has rendered are not lost', async () => {
+      fresh();
+      await loaded();
+      press('a');
+      press('p'); // no change detection in between: the dialog does not exist yet
+      press('l');
+      fixture.detectChanges();
+      expect((q('input[type="search"]') as HTMLInputElement).value).toBe('apl');
     });
 
     it('does not hijack typing in form fields, shortcuts with modifiers, or navigation keys', async () => {

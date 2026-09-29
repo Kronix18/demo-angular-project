@@ -18,6 +18,9 @@ Requests (with reference screenshots of TradingView):
 | 11.3 | Type-to-search symbol dialog | DONE |
 | 11.4 | Auto-scale toggle, vertical pan, log price + volume | DONE |
 | 11.5 | Drawing sidebar + tools | DONE |
+| 11.6 | Symbol + volume settings from the legend | DONE |
+| 11.7 | Full TradingView drawing tool set (7 groups, 50+ tools) | DONE |
+| — | Bug: indicator lines clipped short while panning | FIXED |
 
 ## 11.1 results
 - Legend header is now `SYMBOL · 1D  O H L C  V  change` for the hovered bar (latest when idle); indicator rows sit under it (overlays) or in their own pane (oscillators). Each row: chip, live value, ⚙ settings, eye, ✕; double-click opens settings.
@@ -56,3 +59,27 @@ Requests (with reference screenshots of TradingView):
 - **Lock / hide** persist (localStorage) and apply to all symbols; locked drawings cannot be selected, moved or deleted.
 - Sidebar extracted into its own component to keep the viewer's stylesheet inside the 4 kB budget (budget unchanged).
 - Tests: geometry / store / controller specs, viewer "drawing sidebar" block (9), e2e "TradingView sidebar" flow. Screenshot `docs/screenshots/11.5-drawing-tools.png`.
+
+## Follow-up round (bug + 11.6 + 11.7)
+
+### Indicator lines cut off left/right while panning
+- **Cause**: Chart.js only builds/draws the "visible" points of a sorted line dataset, using pixel positions from the previous layout. While panning with the LOD window, the first/last visible points were stale, so overlay and pane indicators ended short of the bars (worse the faster you pan).
+- **Fix**: the chart marks every dataset's meta as unsorted before each dataset update (`beforeDatasetUpdate`), so all loaded points are positioned and drawn. The LOD window is already ≤ ~500 points, so this costs nothing measurable (the pan perf test still passes).
+- **Test**: e2e "indicator lines run edge to edge while panning" (fails without the fix).
+
+### 11.6 — symbol and volume settings
+- The legend header has an eye and a gear (on hover), and there is a **Volume** row with its own eye and gear (no remove). Eye = show/hide that series; gear opens `SymbolSettingsDialogComponent`.
+- **Symbol settings**: rising / falling colour, **colour based on previous close** (direction from the previous close instead of the open — candles, hollow, bars, HLC, high-low, columns, and the volume histogram), line/border width, and for line styles (line, markers, step, area) the **source** (close, open, high, low, HL/2, HLC/3, OHLC/4) and line colour. **Volume settings**: colours and previous-close colouring.
+- Stored in the chart state (`price`, `volume`; validated on rehydrate by `core/models/symbol-settings.ts`). Direction by previous close rides on each data point (`dir`); the financial plugin's colour options are scriptable and return one uniform colour so the element's own open/close test cannot override it. Bucketed bars carry `upPc` (LOD).
+- Tests: model, state, price-series (9), LOD, legend, dialog (5), viewer integration (4).
+
+### 11.7 — the TradingView drawing set
+- **Seven groups with flyouts** (`›` next to each group button; the button stands for the last tool you picked): Trend lines (trend, ray, info line, extended, trend angle, horizontal line, horizontal ray, vertical, cross, arrow, parallel channel, disjoint channel, regression trend), Fib & Gann (retracement, trend-based extension, channel, time zone, speed-resistance fan, circles, Gann box, Gann fan, pitchfork), Patterns (XABCD, ABCD, triangle, head & shoulders, three drives, Elliott impulse / correction / triangle), Forecasting & measuring (long / short position with risk-reward, forecast, date range, price range, date and price range), Brushes & shapes (brush, highlighter, rectangle, rotated rectangle, circle, ellipse, triangle, polyline, path, curve), Text & notes (text, note, callout, price label), Icons (arrow up/down, check, cross, star, flag). Measure and zoom stay one click away.
+- **One pipeline**: `drawing-tools.ts` (registry: id, label, group, number of anchors) → `drawing-shapes.ts` (pure: anchors → line / poly / rect / ellipse / arrow / curve / text shapes) → the canvas plugin paints the shapes and the controller hit-tests the very same shapes (distance to lines, rays, outlines, filled areas, text boxes). Every old tool moved onto it, so adding a tool is one registry line plus one builder.
+- **Placing**: 1 click, 2 = drag, 3+ anchors = drag the first segment (or click) then one click per remaining anchor with a live preview, polyline/path finish with double-click or Enter, Esc abandons. Handles on every anchor; dragging the body moves all anchors; the style toolbar and text editor work for the new tools (note and callout ask for text).
+- Regression trend is a least-squares fit of the closes between the anchors with ±2σ bands; position tools show profit/loss zones and risk/reward.
+- Not done: Gann square, Fib spiral/arcs, Cypher/three-drives ratio checks, bars-pattern, anchored text/VWAP, table, sticker emoji packs.
+- Tests: registry + shapes (18, incl. every tool renders finite geometry), controller (9 new flows), viewer (flyouts, every tool renders selected/hidden), e2e "tool groups". Screenshots `docs/screenshots/11.7-*.png`.
+
+### Also fixed
+- Characters typed while the symbol-search dialog was still opening were lost (the first key opens it, the next ones raced its render). They are now appended / forwarded to the box.

@@ -412,4 +412,34 @@ test.describe('chart panel (2.x–5.x)', () => {
       }
     }
   });
+
+  test('symbol + volume settings from the legend (11.6): colours, previous-close colouring, hide', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    const ds = (label: string) => page.evaluate((l) => {
+      const d = (window as any).__charts.chart.data.datasets.find((x: any) => x.label === l);
+      return { hidden: !!d.hidden, colors: d.backgroundColors && typeof d.backgroundColors !== 'function' ? d.backgroundColors : null, dir: d.data[0]?.dir ?? null };
+    }, label);
+    await page.locator('[data-legend-header]').hover();
+    await page.click('[data-price-settings]');
+    await page.locator('[data-set="up"]').fill('#ff8800');
+    await page.locator('[data-set="prev"]').check();
+    await page.click('[data-ok]');
+    await expect(page.locator('app-symbol-settings-dialog')).toHaveCount(0);
+    const price = await ds('Price');
+    expect(['up', 'down']).toContain(price.dir);
+    await page.locator('[data-legend-header]').hover();
+    await page.click('[data-price-eye]');
+    expect((await ds('Price')).hidden).toBe(true);
+    await page.click('[data-price-eye]');
+    expect((await ds('Price')).hidden).toBe(false);
+    await page.locator('[data-volume-row]').hover();
+    await page.click('[data-volume-eye]');
+    expect((await ds('Volume')).hidden).toBe(true);
+    await page.click('[data-volume-eye]');
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__charts?.chart);
+    expect((await ds('Price')).dir).not.toBeNull(); // settings survive a refresh
+    expect(errors).toEqual([]);
+  });
 });

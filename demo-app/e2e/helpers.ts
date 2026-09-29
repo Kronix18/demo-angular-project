@@ -1,3 +1,4 @@
+import { toolDef } from '../src/app/charts/drawings/drawing-tools';
 import { expect, Page } from '@playwright/test';
 
 /** Opens a chart and waits until the panel chart exists and loading is over. */
@@ -48,3 +49,13 @@ export function collectErrors(page: Page, ignore: RegExp = /$^/): string[] {
 }
 
 export { expect, test } from '@playwright/test';
+
+/** Picks a drawing tool: measure / zoom / cursor and a group's current tool are on the sidebar, everything else via its group's flyout. */
+export async function pickTool(page: Page, id: string): Promise<void> {
+  const def = toolDef(id);
+  if (!def) { await page.locator(`.draw-tools [data-tool="${id}"]`).click(); return; }
+  const direct = page.locator(`.draw-tools [data-group="${def.group}"][data-tool="${id}"]`);
+  if (await direct.count()) { await direct.click(); return; }
+  await page.locator(`[data-flyout="${def.group}"]`).click();
+  await page.locator(`[data-flyout-tool="${id}"]`).click(); // auto-waits for the menu to render
+}

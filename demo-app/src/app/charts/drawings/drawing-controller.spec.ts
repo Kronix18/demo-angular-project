@@ -295,4 +295,102 @@ describe('DrawingController (10.3)', () => {
       expect(b.pts![1].p).toBe(30);
     });
   });
+
+  describe('multi-point and extended tools (11.7)', () => {
+    const click = (x: number, y: number) => { ctl.pointerDown(x, y); ctl.pointerUp(x, y); };
+
+    it('a 3-point tool: drag the first segment, then one click for the last anchor', () => {
+      tool = 'fibext';
+      ctl.pointerDown(100, 100); ctl.pointerMove(150, 80); ctl.pointerUp(200, 60);
+      expect(store.list('msft')).toEqual([]);
+      expect(ctl.view().draft!.phase).toBe(3);
+      ctl.pointerMove(250, 90);
+      expect(ctl.draftDrawing()!.pts!.length).toBe(3); // the cursor is the provisional next anchor
+      ctl.pointerDown(260, 90); ctl.pointerUp(260, 90);
+      const [d] = store.list('msft');
+      expect(d.type).toBe('fibext');
+      expect(d.pts!.length).toBe(3);
+      expect([d.a, d.b]).toEqual([d.pts![0], d.pts![1]]);
+      expect(ctl.view().draft).toBeNull();
+      expect(committed).toEqual(['fibext']);
+    });
+
+    it('clicking each point works too (click, click, click)', () => {
+      tool = 'longpos';
+      click(100, 100); click(100, 120); click(300, 60);
+      const [d] = store.list('msft');
+      expect(d.pts!.map((p) => p.p)).toEqual([100, 80, 140]);
+    });
+
+    it('a 5-point pattern needs five anchors; Escape abandons it', () => {
+      tool = 'xabcd';
+      [[50, 100], [100, 60], [150, 90], [200, 50], [250, 80]].forEach(([x, y], i) => {
+        click(x, y);
+        expect(store.list('msft').length).toBe(i === 4 ? 1 : 0);
+      });
+      expect(store.list('msft')[0].pts!.length).toBe(5);
+      click(50, 100); click(100, 60);
+      ctl.key('Escape');
+      expect(ctl.view().draft).toBeNull();
+      expect(store.list('msft').length).toBe(1);
+    });
+
+    it('polyline / path: click points, finish with Enter (or finish()); fewer than two points stores nothing', () => {
+      tool = 'polyline';
+      click(50, 100); click(100, 60); click(150, 90);
+      ctl.key('Enter');
+      expect(store.list('msft')[0].pts!.length).toBe(3);
+      tool = 'path';
+      click(50, 100);
+      ctl.finish();
+      expect(store.list('msft').length).toBe(1);
+      click(50, 120); click(80, 60); click(80, 60); // a double-click adds the same point twice
+      ctl.finish();
+      expect(store.list('msft')[1].pts!.length).toBe(2);
+    });
+
+    it('extra tools that ask for text: callout after its drag, note after one click', () => {
+      tool = 'note';
+      click(100, 100);
+      tool = 'callout';
+      ctl.pointerDown(100, 100); ctl.pointerMove(200, 60); ctl.pointerUp(200, 60);
+      expect(store.list('msft').map((d) => d.type)).toEqual(['note', 'callout']);
+      expect(edits).toEqual([store.list('msft')[0].id, store.list('msft')[1].id]);
+      expect(ctl.textAt(105, 100)).toBe(store.list('msft')[0].id);
+    });
+
+    it('one-click tools of the new sets: horizontal ray, cross line, price label, icons', () => {
+      for (const t of ['cross', 'pricelabel', 'iconstar', 'iconup'] as const) { tool = t; click(120, 80); }
+      expect(store.list('msft').map((d) => d.type)).toEqual(['cross', 'pricelabel', 'iconstar', 'iconup']);
+    });
+
+    it('highlighter is freehand like the brush', () => {
+      tool = 'highlighter';
+      ctl.pointerDown(100, 100);
+      for (let x = 105; x <= 160; x += 5) ctl.pointerMove(x, 100 - (x - 100) / 2);
+      ctl.pointerUp(160, 70);
+      expect(store.list('msft')[0].type).toBe('highlighter');
+      expect(store.list('msft')[0].pts!.length).toBeGreaterThan(5);
+    });
+
+    it('a selected multi-point drawing has a handle per anchor; dragging one moves only that anchor', () => {
+      store.add('msft', { id: 'p', type: 'abcd', a: { t: bars[5].timestamp, p: 50 }, b: { t: bars[10].timestamp, p: 90 },
+        pts: [{ t: bars[5].timestamp, p: 50 }, { t: bars[10].timestamp, p: 90 }, { t: bars[15].timestamp, p: 60 }, { t: bars[20].timestamp, p: 100 }] });
+      ctl.pointerDown(100, 110); ctl.pointerUp(100, 110); // on the B–... segment: selects
+      expect(ctl.view().selectedId).toBe('p');
+      // grab the third anchor (bar 15, price 60 -> pixel 150,140) and move it up by 30 price units
+      ctl.pointerDown(150, 140); ctl.pointerMove(150, 110); ctl.pointerUp(150, 110);
+      const d = store.list('msft')[0];
+      expect(d.pts!.map((p) => p.p)).toEqual([50, 90, 90, 100]);
+      expect(d.a.p).toBe(50);
+      expect(d.b!.p).toBe(90);
+    });
+
+    it('moving the body of a multi-point drawing moves every anchor together', () => {
+      store.add('msft', { id: 'p', type: 'triangleshape', a: { t: bars[5].timestamp, p: 50 }, b: { t: bars[10].timestamp, p: 90 },
+        pts: [{ t: bars[5].timestamp, p: 50 }, { t: bars[10].timestamp, p: 90 }, { t: bars[15].timestamp, p: 60 }] });
+      ctl.pointerDown(75, 130); ctl.pointerMove(75, 120); ctl.pointerUp(75, 120); // on the first edge's mid-point
+      expect(store.list('msft')[0].pts!.map((p) => p.p)).toEqual([60, 100, 70]);
+    });
+  });
 });

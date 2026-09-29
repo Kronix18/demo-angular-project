@@ -3,7 +3,8 @@ import { OHLCV } from '../../core/models/ohlcv.model';
 /** A chart anchor in DATA coordinates (time + price) — independent of interval, zoom and LOD bucketing. */
 export interface Anchor { t: number; p: number; }
 
-export type DrawingType = 'trend' | 'arrow' | 'ray' | 'hline' | 'vline' | 'channel' | 'rect' | 'ellipse' | 'fib' | 'brush' | 'text';
+import type { DrawingType } from './drawing-tools';
+export type { DrawingType };
 
 export interface DrawingStyle {
   color?: string;
@@ -15,13 +16,13 @@ export interface Drawing {
   id: string;
   type: DrawingType;
   a: Anchor;
-  /** second anchor (trend, channel base line); absent for a horizontal ray */
+  /** second anchor (trend, channel base line); absent for one-click tools */
   b?: Anchor;
   /** channel: price distance of the parallel line from the base line */
   offset?: number;
   /** text label */
   text?: string;
-  /** freehand brush points */
+  /** every anchor of a 3+ point tool, or the freehand / polyline points */
   pts?: Anchor[];
   style?: DrawingStyle;
 }

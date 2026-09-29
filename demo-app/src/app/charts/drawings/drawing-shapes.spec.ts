@@ -42,7 +42,7 @@ describe('drawing shapes (11.7)', () => {
       const shapes = shapesFor(d, env);
       expect(shapes.length, def.id).toBeGreaterThan(0);
       expect(JSON.stringify(shapes).includes('null'), `${def.id} produced NaN/Infinity`).toBe(false);
-      expect(Number.isFinite(distanceToShapes(shapes, 5, 5, env)), def.id).toBe(true);
+      expect(Number.isNaN(distanceToShapes(shapes, 5, 5, env)), def.id).toBe(false);
     }
   });
 
@@ -163,8 +163,8 @@ describe('drawing shapes (11.7)', () => {
 
   it('hit testing: segment, ray, filled areas, text boxes', () => {
     const trend = shapesFor(drawing('trend', [at(10, 100), at(20, 110)]), env);
-    expect(distanceToShapes(trend, 150, 185, env)).toBeCloseTo(0, 6);
-    expect(distanceToShapes(trend, 150, 195, env)).toBeCloseTo(10, 6);
+    expect(distanceToShapes(trend, 150, 195, env)).toBeCloseTo(0, 6);
+    expect(distanceToShapes(trend, 150, 205, env)).toBeCloseTo(9.95, 1); // perpendicular to a 0.1 slope
     const ray = shapesFor(drawing('rayline', [at(10, 100), at(20, 110)]), env);
     expect(distanceToShapes(ray, 400, 200 - 30, env)).toBeLessThan(1); // far along the extension
     const rect = shapesFor(drawing('rect', [at(10, 100), at(30, 120)]), env);

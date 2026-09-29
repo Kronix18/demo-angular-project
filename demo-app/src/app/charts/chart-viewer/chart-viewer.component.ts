@@ -281,7 +281,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           <button type="button" data-auto [attr.aria-pressed]="autoScale()" title="Auto-fit the price scale to the visible bars (drag the chart vertically to switch it off)" (click)="setAuto()">auto</button>
           <button type="button" data-log [attr.aria-pressed]="logOn" title="Logarithmic price scale (volume too)" (click)="toggleLog()">log</button>
         </div>
-        <app-drawing-sidebar [tools]="drawTools" [tool]="tool()" [magnet]="magnetOn" [keep]="keepDrawing()"
+        <app-drawing-sidebar [tool]="tool()" [magnet]="magnetOn" [keep]="keepDrawing()"
           [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
           (keepToggle)="keepDrawing.set(!keepDrawing())" (lockToggle)="drawingStore.toggleLocked()"
           (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" />
@@ -533,22 +533,6 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     if (!id || this.drawingStore.hidden()) return null;
     return this.drawingStore.list(this.currentSymbol).find((d) => d.id === id) ?? null;
   });
-  readonly drawTools: { id: Tool; icon: string; title: string }[] = [
-    { id: 'cursor', icon: '↖', title: 'Cursor: select / move drawings, pan the chart' },
-    { id: 'trend', icon: '⟋', title: 'Trend line: drag from point A to B' },
-    { id: 'arrow', icon: '➚', title: 'Arrow: drag from point A to B' },
-    { id: 'ray', icon: '⟶', title: 'Ray: click a bar; extends to the right' },
-    { id: 'hline', icon: '―', title: 'Horizontal line: click a price level' },
-    { id: 'vline', icon: '¦', title: 'Vertical line: click a bar' },
-    { id: 'channel', icon: '⫽', title: 'Parallel channel: drag the base line, then click the offset' },
-    { id: 'rect', icon: '▭', title: 'Rectangle: drag a corner to the opposite corner' },
-    { id: 'ellipse', icon: '◯', title: 'Ellipse: drag its bounding box' },
-    { id: 'fib', icon: 'Fib', title: 'Fib retracement: drag from the low to the high' },
-    { id: 'brush', icon: '✎', title: 'Brush: draw freehand' },
-    { id: 'text', icon: 'T', title: 'Text label: click, then type' },
-    { id: 'measure', icon: '⇔', title: 'Measure: drag to read price change, bars and time' },
-    { id: 'zoom', icon: '⌕', title: 'Zoom: drag a region to zoom into it' },
-  ];
   private drawings = new DrawingController({
     chart: () => this.chart,
     bars: () => this.bars,
@@ -633,6 +617,13 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const t = e.target as HTMLElement | null;
     if (t && (/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.isContentEditable)) return;
     // TradingView: start typing anywhere on the chart -> symbol search opens with that character
+    // keystrokes typed while the search dialog is still opening must not be lost
+    if (this.searchOpen() && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
+      const box = document.querySelector<HTMLInputElement>('app-symbol-search-dialog input[type="search"]');
+      if (box) box.focus(); // the browser then types the character into it
+      else { e.preventDefault(); this.searchInitial.update((v) => v + e.key); }
+      return;
+    }
     const dialogOpen = this.searchOpen() || this.indicatorsOpen() || this.settingsIndex() !== null || this.seriesDialog() !== null;
     if (!dialogOpen && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
       e.preventDefault();
@@ -720,6 +711,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   onDblClick(e: MouseEvent): void {
+    if (this.drawings.view().draft) { this.drawings.finish(); return; }
     const tid = this.drawings.textAt(e.offsetX, e.offsetY);
     if (tid) { this.openTextEditor(tid); return; }
     const c = this.chart as any;

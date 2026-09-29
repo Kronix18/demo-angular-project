@@ -1,15 +1,15 @@
 import { Injectable, signal } from '@angular/core';
 import { Drawing } from './drawing-geometry';
+import { isDrawingType } from './drawing-tools';
 
 const KEY = 'chart-drawings';
-const TYPES = ['trend', 'arrow', 'ray', 'hline', 'vline', 'channel', 'rect', 'ellipse', 'fib', 'brush', 'text'];
 const DASHES = ['solid', 'dash', 'dot'];
 const EMPTY: Drawing[] = [];
 
 const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
 const anchor = (v: any) => v && num(v.t) && num(v.p);
 const valid = (d: any): d is Drawing =>
-  !!d && typeof d.id === 'string' && TYPES.includes(d.type) && anchor(d.a) && (d.b === undefined || anchor(d.b)) && (d.offset === undefined || num(d.offset))
+  !!d && typeof d.id === 'string' && isDrawingType(d.type) && anchor(d.a) && (d.b === undefined || anchor(d.b)) && (d.offset === undefined || num(d.offset))
   && (d.text === undefined || typeof d.text === 'string') && (d.pts === undefined || (Array.isArray(d.pts) && d.pts.every(anchor)));
 
 /** Keeps only the known style keys (persisted data is never trusted). */

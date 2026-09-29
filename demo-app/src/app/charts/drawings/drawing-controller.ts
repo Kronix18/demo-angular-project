@@ -1,16 +1,17 @@
 import type { Chart } from 'chart.js';
 import { OHLCV } from '../../core/models/ohlcv.model';
-import {
-  Anchor, Drawing, DrawingStyle, DrawingType, FIB_LEVELS, distToEllipse, distToPolyline, distToRay, distToRectBorder, distToSegment,
-  fibPrice, indexForTime, measureInfo, snapToOhlc, timeForIndex,
-} from './drawing-geometry';
+import { Anchor, Drawing, DrawingStyle, indexForTime, measureInfo, snapToOhlc, timeForIndex } from './drawing-geometry';
 import { DrawingStore } from './drawing-store.service';
+import { DrawingType, toolDef } from './drawing-tools';
+import { Env, Pt, distanceToShapes, handlePoints, shapesFor, textWidth } from './drawing-shapes';
+export { textWidth };
 
 /** Interactive tools: the cursor, every persistent drawing type, and two transient ones. */
 export type Tool = 'cursor' | DrawingType | 'measure' | 'zoom';
 
 /** In-progress gesture (not persisted until committed). */
-export interface Draft { type: DrawingType | 'measure' | 'zoom'; a: Anchor; b: Anchor; offset?: number; phase: 1 | 2; pts?: Anchor[]; }
+/** phase 1: dragging the first segment, 2: channel offset click, 3: placing the remaining anchors one click at a time */
+export interface Draft { type: DrawingType | 'measure' | 'zoom'; a: Anchor; b: Anchor; offset?: number; phase: 1 | 2 | 3; pts?: Anchor[]; }
 export interface MeasureView { a: Anchor; b: Anchor; }
 export interface DrawingView { drawings: Drawing[]; draft: Draft | null; selectedId: string | null; measure: MeasureView | null; }
 /** Zoom-to-region request: x in fractional bar indices, p in prices (ordered low → high). */
@@ -33,7 +34,7 @@ interface Deps {
 }
 
 type Drag =
-  | { mode: 'handle'; id: string; which: 'a' | 'b' }
+  | { mode: 'handle'; id: string; index: number }
   | { mode: 'body'; id: string; idx0: number; p0: number; orig: Drawing }
   | null;
 
@@ -42,10 +43,28 @@ const HANDLE = 9;   // px: endpoint pick tolerance
 const MIN_DRAG = 3; // px: below this a "drag" is just a click
 const BRUSH_STEP = 3; // px between recorded brush points
 
-const TWO_POINT: Tool[] = ['trend', 'arrow', 'rect', 'ellipse', 'fib', 'channel', 'measure', 'zoom'];
-const ONE_CLICK: Tool[] = ['ray', 'hline', 'vline'];
-const TEXT_H = 18;
-export const textWidth = (text: string): number => Math.max(20, text.length * 7 + 8);
+/** A copy of the drawing with anchor `i` replaced (a/b stay in step with pts). */
+function withAnchor(d: Drawing, i: number, pt: Anchor): Drawing {
+  if (d.pts && d.pts.length > 1 && toolDef(d.type)?.points !== 'free') {
+    const pts = d.pts.map((p, k) => (k === i ? pt : p));
+    return { ...d, pts, a: pts[0], ...(pts[1] ? { b: pts[1] } : {}) };
+  }
+  return i === 0 ? { ...d, a: pt } : { ...d, b: pt };
+}
+
+const TRANSIENT: Tool[] = ['measure', 'zoom'];
+
+/** How a tool collects its anchors. */
+function kind(tool: Tool): 'one' | 'drag' | 'channel' | 'sequence' | 'free' | 'transient' | null {
+  if (TRANSIENT.includes(tool)) return 'transient';
+  if (tool === 'cursor') return null;
+  if (tool === 'channel') return 'channel';
+  const def = toolDef(tool);
+  if (!def) return null;
+  if (def.points === 'free') return 'free';
+  if (def.points === 'poly' || (typeof def.points === 'number' && def.points >= 3)) return 'sequence';
+  return def.points === 1 ? 'one' : 'drag';
+}
 
 /**
  * Pointer/keyboard logic for the drawing tools, independent of the DOM: the
@@ -106,7 +125,7 @@ export class DrawingController {
 
   /** Id of the text label under a point (for double-click editing). */
   textAt(x: number, y: number): string | null {
-    for (const d of this.deps.store.list(this.deps.symbol())) if (d.type === 'text' && this.distance(d, x, y) === 0) return d.id;
+    for (const d of this.deps.store.list(this.deps.symbol())) if (toolDef(d.type)?.text && this.distance(d, x, y) === 0) return d.id;
     return null;
   }
 
@@ -135,22 +154,25 @@ export class DrawingController {
     const tool = this.deps.tool();
     if (this.measure) { this.measure = null; this.deps.changed(); }
     if (this.draft?.phase === 2) return this.commitChannel(x, y);
+    if (this.draft?.phase === 3) return this.addAnchor(x, y);
     if (tool === 'cursor') return this.selectOrGrab(x, y);
     const pt = this.toData(x, y);
     if (!pt) return;
     this.selectedId = null;
-    if (ONE_CLICK.includes(tool)) return this.commit({ id: this.newId(), type: tool as DrawingType, a: pt });
-    if (tool === 'text') {
-      const d: Drawing = { id: this.newId(), type: 'text', a: pt, text: '' };
+    const k = kind(tool);
+    if (k === 'one') {
+      const d: Drawing = { id: this.newId(), type: tool as DrawingType, a: pt, ...(toolDef(tool)?.text ? { text: '' } : {}) };
       this.commit(d);
-      this.deps.editText?.(d.id);
+      if (toolDef(tool)?.text) this.deps.editText?.(d.id);
       return;
     }
     this.start = { x, y };
-    if (tool === 'brush') {
+    if (k === 'free') {
       this.lastBrush = { x, y };
-      this.draft = { type: 'brush', a: pt, b: pt, phase: 1, pts: [pt] };
-    } else if (TWO_POINT.includes(tool)) {
+      this.draft = { type: tool as DrawingType, a: pt, b: pt, phase: 1, pts: [pt] };
+    } else if (k === 'sequence') {
+      this.draft = { type: tool as DrawingType, a: pt, b: pt, phase: 1, pts: [pt] };
+    } else if (k) {
       this.draft = { type: tool as Draft['type'], a: pt, b: pt, phase: 1 };
     }
     this.deps.changed();
@@ -160,7 +182,7 @@ export class DrawingController {
     if (this.draft) {
       if (this.draft.phase === 2) {
         this.draft = { ...this.draft, offset: this.offsetAt(this.draft, x, y) };
-      } else if (this.draft.type === 'brush') {
+      } else if (kind(this.deps.tool()) === 'free') {
         const last = this.lastBrush;
         const pt = this.toData(x, y, true);
         if (pt && last && Math.hypot(x - last.x, y - last.y) >= BRUSH_STEP) {
@@ -186,7 +208,14 @@ export class DrawingController {
     const moved = this.start ? Math.hypot(x - this.start.x, y - this.start.y) : 0;
     this.start = null;
     this.lastBrush = null;
-    if (moved < MIN_DRAG || (d.type === 'brush' && (d.pts?.length ?? 0) < 2)) {
+    const k = kind(d.type as Tool);
+    if (k === 'sequence') {
+      // the first press may have been a drag (A -> B) or a plain click (A, then B on the next click)
+      const rel = moved >= MIN_DRAG ? this.toData(x, y, true) : null;
+      this.draft = { ...d, phase: 3, pts: rel ? [d.a, rel] : [d.a] };
+      return this.afterAnchor();
+    }
+    if (moved < MIN_DRAG || (k === 'free' && (d.pts?.length ?? 0) < 2)) {
       this.draft = null;
       return this.deps.changed();
     }
@@ -206,8 +235,48 @@ export class DrawingController {
       this.deps.zoomTo?.({ x0: Math.min(i0, i1), x1: Math.max(i0, i1), p0: Math.min(d.a.p, d.b.p), p1: Math.max(d.a.p, d.b.p) });
       return this.deps.changed();
     }
-    if (d.type === 'brush') return this.commit({ id: this.newId(), type: 'brush', a: d.a, pts: d.pts });
-    this.commit({ id: this.newId(), type: d.type, a: d.a, b: d.b });
+    if (k === 'free') return this.commit({ id: this.newId(), type: d.type as DrawingType, a: d.a, pts: d.pts });
+    const text = toolDef(d.type)?.text;
+    const nd: Drawing = { id: this.newId(), type: d.type as DrawingType, a: d.a, b: d.b, ...(text ? { text: '' } : {}) };
+    this.commit(nd);
+    if (text) this.deps.editText?.(nd.id);
+  }
+
+  /** Sequence tools: a click adds the next anchor. */
+  private addAnchor(x: number, y: number): void {
+    const d = this.draft;
+    if (!d) return;
+    const pt = this.toData(x, y, true);
+    if (!pt) return;
+    this.draft = { ...d, pts: [...(d.pts ?? []), pt] };
+    this.afterAnchor();
+  }
+
+  private afterAnchor(): void {
+    const d = this.draft!;
+    const n = toolDef(d.type)?.points;
+    if (typeof n === 'number' && (d.pts?.length ?? 0) >= n) return this.finishSequence();
+    this.deps.changed();
+  }
+
+  /** Polyline / path: finish on double-click or Enter (needs two distinct points). */
+  finish(): void {
+    const d = this.draft;
+    if (d?.phase === 3 && toolDef(d.type)?.points === 'poly') this.finishSequence();
+  }
+
+  private finishSequence(): void {
+    const d = this.draft!;
+    let pts = d.pts ?? [];
+    // a double-click delivers two presses at the same spot
+    const [p, q] = [pts[pts.length - 2], pts[pts.length - 1]].map((a) => (a ? this.pixel(a) : null));
+    if (p && q && Math.hypot(p.x - q.x, p.y - q.y) < 3) pts = pts.slice(0, -1);
+    this.draft = null;
+    if (pts.length < 2) return this.deps.changed();
+    const text = toolDef(d.type)?.text;
+    const nd: Drawing = { id: this.newId(), type: d.type as DrawingType, a: pts[0], b: pts[1], pts, ...(text ? { text: '' } : {}) };
+    this.commit(nd);
+    if (text) this.deps.editText?.(nd.id);
   }
 
   key(k: string): void {
@@ -215,6 +284,8 @@ export class DrawingController {
       this.deps.store.remove(this.deps.symbol(), this.selectedId);
       this.selectedId = null;
       this.deps.changed();
+    } else if (k === 'Enter') {
+      this.finish();
     } else if (k === 'Escape') {
       this.draft = null;
       this.drag = null;
@@ -293,41 +364,32 @@ export class DrawingController {
     return { t: timeForIndex(bars, idx), p: price };
   }
 
-  /** Pixel geometry of every persistent type, for hit-testing. */
-  private distance(d: Drawing, x: number, y: number): number {
+  /** Shape-generation environment (price pane, pixel mapping, bars). */
+  env(): Env | null {
     const s = this.scales();
-    const a = this.pixel(d.a);
-    if (!s || !a) return Infinity;
-    const b = d.b ? this.pixel(d.b) : null;
-    switch (d.type) {
-      case 'ray': return distToRay(x, y, a.x, a.y);
-      case 'hline': return Math.abs(y - a.y);
-      case 'vline': return Math.abs(x - a.x);
-      case 'trend':
-      case 'arrow': return b ? distToSegment(x, y, a.x, a.y, b.x, b.y) : Infinity;
-      case 'rect': return b ? distToRectBorder(x, y, a.x, a.y, b.x, b.y) : Infinity;
-      case 'ellipse': return b ? distToEllipse(x, y, (a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2) : Infinity;
-      case 'fib': {
-        if (!b) return Infinity;
-        const l = Math.min(a.x, b.x), r = Math.max(a.x, b.x);
-        return Math.min(...FIB_LEVELS.map((lv) => {
-          const py = this.pixel({ t: d.a.t, p: fibPrice(d.a, d.b!, lv) })!.y;
-          return distToSegment(x, y, l, py, r, py);
-        }));
-      }
-      case 'brush': return distToPolyline(x, y, (d.pts ?? []).map((p) => this.pixel(p)).filter((p): p is { x: number; y: number } => !!p));
-      case 'text': {
-        const w = textWidth(d.text ?? '');
-        const inside = x >= a.x && x <= a.x + w && y >= a.y - TEXT_H / 2 && y <= a.y + TEXT_H / 2;
-        return inside ? 0 : Infinity;
-      }
-      case 'channel': {
-        if (!b) return Infinity;
-        const a2 = this.pixel({ t: d.a.t, p: d.a.p + (d.offset ?? 0) })!;
-        const b2 = this.pixel({ t: d.b!.t, p: d.b!.p + (d.offset ?? 0) })!;
-        return Math.min(distToSegment(x, y, a.x, a.y, b.x, b.y), distToSegment(x, y, a2.x, a2.y, b2.x, b2.y));
-      }
-    }
+    if (!s) return null;
+    return {
+      area: { left: s.area.left, right: s.area.right, top: s.y.top, bottom: s.y.bottom },
+      full: { left: s.area.left, right: s.area.right, top: s.area.top, bottom: s.area.bottom },
+      bars: this.deps.bars(),
+      px: (a) => this.pixel(a)!,
+      fmt: (p) => p.toFixed(2),
+    };
+  }
+
+  /** A draft as a drawing (a sequence tool also follows the cursor with its next anchor). */
+  draftDrawing(): Drawing | null {
+    const d = this.draft;
+    if (!d) return null;
+    const sequence = d.phase === 3 || (d.pts && kind(d.type as Tool) === 'sequence');
+    const pts = sequence ? [...(d.pts ?? []), d.b] : d.pts;
+    return { id: 'draft', type: d.type as DrawingType, a: d.a, b: d.b, ...(pts ? { pts } : {}), ...(d.offset !== undefined ? { offset: d.offset } : {}) };
+  }
+
+  /** Pixel geometry of a drawing, for hit-testing. */
+  private distance(d: Drawing, x: number, y: number): number {
+    const env = this.env();
+    return env ? distanceToShapes(shapesFor(d, env), x, y, env) : Infinity;
   }
 
   private selectOrGrab(x: number, y: number): void {
@@ -337,11 +399,12 @@ export class DrawingController {
     }
     const list = this.deps.store.list(this.deps.symbol());
     const sel = list.find((d) => d.id === this.selectedId);
-    if (sel && sel.b) {
-      for (const which of ['a', 'b'] as const) {
-        const px = this.pixel(sel[which]!);
-        if (px && Math.hypot(px.x - x, px.y - y) <= HANDLE) {
-          this.drag = { mode: 'handle', id: sel.id, which };
+    const env = this.env();
+    if (sel && env) {
+      const hs = handlePoints(sel, env);
+      for (let index = 0; index < hs.length; index++) {
+        if (Math.hypot(hs[index].x - x, hs[index].y - y) <= HANDLE) {
+          this.drag = { mode: 'handle', id: sel.id, index };
           return;
         }
       }
@@ -369,7 +432,7 @@ export class DrawingController {
     if (drag.mode === 'handle') {
       const pt = this.toData(x, y, true);
       const cur = this.find(drag.id);
-      if (pt && cur) this.deps.store.update(sym, { ...cur, [drag.which]: pt });
+      if (pt && cur) this.deps.store.update(sym, withAnchor(cur, drag.index, pt));
     } else {
       const dIdx = (s.x.getValueForPixel(x) as number) - drag.idx0;
       const dP = (s.y.getValueForPixel(y) as number) - drag.p0;
