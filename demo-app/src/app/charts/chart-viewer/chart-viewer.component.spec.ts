@@ -681,6 +681,168 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('drawing sidebar, styles, text, zoom tool (11.5)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const qa = (sel: string) => Array.from(fixture.nativeElement.querySelectorAll(sel)) as HTMLElement[];
+    const fresh = () => { sessionStorage.clear(); localStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const ctl = () => (component as any).drawings;
+    let store: any;
+    beforeEach(async () => {
+      const { DrawingStore } = await import('../drawings/drawing-store.service');
+      store = TestBed.inject(DrawingStore);
+    });
+    async function ready() {
+      fresh();
+      await loaded();
+      const c = chartOf();
+      c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
+      c.scales.y.top = 0; c.scales.y.bottom = 300; c.scales.y.height = 300;
+      // fake pixel mapping: x = index * 10, y = 300 - price (so prices 0..300 fit the pane)
+      c.scales.x.getPixelForValue = (v: number) => v * 10;
+      c.scales.x.getValueForPixel = (px: number) => px / 10;
+      c.scales.y.getPixelForValue = (v: number) => 300 - v;
+      c.scales.y.getValueForPixel = (px: number) => 300 - px;
+      return c;
+    }
+    const drawn = () => store.list('msft');
+
+    it('the sidebar offers every tool + magnet / stay-in-drawing / lock / hide / delete-all', async () => {
+      await ready();
+      expect(qa('[data-tool]').map((b) => b.dataset['tool'])).toEqual([
+        'cursor', 'trend', 'arrow', 'ray', 'hline', 'vline', 'channel', 'rect', 'ellipse', 'fib', 'brush', 'text', 'measure', 'zoom',
+      ]);
+      for (const sel of ['[data-magnet]', '[data-keep]', '[data-lock]', '[data-hide]', '[data-tool-clear]']) expect(q(sel), sel).toBeTruthy();
+      for (const b of qa('.draw-tools button')) expect(b.getAttribute('aria-label') || b.getAttribute('title'), b.outerHTML).toBeTruthy();
+      expect(q('.chart-tools [data-magnet]')).toBeNull(); // magnet moved into the sidebar
+    });
+
+    it('after finishing a drawing the tool returns to the cursor — unless "stay in drawing mode" is on', async () => {
+      await ready();
+      component.setTool('hline');
+      ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
+      fixture.detectChanges();
+      expect(component.tool()).toBe('cursor');
+      (q('[data-keep]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('[data-keep]')!.getAttribute('aria-pressed')).toBe('true');
+      component.setTool('hline');
+      ctl().pointerDown(100, 120); ctl().pointerUp(100, 120);
+      expect(component.tool()).toBe('hline');
+      expect(drawn().length).toBe(2);
+    });
+
+    it('Escape leaves the drawing tool; lock / hide buttons toggle the store flags; picking a tool un-hides', async () => {
+      await ready();
+      component.setTool('trend');
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(component.tool()).toBe('cursor');
+      (q('[data-lock]') as HTMLButtonElement).click();
+      (q('[data-hide]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(store.locked()).toBe(true);
+      expect(store.hidden()).toBe(true);
+      expect(q('[data-lock]')!.getAttribute('aria-pressed')).toBe('true');
+      expect(q('[data-hide]')!.getAttribute('aria-pressed')).toBe('true');
+      (q('[data-tool="rect"]') as HTMLButtonElement).click();
+      expect(store.hidden()).toBe(false);
+    });
+
+    it('a selected drawing shows the style toolbar: colour, width, dash, delete', async () => {
+      await ready();
+      expect(q('[data-draw-style]')).toBeNull();
+      component.setTool('hline');
+      ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
+      fixture.detectChanges();
+      expect(q('[data-draw-style]')).toBeTruthy();
+      const color = q('[data-draw-color]') as HTMLInputElement;
+      color.value = '#ff0000'; color.dispatchEvent(new Event('input'));
+      const width = q('[data-draw-width]') as HTMLSelectElement;
+      width.value = '3'; width.dispatchEvent(new Event('change'));
+      const dash = q('[data-draw-dash]') as HTMLSelectElement;
+      dash.value = 'dot'; dash.dispatchEvent(new Event('change'));
+      expect(drawn()[0].style).toEqual({ color: '#ff0000', width: 3, dash: 'dot' });
+      (q('[data-draw-delete]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(drawn()).toEqual([]);
+      expect(q('[data-draw-style]')).toBeNull();
+    });
+
+    it('text tool: click opens an inline editor; Enter saves the label, Esc / blank discards it', async () => {
+      await ready();
+      component.setTool('text');
+      ctl().pointerDown(150, 100); ctl().pointerUp(150, 100);
+      fixture.detectChanges();
+      const input = q('[data-text-edit]') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      input.value = 'breakout';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      expect(drawn()[0].text).toBe('breakout');
+      expect(q('[data-text-edit]')).toBeNull();
+      component.setTool('text');
+      ctl().pointerDown(250, 100); ctl().pointerUp(250, 100);
+      fixture.detectChanges();
+      (q('[data-text-edit]') as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+      expect(drawn().length).toBe(1); // the empty label was discarded
+    });
+
+    it('double-clicking a text label edits it', async () => {
+      await ready();
+      store.add('msft', { id: 't1', type: 'text', a: { t: chartOf().data.datasets[0].data[1].t, p: 100 }, text: 'old' });
+      const x = chartOf().scales.x.getPixelForValue(chartOf().data.datasets[0].data[1].x);
+      Object.defineProperty(MouseEvent.prototype, 'offsetX', { get: () => x + 5, configurable: true });
+      Object.defineProperty(MouseEvent.prototype, 'offsetY', { get: () => 200, configurable: true });
+      component.chartCanvas!.nativeElement.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      delete (MouseEvent.prototype as any).offsetX;
+      delete (MouseEvent.prototype as any).offsetY;
+      fixture.detectChanges();
+      expect((q('[data-text-edit]') as HTMLInputElement).value).toBe('old');
+    });
+
+    it('zoom tool: dragging a region zooms x to it and sets a manual price range (auto off), then returns to the cursor', async () => {
+      const c = await ready();
+      component.setTool('zoom');
+      expect(c.data.datasets[0].data.length).toBeGreaterThan(0);
+      component.zoomToRegion({ x0: 0, x1: 2, p0: 90, p1: 130 });
+      fixture.detectChanges();
+      expect(component.autoScale()).toBe(false);
+      expect(chartOf().options.scales.y.min).toBeCloseTo(90, 4);
+      expect(chartOf().options.scales.y.max).toBeCloseTo(130, 4);
+      expect(component.tool()).toBe('cursor');
+    });
+
+    it('measure readout is transient and never persisted', async () => {
+      await ready();
+      component.setTool('measure');
+      ctl().pointerDown(100, 100); ctl().pointerMove(200, 60); ctl().pointerUp(200, 60);
+      expect(ctl().view().measure).toBeTruthy();
+      expect(() => chartOf().draw()).not.toThrow();
+      expect(drawn()).toEqual([]);
+    });
+
+    it('every drawing type renders without errors (incl. hidden and selected states)', async () => {
+      const c = await ready();
+      const t0 = c.data.datasets[0].data[0].t;
+      const t1 = c.data.datasets[0].data[2].t;
+      const a = { t: t0, p: 100 };
+      const b = { t: t1, p: 120 };
+      for (const d of [
+        { id: '1', type: 'trend', a, b }, { id: '2', type: 'arrow', a, b }, { id: '3', type: 'ray', a }, { id: '4', type: 'hline', a },
+        { id: '5', type: 'vline', a }, { id: '6', type: 'channel', a, b, offset: 5 }, { id: '7', type: 'rect', a, b },
+        { id: '8', type: 'ellipse', a, b }, { id: '9', type: 'fib', a, b }, { id: '10', type: 'brush', a, pts: [a, b] },
+        { id: '11', type: 'text', a, text: 'note', style: { color: '#00ff00', width: 2, dash: 'dash' } },
+      ]) store.add('msft', d);
+      expect(() => c.draw()).not.toThrow();
+      ctl().pointerDown(0, 100);
+      for (const id of ['1', '7', '9', '11']) { (ctl() as any).selectedId = id; expect(() => c.draw()).not.toThrow(); }
+      store.setHidden(true);
+      expect(() => c.draw()).not.toThrow();
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>

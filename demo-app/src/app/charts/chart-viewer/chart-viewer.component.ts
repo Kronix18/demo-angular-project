@@ -128,63 +128,8 @@ const paneDecorPlugin = {
 };
 Chart.register(paneDecorPlugin);
 
-/**
- * Drawing renderer (10.3): trend lines, horizontal rays and parallel channels
- * from the DrawingController's view, clipped to the price pane. Anchors are
- * (time, price), so drawings follow zoom/pan/LOD/interval changes.
- */
-const drawingsPlugin = {
-  id: 'drawings',
-  afterDatasetsDraw(chart: any): void {
-    const ctl: DrawingController | undefined = chart.$drawings;
-    const { ctx, chartArea } = chart;
-    const ys = chart.scales?.y;
-    if (!ctl || !ctx || !chartArea || !ys) return;
-    const v = ctl.view();
-    if (!v.drawings.length && !v.draft) return;
-    const color = cssVar('--c-drawing');
-    const fill = cssVar('--c-drawing-fill');
-    const surface = cssVar('--c-chart-bg');
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(chartArea.left, ys.top, chartArea.right - chartArea.left, ys.bottom - ys.top);
-    ctx.clip();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = color;
-    const line = (x1: number, y1: number, x2: number, y2: number) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
-    const draw = (d: any, selected: boolean, draft: boolean) => {
-      const a = ctl.pixel(d.a);
-      if (!a) return;
-      ctx.setLineDash(draft ? [5, 4] : []);
-      if (d.type === 'ray') {
-        line(a.x, a.y, chartArea.right, a.y);
-      } else {
-        const b = ctl.pixel(d.b);
-        if (!b) return;
-        line(a.x, a.y, b.x, b.y);
-        if (d.type === 'channel' && d.offset !== undefined) {
-          const a2 = ctl.pixel({ t: d.a.t, p: d.a.p + d.offset })!;
-          const b2 = ctl.pixel({ t: d.b.t, p: d.b.p + d.offset })!;
-          line(a2.x, a2.y, b2.x, b2.y);
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(b2.x, b2.y); ctx.lineTo(a2.x, a2.y); ctx.closePath();
-          ctx.fillStyle = fill;
-          ctx.fill();
-        }
-      }
-      if (selected) {
-        ctx.setLineDash([]);
-        ctx.fillStyle = surface;
-        const pts = [a, d.b ? ctl.pixel(d.b) : null].filter(Boolean) as { x: number; y: number }[];
-        for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
-      }
-    };
-    for (const d of v.drawings) draw(d, d.id === v.selectedId, false);
-    if (v.draft) draw(v.draft, false, true);
-    ctx.restore();
-  },
-};
-Chart.register(drawingsPlugin);
+import '../drawings/drawings-plugin'; // registers the drawing renderer
+
 
 /**
  * Point & Figure glyphs: the price dataset carries the column envelopes

@@ -106,3 +106,8 @@ export function measureInfo(bars: OHLCV[], a: Anchor, b: Anchor): { dPrice: numb
 export function snapToOhlc(bar: OHLCV, price: number): number {
   return [bar.open, bar.high, bar.low, bar.close].reduce((best, v) => (Math.abs(v - price) < Math.abs(best - price) ? v : best));
 }
+
+/** Price of a Fibonacci level: 0 at the second anchor (b), 1 at the first (a). */
+export function fibPrice(a: Anchor, b: Anchor, level: number): number {
+  return b.p - (b.p - a.p) * level;
+}
