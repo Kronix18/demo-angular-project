@@ -23,10 +23,10 @@ const lines = (s: Shape[]) => s.filter((x): x is Extract<Shape, { k: 'line' }> =
 const anchorsFor = (n: number): Anchor[] => Array.from({ length: n }, (_, k) => at(10 + k * 6, 120 + (k % 2 ? 25 : 0) + k * 3));
 
 describe('drawing tool registry (11.7)', () => {
-  it('has unique ids, every group is populated and TradingView-sized (50+ tools)', () => {
+  it('has unique ids, every group is populated and TradingView-sized (80+ tools)', () => {
     const ids = TOOL_DEFS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeGreaterThanOrEqual(50);
+    expect(ids.length).toBeGreaterThanOrEqual(80);
     for (const g of TOOL_GROUPS) expect(toolsInGroup(g.id).length, g.id).toBeGreaterThan(0);
     expect(isDrawingType('fibext')).toBe(true);
     expect(isDrawingType('measure')).toBe(false); // transient, not a stored drawing
@@ -180,5 +180,88 @@ describe('drawing shapes (11.7)', () => {
     expect(handlePoints(drawing('xabcd', anchorsFor(5)), env).length).toBe(5);
     expect(handlePoints(drawing('brush', anchorsFor(6)), env)).toEqual([]);
     expect(handlePoints(drawing('hline', [at(10, 100)]), env).length).toBe(1);
+  });
+
+  describe('second wave of TradingView tools (11.9)', () => {
+    it('flat top/bottom: a trend line plus a horizontal line at the third anchor\'s price', () => {
+      const shapes = shapesFor(drawing('flat', [at(10, 100), at(30, 120), at(20, 110)]), env);
+      const hs = lines(shapes).filter((l) => l.y1 === l.y2);
+      expect(hs.length).toBe(1);
+      expect(hs[0].y1).toBe(300 - 110);
+    });
+
+    it('cyclic lines repeat the distance; time cycles are arcs on it; sine line oscillates between the anchors', () => {
+      const xs = lines(shapesFor(drawing('cyclic', [at(10, 100), at(20, 100)]), env)).map((l) => l.x1);
+      expect(xs.slice(0, 4)).toEqual([100, 200, 300, 400]);
+      expect(shapesFor(drawing('timecycles', [at(10, 100), at(20, 100)]), env).filter((s) => s.k === 'poly').length).toBeGreaterThan(3);
+      const sine = shapesFor(drawing('sine', [at(10, 100), at(30, 130)]), env).find((s) => s.k === 'poly') as Extract<Shape, { k: 'poly' }>;
+      const ys = sine.pts.map((p) => p.y);
+      expect(Math.min(...ys)).toBeCloseTo(300 - 130, 3);
+      expect(Math.max(...ys)).toBeCloseTo(300 - 100, 3);
+    });
+
+    it('fib arcs / spiral / wedge / trend-based time / gann square / pitchfan', () => {
+      expect(shapesFor(drawing('fibarcs', [at(10, 100), at(20, 120)]), env).filter((s) => s.k === 'poly').length).toBeGreaterThanOrEqual(5);
+      expect(shapesFor(drawing('fibspiral', [at(10, 100), at(20, 120)]), env).some((s) => s.k === 'poly')).toBe(true);
+      expect(lines(shapesFor(drawing('fibwedge', [at(10, 100), at(30, 130), at(30, 90)]), env)).length).toBeGreaterThanOrEqual(2);
+      const xs = lines(shapesFor(drawing('fibtimetrend', [at(10, 100), at(12, 110), at(20, 105)]), env)).map((l) => l.x1);
+      expect(xs.slice(0, 4)).toEqual([200, 220, 240, 260]); // from c, spaced by the a->b distance times 0,1,2,3
+      const sq = shapesFor(drawing('gannsquare', [at(10, 100), at(30, 140)]), env);
+      expect(sq.filter((s) => s.k === 'line').length).toBeGreaterThanOrEqual(10);
+      expect(lines(shapesFor(drawing('pitchfan', anchorsFor(3)), env)).length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('pitchfork variants start the median line elsewhere (Schiff: half-way up to b; modified: half-way in time too); inside pitchfork adds inner lines', () => {
+      const a = at(10, 100), b = at(20, 130), c = at(20, 110);
+      const plain = lines(shapesFor(drawing('pitchfork', [a, b, c]), env))[0];
+      const schiff = lines(shapesFor(drawing('schiff', [a, b, c]), env))[0];
+      const mod = lines(shapesFor(drawing('modschiff', [a, b, c]), env))[0];
+      expect([plain.x1, plain.y1]).toEqual([100, 200]);
+      expect([schiff.x1, schiff.y1]).toEqual([100, 185]);
+      expect([mod.x1, mod.y1]).toEqual([150, 185]);
+      expect(lines(shapesFor(drawing('insidepitchfork', [a, b, c]), env)).length).toBeGreaterThan(3);
+    });
+
+    it('more patterns: cypher, double / triple Elliott combos', () => {
+      expect(texts(shapesFor(drawing('cypher', anchorsFor(5)), env)).filter((s) => /^[XABCD]$/.test(s))).toEqual(['X', 'A', 'B', 'C', 'D']);
+      expect(texts(shapesFor(drawing('elliottdouble', anchorsFor(4)), env))).toEqual(['0', 'W', 'X', 'Y']);
+      expect(texts(shapesFor(drawing('elliotttriple', anchorsFor(6)), env))).toEqual(['0', 'W', 'X', 'Y', 'X', 'Z']);
+    });
+
+    it('projection repeats the first move from the third anchor', () => {
+      const shapes = shapesFor(drawing('projection', [at(10, 100), at(20, 110), at(30, 105)]), env);
+      const arrows = shapes.filter((s) => s.k === 'arrow') as Extract<Shape, { k: 'arrow' }>[];
+      expect(arrows.length).toBe(2);
+      expect([arrows[1].x2, arrows[1].y2]).toEqual([400, 300 - 115]); // (30+10, 105+10)
+    });
+
+    it('bars pattern copies the bars between a and b to c; volume profile bins volume by price; anchored VWAP follows the cumulative typical price', () => {
+      const pattern = shapesFor(drawing('barspattern', [at(10, 110), at(20, 120), at(50, 200)]), env);
+      expect(pattern.length).toBeGreaterThan(10);
+      const prof = shapesFor(drawing('volprofile', [at(10, 100), at(40, 140)]), env).filter((s) => s.k === 'rect');
+      expect(prof.length).toBeGreaterThan(5);
+      const vwap = shapesFor(drawing('avwap', [at(10, 110)]), env).find((s) => s.k === 'poly') as Extract<Shape, { k: 'poly' }>;
+      expect(vwap.pts.length).toBe(90); // bars 10..99
+      // first point: typical price of bar 10 = (112 + 108 + 110) / 3
+      expect(vwap.pts[0].y).toBeCloseTo(300 - (112 + 108 + 110) / 3, 6);
+    });
+
+    it('arc goes through its three points; double curve is a smooth S through four', () => {
+      const arc = shapesFor(drawing('arc', [at(10, 100), at(20, 130), at(30, 100)]), env).find((s) => s.k === 'poly') as Extract<Shape, { k: 'poly' }>;
+      expect(arc.pts[0]).toEqual({ x: 100, y: 200 });
+      expect(arc.pts[arc.pts.length - 1].x).toBeCloseTo(300, 6);
+      expect(arc.pts.some((p) => Math.abs(p.x - 200) < 4 && Math.abs(p.y - 170) < 4)).toBe(true);
+      expect(shapesFor(drawing('doublecurve', anchorsFor(4)), env).some((s) => s.k === 'poly' || s.k === 'curve')).toBe(true);
+    });
+
+    it('more text tools: price note, pin, comment, signpost; more icons', () => {
+      expect(texts(shapesFor(drawing('pricenote', [at(10, 123.4), at(20, 130)]), env))).toContain('123.40');
+      expect(texts(shapesFor(drawing('pin', [at(10, 100)], { text: 'hi' }), env))).toContain('hi');
+      expect(texts(shapesFor(drawing('comment', [at(10, 100)], { text: 'yo' }), env))).toContain('yo');
+      expect(texts(shapesFor(drawing('signpost', [at(10, 100)], { text: 'go' }), env))).toContain('go');
+      for (const id of ['iconheart', 'iconthumb', 'iconfire', 'iconrocket', 'iconwarn', 'iconbulb', 'iconbell', 'icondollar']) {
+        expect(shapesFor(drawing(id, [at(10, 100)]), env).length, id).toBe(1);
+      }
+    });
   });
 });
