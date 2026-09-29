@@ -616,11 +616,98 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(chartOf().data.datasets.some((d: any) => d.label === 'Volume')).toBe(true);
     });
 
+    it('EVERY chart style renders: price series shape per style, finite y-axis, no exceptions', async () => {
+      const st = fresh();
+      await loaded();
+      const expected: Record<string, (ds: any) => void> = {
+        candles: (d) => { expect(d.type).toBe('candlestick'); expect(d.backgroundColors).toBeTruthy(); expect(d.borderColors).toBeTruthy(); },
+        hollow: (d) => { expect(d.type).toBe('candlestick'); expect(d.backgroundColors.up).toBe('transparent'); expect(d.backgroundColors.down).not.toBe('transparent'); },
+        ohlc: (d) => { expect(d.type).toBe('tvbar'); expect(d.barStyle).toBe('ohlc'); },
+        hlc: (d) => { expect(d.type).toBe('tvbar'); expect(d.barStyle).toBe('hlc'); },
+        highlow: (d) => { expect(d.type).toBe('tvbar'); expect(d.barStyle).toBe('highlow'); },
+        columns: (d) => { expect(d.type).toBe('bar'); expect(d.data.map((p: any) => p.y)).toEqual([105, 112, 118]); expect(typeof d.backgroundColor).toBe('function'); },
+        line: (d) => { expect(d.type).toBe('line'); expect(d.fill).toBeFalsy(); expect(d.pointRadius).toBe(0); },
+        markers: (d) => { expect(d.type).toBe('line'); expect(d.pointRadius).toBeGreaterThan(0); },
+        step: (d) => { expect(d.type).toBe('line'); expect(d.stepped).toBe('after'); },
+        area: (d) => { expect(d.type).toBe('line'); expect(d.fill).toBeTruthy(); },
+        hlcarea: (d) => { expect(d.type).toBe('line'); },
+        baseline: (d) => { expect(d.type).toBe('line'); expect(d.fill.target.value).toBeGreaterThan(90); expect(typeof d.segment.borderColor).toBe('function'); },
+        heikin: (d) => { expect(d.type).toBe('candlestick'); },
+        renko: (d) => { expect(d.type).toBe('candlestick'); },
+        linebreak: (d) => { expect(d.type).toBe('candlestick'); },
+        kagi: (d) => { expect(d.type).toBe('line'); expect(d.stepped).toBe('after'); expect(typeof d.segment.borderColor).toBe('function'); },
+        pnf: (d) => { expect(d.type).toBe('candlestick'); expect(d.pnf).toBe(true); },
+        range: (d) => { expect(d.type).toBe('candlestick'); },
+      };
+      for (const [type, check] of Object.entries(expected)) {
+        st.setChartType(type as any);
+        await fixture.whenStable();
+        const c = chartOf();
+        expect(c, type).toBeTruthy();
+        check(c.data.datasets[0]);
+        expect(c.data.datasets.some((d: any) => d.label === 'Volume'), type).toBe(true);
+        expect(Number.isFinite(c.scales.y.min) && Number.isFinite(c.scales.y.max), `${type} y axis`).toBe(true);
+        expect(() => c.draw(), type).not.toThrow();
+      }
+    });
+
+    it('HLC area adds high + low lines around the close', async () => {
+      const st = fresh();
+      await loaded();
+      st.setChartType('hlcarea');
+      await fixture.whenStable();
+      const labels = chartOf().data.datasets.map((d: any) => d.label);
+      expect(labels).toEqual(expect.arrayContaining(['Price', 'High', 'Low']));
+    });
+
+    it('Heikin Ashi keeps the view on a switch; brick styles reframe (their bar indexes differ)', async () => {
+      const st = fresh();
+      await loaded();
+      chartOf().zoomScale('x', { min: 1, max: 2 });
+      st.setChartType('heikin');
+      await fixture.whenStable();
+      expect(chartOf().options.scales.x.min).toBe(1);
+      st.setChartType('renko');
+      await fixture.whenStable();
+      expect(chartOf().options.scales.x.min).not.toBe(1);
+    });
+
+    it('brick styles work on a long history (bounded data window, volume + indicators still aligned)', async () => {
+      const st = fresh();
+      st.addIndicator({ type: 'sma', period: 5 });
+      stubCanvas();
+      const rows = ['<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>'];
+      for (let i = 0; i < 400; i++) {
+        const d = new Date(Date.UTC(2020, 0, 1 + i)).toISOString().slice(0, 10).replace(/-/g, '');
+        const c = 100 + Math.sin(i / 15) * 20 + i * 0.05;
+        rows.push(`MSFT.US,D,${d},000000,${c - 1},${c + 2},${c - 2},${c},${1000 + i},0`);
+      }
+      httpMock.expectOne('test-data/msft.us.txt').flush(rows.join('\r\n'));
+      await fixture.whenStable();
+      for (const type of ['renko', 'kagi', 'pnf', 'range', 'linebreak']) {
+        st.setChartType(type as any);
+        await fixture.whenStable();
+        const c = chartOf();
+        const price = c.data.datasets[0].data;
+        const vol = c.data.datasets.find((d: any) => d.label === 'Volume').data;
+        const sma = c.data.datasets.find((d: any) => d.label === 'SMA 5').data;
+        expect(price.length, type).toBeGreaterThan(3);
+        expect(vol.length, type).toBe(price.length);
+        expect(sma.length, type).toBe(price.length);
+        expect(price.map((p: any) => p.x), type).toEqual(vol.map((p: any) => p.x));
+      }
+    });
+
     it('the type select writes the state; y-axis still fits the line/ohlc data', async () => {
       const st = fresh();
       await loaded();
       const sel = q('select[name="chartType"]') as HTMLSelectElement;
-      expect(Array.from(sel.options).map((o) => o.value)).toEqual(['candles', 'ohlc', 'line', 'area']);
+      expect(Array.from(sel.options).map((o) => o.value)).toEqual([
+        'candles', 'hollow', 'ohlc', 'hlc', 'highlow', 'columns',
+        'line', 'markers', 'step', 'area', 'hlcarea', 'baseline',
+        'heikin', 'renko', 'linebreak', 'kagi', 'pnf', 'range',
+      ]);
+      expect(Array.from(sel.querySelectorAll('optgroup')).map((g) => g.label)).toEqual(['Bars & candles', 'Lines & areas', 'Alternative charts']);
       sel.value = 'line';
       sel.dispatchEvent(new Event('change'));
       expect(st.snapshot().chartType).toBe('line');
