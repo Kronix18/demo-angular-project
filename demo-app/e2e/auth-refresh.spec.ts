@@ -11,10 +11,9 @@ test('expired token: 401 -> POST /api/auth/refresh -> replay with the new token;
   page.on('request', (r) => { if (r.url().includes('/api/')) seen.push({ path: new URL(r.url()).pathname, auth: r.headers()['authorization'] ?? null }); });
   await mockApi(page, { expiredTokens: ['old-token'] });
   await page.goto('/screener');
-  await expect.poll(() => seen.filter((s) => s.path === '/api/screener/run').length).toBeGreaterThanOrEqual(2);
-  const runs = seen.filter((s) => s.path === '/api/screener/run');
-  expect(runs[0].auth).toBe('Bearer old-token');
-  expect(runs[runs.length - 1].auth).toBe('Bearer new-token');
+  await expect.poll(() => seen.filter((s) => s.path === '/api/screener/run' && s.auth === 'Bearer new-token').length).toBeGreaterThanOrEqual(1);
+  // whichever request (meta or screener) hit the expired token first, exactly ONE refresh served them all
+  expect(seen.some((s) => s.auth === 'Bearer old-token')).toBe(true);
   expect(seen.filter((s) => s.path === '/api/auth/refresh')).toHaveLength(1);
   await expect(page.locator('[data-api-toast]')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('auth_token'))).toBe('new-token');

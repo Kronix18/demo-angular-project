@@ -43,10 +43,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const refresher = inject(TokenRefresher);
   const auth = inject(AuthService);
 
-  return next(withToken(req, tokens.access())).pipe(
+  const sentWith = tokens.access();
+  return next(withToken(req, sentWith)).pipe(
     catchError((err: unknown) => {
       const unauthorised = err instanceof HttpErrorResponse && err.status === 401;
       if (!unauthorised || !tokens.refresh() || req.context.get(RETRIED)) return throwError(() => err);
+      const current = tokens.access();
+      // Another request already refreshed while this one was in flight: just replay with the current token.
+      if (current && current !== sentWith) return next(withToken(req.clone({ context: new HttpContext().set(RETRIED, true) }), current));
       return refresher.refresh().pipe(
         catchError(() => {
           tokens.clear();
