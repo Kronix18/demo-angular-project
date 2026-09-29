@@ -5,6 +5,7 @@ import { distinctUntilChanged, map } from 'rxjs/operators';
 
 /** Chart state shape (4.1). Indicators: {type, period, hidden?} entries (hidden = eye toggle, 10.2). */
 import { CHART_TYPES, ChartType } from '../models/chart-type';
+import { PriceSettings, VolumeSettings, sanitizePrice, sanitizeVolume } from '../models/symbol-settings';
 export { CHART_TYPES };
 export type { ChartType };
 
@@ -19,6 +20,9 @@ export interface ChartState {
   logScale: boolean;
   /** crosshair magnet: snap the horizontal line to the hovered bar's close (10.5) */
   magnet: boolean;
+  /** symbol + volume settings from the legend (11.6) */
+  price: PriceSettings;
+  volume: VolumeSettings;
 }
 
 const STORAGE_KEY = 'chart-state';
@@ -59,6 +63,8 @@ const DEFAULTS: ChartState = {
   chartType: 'candles',
   magnet: false,
   logScale: false,
+  price: {},
+  volume: {},
 };
 
 /**
@@ -120,6 +126,20 @@ export class ChartStateService {
     if (CHART_TYPES.includes(chartType)) this.update({ chartType });
   }
 
+  /** Replaces the symbol settings (invalid values are dropped). */
+  setPriceSettings(price: PriceSettings): void { this.update({ price: sanitizePrice(price) }); }
+  setVolumeSettings(volume: VolumeSettings): void { this.update({ volume: sanitizeVolume(volume) }); }
+
+  togglePriceHidden(): void {
+    const { hidden, ...rest } = this.subject.value.price;
+    this.update({ price: hidden ? rest : { ...rest, hidden: true } });
+  }
+
+  toggleVolumeHidden(): void {
+    const { hidden, ...rest } = this.subject.value.volume;
+    this.update({ volume: hidden ? rest : { ...rest, hidden: true } });
+  }
+
   toggleLogScale(): void {
     this.update({ logScale: !this.subject.value.logScale });
   }
@@ -148,7 +168,7 @@ export class ChartStateService {
   /** Restore defaults and clear the persisted state. */
   reset(): void {
     sessionStorage.removeItem(STORAGE_KEY);
-    this.subject.next({ ...DEFAULTS, indicators: [] });
+    this.subject.next({ ...DEFAULTS, indicators: [], price: {}, volume: {} });
   }
 
   private update(partial: Partial<ChartState>): void {
@@ -169,7 +189,7 @@ export class ChartStateService {
   private readPersisted(): ChartState {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...DEFAULTS, indicators: [] };
+      if (!raw) return { ...DEFAULTS, indicators: [], price: {}, volume: {} };
       const parsed = JSON.parse(raw);
       return {
         symbol: typeof parsed.symbol === 'string' ? parsed.symbol : DEFAULTS.symbol,
@@ -178,12 +198,14 @@ export class ChartStateService {
         chartType: CHART_TYPES.includes(parsed.chartType) ? parsed.chartType : DEFAULTS.chartType,
         magnet: parsed.magnet === true,
         logScale: parsed.logScale === true,
+        price: sanitizePrice(parsed.price),
+        volume: sanitizeVolume(parsed.volume),
         indicators: Array.isArray(parsed.indicators)
           ? parsed.indicators.map(sanitizeIndicator).filter((i: IndicatorEntry | null): i is IndicatorEntry => i !== null)
           : [],
       };
     } catch {
-      return { ...DEFAULTS, indicators: [] };
+      return { ...DEFAULTS, indicators: [], price: {}, volume: {} };
     }
   }
 }

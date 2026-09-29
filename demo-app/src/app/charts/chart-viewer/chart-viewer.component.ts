@@ -21,6 +21,8 @@ import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
+import { SymbolSettingsDialogComponent } from '../dialogs/symbol-settings-dialog.component';
+import { PriceSettings, VolumeSettings } from '../../core/models/symbol-settings';
 import { DrawingSidebarComponent } from '../drawings/drawing-sidebar.component';
 import { DrawingStore } from '../drawings/drawing-store.service';
 import { Range, fitRangeLog, panRange, scaleRange } from '../y-scale-math';
@@ -236,7 +238,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, DrawingSidebarComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -263,6 +265,10 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       @if (searchOpen()) {
         <app-symbol-search-dialog [initial]="searchInitial()" [current]="currentSymbol" (pick)="pickFromSearch($event)" (closed)="searchOpen.set(false)" />
+      }
+      @if (seriesDialog(); as k) {
+        <app-symbol-settings-dialog [kind]="k" [settings]="k === 'price' ? chartState.snapshot().price : chartState.snapshot().volume" [lineLike]="lineLike()"
+          (save)="saveSeriesSettings(k, $event)" (closed)="seriesDialog.set(null)" />
       }
       @if (settingsFor(); as sf) {
         <app-indicator-settings-dialog [entry]="sf.entry" (save)="saveSettings(sf.index, $event)" (closed)="settingsIndex.set(null)" />
@@ -296,7 +302,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             (input)="et.value = $any($event.target).value" (keydown)="textKey($event, et)" (blur)="commitText(et)" />
         }
         @if (!error) {
-          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" />
+          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" (seriesToggle)="toggleSeries($event)" (seriesSettings)="seriesDialog.set($event)" />
         }
         @if (loading) {
           <div class="loading-overlay skeleton" role="status" aria-live="polite">
@@ -478,7 +484,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   // ZONELESS app: async callbacks don't trigger change detection — markForCheck()
   // after state updates makes the @if(loading)/@if(error) blocks re-render.
   private cdr: ChangeDetectorRef;
-  private chartState: ChartStateService;
+  protected chartState: ChartStateService;
   private indicatorCalc = inject(IndicatorCalculationService);
   private destroyRef = inject(DestroyRef);
 
@@ -627,7 +633,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const t = e.target as HTMLElement | null;
     if (t && (/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.isContentEditable)) return;
     // TradingView: start typing anywhere on the chart -> symbol search opens with that character
-    const dialogOpen = this.searchOpen() || this.indicatorsOpen() || this.settingsIndex() !== null;
+    const dialogOpen = this.searchOpen() || this.indicatorsOpen() || this.settingsIndex() !== null || this.seriesDialog() !== null;
     if (!dialogOpen && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
       e.preventDefault();
       this.openSearch(e.key);
@@ -749,11 +755,20 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   /** Bar under the crosshair (null = show the latest bar). */
   readonly hoverIndex = signal<number | null>(null);
   private readonly paneTops = signal<Record<string, number>>({});
-  private readonly legendSource = signal<{ series: LegendSeries[]; paneKeys: number } | null>(null);
+  private readonly legendSource = signal<{ series: LegendSeries[]; paneKeys: number; priceHidden: boolean; volumeHidden: boolean; volumeColor: string } | null>(null);
   readonly legendGroups = computed<LegendGroup[]>(() => this.buildLegend());
 
   setHoverIndex(i: number | null): void {
     if (this.hoverIndex() !== i) this.hoverIndex.set(i);
+  }
+  readonly seriesDialog = signal<'price' | 'volume' | null>(null);
+  lineLike(): boolean { return ['line', 'markers', 'step', 'area'].includes(this.chartTypeValue); }
+  toggleSeries(k: 'price' | 'volume'): void { if (k === 'price') this.chartState.togglePriceHidden(); else this.chartState.toggleVolumeHidden(); }
+  saveSeriesSettings(k: 'price' | 'volume', s: PriceSettings | VolumeSettings): void {
+    // the hidden flag belongs to the eye, not the dialog
+    const cur = k === 'price' ? this.chartState.snapshot().price : this.chartState.snapshot().volume;
+    const next = { ...s, ...(cur.hidden ? { hidden: true } : {}) };
+    if (k === 'price') this.chartState.setPriceSettings(next); else this.chartState.setVolumeSettings(next);
   }
   toggleIndicator(index: number): void { this.chartState.toggleHidden(index); }
   removeIndicator(index: number): void { this.chartState.removeIndicator(index); }
@@ -799,8 +814,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const groups: LegendGroup[] = [
       {
         key: 'price', top: tops['y'] ?? 0,
-        header: { symbol: this.currentSymbol.toUpperCase(), interval: this.currentInterval.toUpperCase(), ohlc },
-        rows: src.series.filter((s) => !s.pane).map(row),
+        header: { symbol: this.currentSymbol.toUpperCase(), interval: this.currentInterval.toUpperCase(), ohlc, hidden: src.priceHidden },
+        rows: [
+          ...src.series.filter((s) => !s.pane).map(row),
+          { key: 'volume', label: 'Volume', value: compactVolume(bar.volume), color: src.volumeColor, hidden: src.volumeHidden, builtin: 'volume' as const },
+        ],
       },
     ];
     src.series.filter((s) => s.pane).forEach((s, k) => {
@@ -1037,11 +1055,18 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     this.builders = [];
     const add = (ds: any, b: DataBuilder) => { datasets.push(ds); this.builders.push(b); };
 
+    const ps = this.chartState.snapshot().price;
+    const vs = this.chartState.snapshot().volume;
+    const priceUp = ps.up ?? up;
+    const priceDown = ps.down ?? down;
     for (const entry of buildPriceSeries(ctype, {
-      up, down, muted: cssVar('--c-text-muted'), upFill: cssVar('--c-up-fill'), downFill: cssVar('--c-down-fill'),
-      line: cssVar('--c-price-line'), area: cssVar('--c-price-area'),
+      up: priceUp, down: priceDown, muted: cssVar('--c-text-muted'), upFill: cssVar('--c-up-fill'), downFill: cssVar('--c-down-fill'),
+      line: ps.line ?? cssVar('--c-price-line'), area: cssVar('--c-price-area'),
       baseline: baselineFor(rangeSlice), box: boxSizeFor(sourceBars),
-    })) add(entry.dataset, entry.builder);
+      byPrevClose: ps.byPrevClose, width: ps.width, source: ps.source,
+    })) add(ps.hidden ? { ...entry.dataset, hidden: true } : entry.dataset, entry.builder);
+    const volUp = vs.up ?? up;
+    const volDown = vs.down ?? down;
     const legendSeries: LegendSeries[] = [];
     const interval = this.currentInterval;
     overlays.forEach(({ index, resolved, outputs }, i) => {
@@ -1057,10 +1082,10 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       legendSeries.push({ index, label: resolved.label, color, hidden: resolved.hidden || !resolved.visibleOn(interval), values, pane: false });
     });
     add({
-      type: 'bar', label: 'Volume', yAxisID: 'yVol', data: [], parsing: false, normalized: true,
+      type: 'bar', label: 'Volume', yAxisID: 'yVol', data: [], parsing: false, normalized: true, hidden: !!vs.hidden,
       barPercentage: 1, categoryPercentage: 0.9,
-      backgroundColor: (ctx: any) => (ctx.raw?.up ? up : down),
-    }, (pts) => pts.map((p) => ({ x: p.x, y: this.logOn && !(p.v > 0) ? null : p.v, up: p.up, t: p.t })));
+      backgroundColor: (ctx: any) => (ctx.raw?.up ? volUp : volDown),
+    }, (pts) => pts.map((p) => ({ x: p.x, y: this.logOn && !(p.v > 0) ? null : p.v, up: vs.byPrevClose ? p.upPc : p.up, t: p.t })));
 
     const paneScales: Record<string, any> = {};
     panes.forEach(({ index, resolved, outputs }, i) => {
@@ -1184,7 +1209,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     (this.chart as any).$drawings = this.drawings;
     this.drawings.syncPan();
     this.chart.draw(); // the constructor's first render ran before the controller was attached
-    this.legendSource.set({ series: legendSeries, paneKeys: panes.length });
+    this.legendSource.set({ series: legendSeries, paneKeys: panes.length, priceHidden: !!ps.hidden, volumeHidden: !!vs.hidden, volumeColor: volUp });
     this.hoverIndex.set(null);
     // Dev-only test handle for the Playwright verification scripts.
     if (typeof ngDevMode !== 'undefined' && ngDevMode) {

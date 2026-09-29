@@ -9,6 +9,8 @@ export interface LegendRow {
   hidden: boolean;
   /** Index into the chart state's indicator list; absent for non-indicator rows (Volume). */
   index?: number;
+  /** The built-in Volume row (eye + settings, no remove). */
+  builtin?: 'volume';
 }
 
 export interface LegendGroup {
@@ -18,6 +20,8 @@ export interface LegendGroup {
   header?: {
     symbol: string;
     interval: string;
+    /** the price series is hidden with the eye */
+    hidden?: boolean;
     ohlc: { o: string; h: string; l: string; c: string; v: string; change: string; up: boolean } | null;
   };
   rows: LegendRow[];
@@ -37,7 +41,7 @@ export interface LegendGroup {
     @for (g of groups(); track g.key) {
       <div class="group" [attr.data-legend-group]="g.key" [style.top.px]="g.top">
         @if (g.header; as h) {
-          <div class="header" data-legend-header>
+          <div class="header" data-legend-header [class.hidden]="h.hidden">
             <button type="button" class="symbol symbol-btn" data-symbol-btn aria-label="Search symbol" title="Search symbol (or just start typing)"
               (click)="symbolClick.emit()">{{ h.symbol }} · {{ h.interval }}</button>
             @if (h.ohlc; as b) {
@@ -50,6 +54,9 @@ export interface LegendGroup {
                 <span class="change">{{ b.change }}</span>
               </span>
             }
+            <button type="button" class="ctl" data-price-eye [attr.aria-pressed]="!h.hidden" [attr.aria-label]="h.hidden ? 'Show symbol' : 'Hide symbol'"
+              [title]="h.hidden ? 'Show' : 'Hide'" (click)="seriesToggle.emit('price')">{{ h.hidden ? '◌' : '◉' }}</button>
+            <button type="button" class="ctl" data-price-settings aria-label="Symbol settings" title="Settings" (click)="seriesSettings.emit('price')">⚙</button>
           </div>
         }
         @for (r of g.rows; track r.key) {
@@ -65,6 +72,15 @@ export interface LegendGroup {
                 title="Settings" (click)="settings.emit(r.index!)">⚙</button>
               <button type="button" class="ctl" data-remove [attr.aria-label]="'Remove ' + r.label"
                 title="Remove" (click)="remove.emit(r.index!)">×</button>
+            </div>
+          } @else if (r.builtin) {
+            <div class="row" data-volume-row [class.hidden]="r.hidden">
+              <span class="chip" [style.background]="r.color"></span>
+              <span class="label">{{ r.label }}</span>
+              <span class="value">{{ r.value }}</span>
+              <button type="button" class="ctl" data-volume-eye [attr.aria-pressed]="!r.hidden" [attr.aria-label]="r.hidden ? 'Show volume' : 'Hide volume'"
+                [title]="r.hidden ? 'Show' : 'Hide'" (click)="seriesToggle.emit('volume')">{{ r.hidden ? '◌' : '◉' }}</button>
+              <button type="button" class="ctl" data-volume-settings aria-label="Volume settings" title="Settings" (click)="seriesSettings.emit('volume')">⚙</button>
             </div>
           } @else {
             <div class="row plain">
@@ -90,6 +106,9 @@ export interface LegendGroup {
       .ohlc.down { color: var(--c-down); }
       .row { border-radius: var(--border-radius-sm); padding: 0 0.25rem 0 0; pointer-events: auto; }
       .row.plain { pointer-events: none; }
+      .header { pointer-events: auto; width: fit-content; border-radius: var(--border-radius-sm); }
+      .header:hover .ctl { opacity: 1; }
+      .header.hidden .symbol, .header.hidden .ohlc { opacity: 0.45; }
       .row:hover { background: var(--c-primary-tint); }
       .row.hidden .label, .row.hidden .value { opacity: 0.45; text-decoration: line-through; }
       .chip { width: 8px; height: 8px; border-radius: 50%; flex: none; }
@@ -110,4 +129,6 @@ export class ChartLegendComponent {
   readonly remove = output<number>();
   readonly settings = output<number>();
   readonly symbolClick = output<void>();
+  readonly seriesToggle = output<'price' | 'volume'>();
+  readonly seriesSettings = output<'price' | 'volume'>();
 }

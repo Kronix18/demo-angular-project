@@ -20,6 +20,8 @@ export interface LodPoint {
   c: number;
   v: number;
   up: boolean;
+  /** closed at/above the previous bar's close (first bar: above its own open) */
+  upPc: boolean;
 }
 
 /** Bars per point so that `visibleBars` fit into `maxPoints` points. */
@@ -62,6 +64,7 @@ export function bucketWindow(bars: OHLCV[], from: number, to: number, bucket: nu
     out.push({
       x: start + (end - start) / 2, i: start, n: end - start + 1, t: first.timestamp,
       o: first.open, h, l, c: last.close, v, up: last.close >= first.open,
+      upPc: last.close >= (start > 0 ? bars[start - 1].close : first.open),
     });
   }
   return out;

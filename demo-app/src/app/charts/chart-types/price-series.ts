@@ -1,6 +1,7 @@
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartType } from '../../core/models/chart-type';
 import { LodPoint } from '../chart-lod';
+import { PriceSource } from '../../core/models/symbol-settings';
 
 /** Builds a dataset's data array from the current level-of-detail points. */
 export type DataBuilder = (pts: LodPoint[]) => any[];
@@ -15,7 +16,27 @@ export interface PriceStyleCtx {
   baseline: number;
   /** Box size behind the Point & Figure glyphs. */
   box: number;
+  /** legend settings (11.6) */
+  byPrevClose?: boolean;
+  width?: number;
+  source?: PriceSource;
 }
+
+/** What a line-family style plots for a (bucketed) bar. */
+export function sourceValue(p: LodPoint, source: PriceSource = 'close'): number {
+  switch (source) {
+    case 'open': return p.o;
+    case 'high': return p.h;
+    case 'low': return p.l;
+    case 'hl2': return (p.h + p.l) / 2;
+    case 'hlc3': return (p.h + p.l + p.c) / 3;
+    case 'ohlc4': return (p.o + p.h + p.l + p.c) / 4;
+    default: return p.c;
+  }
+}
+
+/** Same colour for every direction, so the element's own open/close test cannot override ours. */
+const uniform = (color: string) => ({ up: color, down: color, unchanged: color });
 
 export function lineDataset(label: string, yAxisID: string, color: string, width: number, dash: number[], hidden = false) {
   return {
@@ -26,21 +47,28 @@ export function lineDataset(label: string, yAxisID: string, color: string, width
   };
 }
 
-const ohlcPoint = (p: LodPoint) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t });
-const closePoint = (p: LodPoint) => ({ x: p.x, y: p.c, t: p.t });
+const ohlcPoint = (p: LodPoint, byPrev?: boolean) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t, ...(byPrev ? { dir: p.upPc ? 'up' : 'down' } : {}) });
 
 /** Base of the OHLC-shaped styles: candlestick (candles/hollow/alternative charts) or our tvbar (bars/HLC/high-low). */
 function ohlcSeries(type: 'candlestick' | 'tvbar', c: PriceStyleCtx, extra: Record<string, unknown> = {}, hollow = false): SeriesEntry {
   const colors = { up: c.up, down: c.down, unchanged: c.muted };
+  const byPrev = !!c.byPrevClose;
+  // by previous close the direction rides on the point (`dir`); a scriptable option then
+  // returns one uniform colour, whatever the element's own open/close comparison says
+  const bg = (raw: any) => (raw?.dir === 'up' ? (hollow ? uniform('transparent') : uniform(c.up)) : raw?.dir === 'down' ? uniform(c.down) : null);
+  const bd = (raw: any) => (raw?.dir === 'up' ? uniform(c.up) : raw?.dir === 'down' ? uniform(c.down) : null);
+  const fill = hollow ? { ...colors, up: 'transparent' } : colors;
+  const widthOpt = c.width ? (type === 'tvbar' ? { lineWidth: c.width } : { borderWidth: c.width }) : {};
   return {
     dataset: {
       type, label: 'Price', yAxisID: 'y', data: [],
       // NB: the financial plugin reads `backgroundColors` / `borderColors` (plural)
-      backgroundColors: hollow ? { ...colors, up: 'transparent' } : colors,
-      borderColors: colors,
+      backgroundColors: byPrev ? (ctx: any) => bg(ctx.raw) ?? fill : fill,
+      borderColors: byPrev ? (ctx: any) => bd(ctx.raw) ?? colors : colors,
+      ...widthOpt,
       ...extra,
     },
-    builder: (pts) => pts.map(ohlcPoint),
+    builder: (pts) => pts.map((p) => ohlcPoint(p, byPrev)),
   };
 }
 
@@ -50,8 +78,8 @@ function ohlcSeries(type: 'candlestick' | 'tvbar', c: PriceStyleCtx, extra: Reco
  */
 export function buildPriceSeries(type: ChartType, c: PriceStyleCtx): SeriesEntry[] {
   const line = (over: Record<string, unknown> = {}): SeriesEntry => ({
-    dataset: { ...lineDataset('Price', 'y', c.line, 2, []), ...over },
-    builder: (pts) => pts.map(closePoint),
+    dataset: { ...lineDataset('Price', 'y', c.line, c.width ?? 2, []), ...over },
+    builder: (pts) => pts.map((p) => ({ x: p.x, y: sourceValue(p, c.source), t: p.t })),
   });
   switch (type) {
     case 'hollow': return [ohlcSeries('candlestick', c, {}, true)];
@@ -65,7 +93,7 @@ export function buildPriceSeries(type: ChartType, c: PriceStyleCtx): SeriesEntry
           barPercentage: 1, categoryPercentage: 0.8,
           backgroundColor: (ctx: any) => (ctx.raw?.up ? c.up : c.down),
         },
-        builder: (pts) => pts.map((p) => ({ x: p.x, y: p.c, up: p.c >= p.o, t: p.t })),
+        builder: (pts) => pts.map((p) => ({ x: p.x, y: p.c, up: c.byPrevClose ? p.upPc : p.c >= p.o, t: p.t })),
       }];
     case 'line': return [line()];
     case 'markers': return [line({ pointRadius: 3, pointBackgroundColor: c.line })];
