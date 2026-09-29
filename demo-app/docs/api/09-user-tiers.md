@@ -23,7 +23,7 @@ The single source of truth for what the UI shows or greys out; **the backend enf
   "features": { "technicals_server": true, "ratings": true, "rs_line": true, "canslim": true, "patterns": true, "trade_levels": true,
                 "sell_signals": true, "fundamentals": true, "institutional_summary": true, "institutional_holders": false,
                 "events": true, "market_state": true, "industries": true, "screener_as_of": false, "backtest": false,
-                "export": true, "api_access": true },
+                "export": true, "api_access": false },
   "usage": { "api_calls_today": 12 } }
 ```
 Feature keys are also what `402 upgrade_required.details.feature` uses.
@@ -52,3 +52,9 @@ Every collection: `GET` list, `POST` create, `PUT /{id}` replace, `DELETE /{id}`
 
 ## 6. Rate limiting
 Per token, headers `X-RateLimit-Limit/Remaining/Reset`; `429` with `Retry-After`. Anonymous: 60/min/IP.
+
+## 7. Decisions (2026-09-29, see `../DATA-PLAN.md` §7)
+- `api_access` is `false` for all tiers until a licensed price feed exists; `/api/plans` lists it as `coming_soon: true`.
+- Anonymous: `/api/plans`, `/api/meta`, `/api/universe/facets` and charts (1 y daily, no ratings) for the 10 demo symbols `MSFT, AAPL, NVDA, AMZN, GOOGL, META, TSLA, AMD, SPY, QQQ` (`GET /api/plans` also returns `demo_symbols`). Everything else → `401`.
+- `GET /api/meta` (or plans) returns `display_names: { "smr_rating": "Quality (Sales·Margins·ROE)", "canslim_score": "O'Neil-style growth score", … }` used for every rating label; the front end never hard-codes rating names.
+- Payment: Stripe Checkout + portal; auth: JWT + rotating refresh.

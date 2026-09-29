@@ -17,7 +17,8 @@ Conventions: see `README.md`.
   "sic": "7372", "sic_name": "Services-Prepackaged Software",
   "ipo_date": "1986-03-13", "delisting_date": null,
   "shares_outstanding": 7430000000, "float_shares": 7420000000, "market_cap": 3120000000000, "shares_as_of": "2026-09-19",
-  "is_adr": false, "is_spac": false, "is_etf": false,
+  "is_adr": false, "is_spac": false, "is_etf": false, "is_active": true,
+  "cik": "0000789019", "country": "US", "is_fundamental_rating_eligible": true,
   "is_rating_eligible": true, "passes_eligibility_gate": true,
   "fund": null,
   "classification_status": "RESOLVED"
@@ -32,7 +33,9 @@ Conventions: see `README.md`.
 | `ipo_date`, `delisting_date` | same | date | DB |
 | `shares_outstanding`, `float_shares` | same | NUMERIC(20,2) → number | DB |
 | `market_cap` | `market_cap` | whole USD | DB (snapshot) |
-| `is_adr`, `is_spac`, `is_etf` | same | bool | DB |
+| `is_adr`, `is_spac`, `is_etf`, `is_active` | same | bool | DB |
+| `cik`, `country` | same | string (CIK zero-padded, 10) | DB |
+| `is_fundamental_rating_eligible` | same (FUNDAMENTAL_UNIVERSE_V1, 5 230 CIKs) | bool | DB |
 | `is_rating_eligible`, `passes_eligibility_gate` | **flags/columns to expose (name TBC)** | bool | DB (5 342 / 3 508) |
 | `fund` | `fund_asset_class`, `fund_category`, `fund_family`, `fund_focus`, `fund_strategy` | object \| null (only when `is_etf`) | DB |
 | `classification_status` | same | `RESOLVED` \| `UNRESOLVED` \| … | DB |

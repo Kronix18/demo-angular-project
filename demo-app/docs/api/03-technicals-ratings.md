@@ -56,7 +56,7 @@ Needs `index_prices` (see `02`).
 
 ## 3. Ratings
 
-**Availability today:** RS ratings daily; **EPS and SMR only on the 19 stored dates** (2023-07-25 … 2026-09-15); Composite, Acc/Dis, Sponsorship, Group RS, Earnings Stability **not built**.
+**Availability today:** RS ratings daily; **EPS and SMR only on the 19 stored dates (target: recompute daily, or at least whenever new earnings are ingested — the contract does not depend on which)** (2023-07-25 … 2026-09-15); Composite, Acc/Dis, Sponsorship, Group RS, Earnings Stability **not built**.
 All values are **model estimates** (ρ ≈ 0.75 EPS, ≈ 0.80 SMR vs IBD), versioned, and may be `null` with a reason.
 
 Object `Ratings` (every rating nullable):
@@ -87,11 +87,19 @@ Object `Ratings` (every rating nullable):
 | `composite_rating` | 1–99 | `composite_rating_history` | PLAN |
 
 `unrated` explains a null: `no_quarterly_data`, `stale_quarter` (latest quarter > 250 days), `not_eligible`, `too_new` (< 5 sessions), `no_cik`, `not_available` (rating not built yet). The UI shows "not rated" (with the reason in a tooltip) distinctly from "loading" and "dataset off".
-Every `*_rating_history` row: `(security_id, effective_date, value, model_version, calculated_at)`; PK `(security_id, effective_date, model_version)`; index `(effective_date, value)` for percentile queries.
+Every `*_rating_history` row (backend design §27: `security_id, date, rating, raw_score, model_version, calculated_at`): API `effective_date` = `date`, and `raw_score` is exposed only on the explain endpoint; PK `(security_id, effective_date, model_version)`; index `(effective_date, value)` for percentile queries.
 
 ### `GET /api/stocks/{symbol}/ratings?as_of=`  → one `Ratings`. Each rating uses the latest row with `effective_date <= as_of`; `effective_dates` shows which date each came from (they differ while EPS/SMR are sparse).
 ### `GET /api/stocks/{symbol}/ratings/history?from=&to=&fields=rs_rating,eps_rating,smr_rating`
 Columnar per field: `{ "rs_rating": { "date":[…], "value":[…] }, "eps_rating": { … } }` — **each field has its own dates** because EPS/SMR have only 19 points; the sparkline draws steps, not interpolated lines.
+### `GET /api/stocks/{symbol}/ratings/explain?rating=eps_rating&as_of=`  (**PLAN**, backend design §33 "Why is EPS Rating 94?")
+```json
+{ "rating": "eps_rating", "value": 97, "raw_score": 0.93, "model_version": "EPS_V5_3", "effective_date": "2026-09-15",
+  "inputs": [ { "key": "eps_yoy_pct_q0", "label": "Latest quarter EPS growth", "value": 48.2, "weight": 0.3, "basis": "adjusted" },
+              { "key": "eps_yoy_pct_q1", "value": 41.0, "weight": 0.2 } ],
+  "percentile": 97.2, "universe_size": 3010, "notes": ["turnaround score capped at 0.7"] }
+```
+Front end: "Why this rating?" popover (task 16.15). Generic shape: `inputs[]` of `{key,label,value,weight?,basis?}`.
 ### `GET /api/ratings/dates` → `{ "rs": ["2026-09-22", …], "eps": [ 19 dates ], "smr": [ 19 dates ] }` — lets the time machine and screener date picker offer only valid dates.
 ### `GET /api/ratings/distribution?field=rs_rating&as_of=`  — histogram for slider hints.
 ### `GET /api/ratings/leaders?field=rs_rating&limit=25&industry_key=&as_of=`  — top-N `{security_id, symbol, company_name, value}`.

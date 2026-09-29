@@ -26,11 +26,15 @@ and never breaks them.
 
 ## 1. Transport
 
+**No API exists yet — this whole folder is the specification of what the backend (Flask + SQLAlchemy + Pydantic, per `TECHNICAL_ARCHITECTURE.md` §1) SHOULD serve.** The v1 spec and the front end's current calls are equally unimplemented and are superseded where they differ. Route mapping to the backend's own sketch (`TECHNICAL_ARCHITECTURE.md` §36): `GET /stock/{symbol}/…` = `GET /api/stocks/{symbol}/…`, `POST /screener` = `POST /api/screener/run`, `POST /backtests` = `POST /api/backtests`. Response models should be Pydantic schemas generated into an OpenAPI file that replaces this folder as the source of truth once it exists.
+
 - HTTPS, JSON (`application/json; charset=utf-8`), gzip or brotli. CORS allows the Angular origin(s); the base URL is
   configured per deployment (`<meta name="api-url">`, see `src/app/core/api-url.ts`).
 - Paths keep the existing `/api/...` prefix (`/api/screener/*`, `/api/stocks/{symbol}`, `/api/user/*`, `/api/chart/*`).
   New endpoints are **additive**; a breaking change gets a new path (`/api/v3/…`), never a silent change.
 - Every response carries `X-API-Version: 2` and `X-Request-Id`.
+
+**Division of labour (backend design rule §37):** the front end never calculates *authoritative* ratings; it may calculate display-only values (chart indicators) and falls back to them only when the backend has no series.
 
 ## 2. Naming, units, formats
 

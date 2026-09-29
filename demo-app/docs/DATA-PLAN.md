@@ -1,8 +1,8 @@
 # Data plan — using the backend security master and the CAN SLIM roadmap in the front end
 
 Date: 2026-09-29. Scope: **front end only**. The backend / data-fetcher are separate projects and are not programmed here.
-Inputs: `SECURITY_MASTER.md`, `PRICE_DATA.md`, `DAILY_INGESTION_GUIDE.md`, `EPS_STATUS.md`, `EPS_COVERAGE_TRACKING.md`, `SMR_STATUS.md` (what the DB holds; the last five arrived in a second batch and changed the picture, revision 2026-09-29) and `IMPLEMENTATION_PLAN.md` (roadmap, §1–§59; its checkboxes are stale).
-Outputs: this plan, the API contract for the backend (`docs/api/`), and small tasks (`TASKS/phase-12` … `phase-22`, 119 tasks).
+Inputs: `SECURITY_MASTER.md`, `PRICE_DATA.md`, `DAILY_INGESTION_GUIDE.md`, `EPS_STATUS.md`, `EPS_COVERAGE_TRACKING.md`, `SMR_STATUS.md`, `FUNDAMENTALS.md`, `SEC_INGESTION.md`, `TECHNICAL_ARCHITECTURE.md`, `PROJECT_DESIGN.md`, `MODEL_CHANGELOG.md` (what the DB holds and how the backend is meant to be built; revision 3, 2026-09-29, after the owner's answers) and `IMPLEMENTATION_PLAN.md` (roadmap, §1–§59; its checkboxes are stale).
+Outputs: this plan, the API contract for the backend (`docs/api/`), and small tasks (`TASKS/phase-12` … `phase-22`, 122 tasks).
 
 ## 1. Audit — what is implemented, what is not, what is planned
 
@@ -10,9 +10,9 @@ Full tables with column names: [`api/00-data-status.md`](api/00-data-status.md).
 
 | State | Items |
 |---|---|
-| **In the DB now** | Security master (13 317 securities, stable `security_id`); classification; V2 enrichment (IPO/delisting dates, shares, float, market cap USD, ADR/SPAC/ETF flags); universe gating (5 342 → 3 508); `sec_filing` index (197 970); **daily prices `stock_history` since 1997 (raw Stooq strings, incremental manual import)**; **`splits`, `dividends`, `corporate_actions`**; **`technical_daily` (persisted, ~28 M rows, 23 columns, `TECHNICAL_DAILY_V1`)**; **RS ratings 3M/6M/12M/ER3 (daily)**; **EPS rating `EPS_V5_3` and SMR rating `SMR_V4` on 19 stored dates**; yfinance quarterly financials for foreign issuers |
+| **In the DB now** | Security master (13 317 securities, stable `security_id`); classification; V2 enrichment (IPO/delisting dates, shares, float, market cap USD, ADR/SPAC/ETF flags); universe gating (5 342 → 3 508); `sec_filing` index (197 970); **daily prices `stock_history` since 1997 (raw Stooq strings, incremental manual import)**; **`splits`, `dividends`, `corporate_actions`**; **`technical_daily` (persisted, ~28 M rows, 23 columns, `TECHNICAL_DAILY_V1`)**; **RS ratings 3M/6M/12M/ER3 (daily)**; **EPS rating `EPS_V5_3` and SMR rating `SMR_V4` on 19 stored dates**; yfinance quarterly financials for foreign issuers; **SEC fundamentals: raw facts (11.3 M), normalised metrics (9.7 M, `FUNDAMENTALS_V2`), reconstructed quarters (`QUARTERS_V2`) with a point-in-time resolver, annual EPS (`ANNUAL_EPS_V1`), fundamental universe of 5 230 CIKs**; index prices expected (S&P 500, Nasdaq) |
 | **Tables exist but empty** | `security_symbol_history`, `security_name_history` |
-| **Not built** | weekly and index prices (so no RS *line* and no market engine yet), Composite, Acc/Dis, Sponsorship, Group RS, Earnings Stability, general fundamentals endpoint tables, CAN SLIM, patterns / trade engine, market state, 13F, news, backtester, application schema; EPS/SMR are not in any daily cron |
+| **Not built** | weekly prices, Composite, Acc/Dis, Sponsorship, Group RS, Earnings Stability, the served fundamentals API (tables exist), RS line / market engine (need the index prices to be exposed), CAN SLIM, patterns / trade engine, market state, 13F, news, backtester, application schema; EPS/SMR are not in any daily cron |
 
 Consequences after the second batch:
 - **Much more can be consumed today than first thought:** prices (raw + split-adjusted on demand), splits/dividends markers, server technicals (only the 23 stored columns), daily RS ratings, EPS and SMR ratings (19 dates), filings, classification. The order below is re-prioritised accordingly.
@@ -39,8 +39,8 @@ Consequences after the second batch:
 | B4 | `/ratings` over `rs_rating_history`, `eps_rating_history`, `smr_rating_history`, `/ratings/dates` | badges, checkup ratings block, screener rating columns/filters (as-of limited to 19 dates for EPS/SMR) | 16.x |
 | B5 | `screener_snapshot` + `screener/fields`, `run` v2, `count`, presets (technical + rating + classification fields) | screener v2 | 15.x |
 | B6 | `/filings` (already in DB) | filing markers | 17.1, 17.3 |
-| B7 | Index prices + weekly bars | compare with index, RS line, server weekly, market engine input | 13.4, 13.8, 14.9, 14.10 |
-| B8 | Serve fundamentals (expose the pipelines' quarterly inputs; annual; metrics) | earnings block, C/A scores, fundamentals filters | 17.x |
+| B7 | Expose `index_prices` (expected to exist) + `weekly_prices` | compare with index, RS line, server weekly, market engine input | 13.4, 13.8, 14.9, 14.10 |
+| B8 | Serve fundamentals from the existing SEC tables (quarter resolver, growth, annual, metrics — `04`) | earnings block, C/A scores, fundamentals filters | 17.x |
 | B9 | Composite, Acc/Dis, Group RS, Earnings Stability, industry ranking; EPS/SMR into the daily cron | full ratings strip, industries page, heat-map | 16.3, 19.1–19.4 |
 | B10 | Market engine (needs B7) | market banner, regime shading, M filters | 19.5–19.9 |
 | B11 | Pattern / trade engine | overlays, breakout screens | 18.3–18.14 |
@@ -92,10 +92,23 @@ The front-end can begin B14-independent work immediately; auth (task 9.1) is blo
 | Backtest | later | 22.8 |
 | Data-info popover (as-of, model versions) | `meta` | 12.11 |
 
-## 7. Pricing and tiers (proposal — needs the owner's decision)
+## 7. Pricing, tiers and licensing — decisions taken (owner delegated, 2026-09-29)
 
-Existing tiers and prices (`subscription.types.ts`): Free 0 · Plus 9.99 · Pro 29.99 · Ultimate 99.99 / month. Guiding rule: **breadth is cheap, depth and
-derived intelligence is what people pay for.** Data licensing may constrain this (see §9, Q9).
+Existing tiers and prices (`subscription.types.ts`): Free 0 · Plus 9.99 · Pro 29.99 · Ultimate 99.99 / month. Rule: **breadth is cheap, depth and derived intelligence is what people pay for.**
+
+**Licensing / branding decisions**
+| # | Decision | Reason |
+|---|---|---|
+| L1 | Data is **display-only**: no bulk data download, no raw-price export, no data API in any tier until a licensed price feed replaces Stooq. Screener result export (derived rows) stays. `api_access` is shown as "coming soon" on the plans page and defaults to `false` in `/api/user/entitlements`. | Stooq's redistribution terms are unverified; a paid tier must not resell raw prices. Derived ratings/technicals are ours. |
+| L2 | Price data always labelled "end-of-day, delayed" with the as-of date; no "live". | Data lags (manual import) and delayed data is the safe legal default. |
+| L3 | Ratings are shown as **model ratings** produced by this product, versioned. UI never uses "IBD", "Investor's Business Daily", their logos or claims of equivalence; backend-controlled `display_name` for every rating/field. Defaults: "EPS Rating", "RS Rating", "Composite Rating", "Group RS", "Accumulation/Distribution", "Sponsorship", "Earnings Stability"; **"SMR" is shown as "Quality (Sales·Margins·ROE)"** and **"CAN SLIM" as "O'Neil-style growth score"** in headings, with the acronym allowed only in explanatory text. Legal review before public launch; changing names needs no release. | Names other than generic terms may be third-party trademarks; making them configurable removes the risk from the code. |
+| L4 | Industry groups are the project's own taxonomy and are called "industry groups" only. | Architecture doc: IBD's groups are proprietary. |
+| L5 | Anonymous visitors: **charts for 10 demo symbols** (`MSFT, AAPL, NVDA, AMZN, GOOGL, META, TSLA, AMD, SPY, QQQ`), 1 year daily, no ratings; everything else needs a free account. | Marketing pages need a working demo without exposing the whole dataset. |
+| L6 | Payment provider: **Stripe Checkout + customer portal** (hosted; no card data in the app). | Least front-end scope, standard. |
+| L7 | Auth: **JWT access + rotating refresh tokens**, Flask side; CORS limited to the app origin. | Matches the current `AuthService` design. |
+| L8 | Default screener universe: the 3 508-name gate set; the price / dollar-volume gates should be added now that `avg_dollar_volume_50` exists. | Cleaner results; matches the architecture's "rating-eligible" idea. |
+
+**Tier matrix** (numbers delivered by `/api/plans` and `/api/user/entitlements`, changeable without a release):
 
 | Capability | Free | Plus (9.99) | Pro (29.99) | Ultimate (99.99) |
 |---|---|---|---|---|
@@ -105,21 +118,21 @@ derived intelligence is what people pay for.** Data licensing may constrain this
 | Indicators | 3 client-side | all client-side | + server technicals, RS line | all |
 | Compare symbols | 1 | 3 | 5 | 8 |
 | Screener results | 50 | 200 | 500 | unlimited |
-| Screener fields | classification, price/volume, basic technicals | + fundamentals | + ratings, CAN SLIM, patterns | + institutional, events, `as_of` |
+| Screener fields | classification, price/volume, basic technicals | + fundamentals | + ratings, CAN SLIM-style score, patterns | + institutional, events, `as_of` |
 | Presets / saved screens | 3 presets / 0 | all / 3 | all / 20 | all / unlimited |
-| Ratings (badges, checkup) | Composite + RS only | + EPS, SMR | all ratings | all + history |
-| CAN SLIM score | – | total only | total + reasons | + history |
+| Ratings (badges, checkup) | RS only | + EPS, Quality | all ratings | all + history + "why this rating" |
+| Growth score (CAN SLIM-style) | – | total only | total + reasons | + history |
 | Patterns, pivots, stops, sell signals | – | – | yes | yes + early entries |
 | Market state / industries | banner only | + industries list | + group RS, heat-map | + breadth, history |
 | Watchlists / items | 1 / 10 | 3 / 25 | 10 / 100 | unlimited |
 | Alerts | – | 5 (price) | 50 (+ rating, breakout) | unlimited |
-| Export | – | – | CSV 500 rows | CSV / JSON unlimited |
+| Export (derived results only) | – | – | CSV 500 rows | CSV / JSON unlimited |
 | Institutional holders, news events | – | – | summary | full |
 | Time machine (`as_of`), backtest | – | – | – | yes |
-| API access (calls/day) | 0 | 0 | 1 000 | 10 000 |
+| Data API | – | – | coming soon | coming soon |
 | Ads | yes | no | no | no |
 
-All numbers are delivered by `/api/plans` and `/api/user/entitlements`, so they can change without a release (tasks 20.2, 20.3).
+Implementation tasks: 20.2 (entitlements), 20.3 (plans from API), 20.8 (backend-controlled display names), 16.12 (model-rating labelling).
 
 ## 8. Phases and dependencies
 
@@ -133,26 +146,25 @@ All numbers are delivered by `/api/plans` and `/api/user/entitlements`, so they 
                     ├─► 20 Accounts/Tiers ◄─ B14 (+ existing 9.1)
                     └─► 21 User data sync ◄─ B14      22 Institutional/Events/Time machine ◄─ B13, all
 ```
-119 tasks (index: `TASKS/README.md`, Phases 12–22). Phase 12 can start immediately; each later task lists the backend dataset it needs.
+122 tasks (index: `TASKS/README.md`, Phases 12–22). Phase 12 can start immediately; each later task lists the backend dataset it needs.
 
-## 9. What I still need from you / the other two projects
+## 9. Answers received and what is still open
 
-**Answered by the second batch of documents:** price table shape (`stock_history`, raw strings, split-only adjustment, volume unadjusted), persistence of technicals (`technical_daily`, 23 columns), what EPS/SMR/RS are and their model versions and coverage, nightly schedule (manual Stooq download today).
+**Owner answers (2026-09-29):**
+1. *No API is serving.* → The contract in `docs/api/` describes what the backend **should serve**; there is nothing to reconcile with (v1 spec and the front end's current calls are equally hypothetical). The backend is planned as Flask + SQLAlchemy + Pydantic (`TECHNICAL_ARCHITECTURE.md`); an OpenAPI export should replace `docs/api` as source of truth when it exists.
+2. *Index prices should exist* (NDX, SPX, …). → Contract assumes `index_prices` with `SPX`, `NDX`, `COMP` (+ optional `NYA`, `RUT`, `DJI`); RS line benchmark = S&P 500; market engine = S&P 500 + Nasdaq.
+3. *Split-adjusted everything, probably the whole universe.* → Contract assumes `technical_daily`, RS and patterns are on split-adjusted prices (`meta.price_basis`); task 14.12 verifies by fixture and falls back per symbol if not.
+4. *Fundamentals are SEC tables.* → Confirmed and mapped in `04-fundamentals.md` (`sec_filing`, `fundamental_period/metric`, `fundamental_quarter_period/metric`, PIT resolver, growth semantics).
+5. *Ratings recomputed daily or at least on earnings ingestion.* → Contract reports `effective_dates` and `/ratings/dates`, so it works for daily and for event-driven recomputation.
+6. *Licensing: I decide.* → Decisions in §7.
 
-**Still open:**
-1. **Real current backend**: OpenAPI or the list of live routes and their real response shapes (`/api/screener/*`, `/api/stocks/*`, `/api/user/*`, `/api/chart/*`) — to reconcile with this contract.
-2. **Index/benchmark prices** (SPX, NDX/COMP, RUT, DJI or ETF proxies SPY/QQQ/IWM): available? source? (blocks RS line, market engine, compare-with-index.)
-3. **Price basis of `technical_daily`**: computed on raw or split-adjusted closes? (the chart shows split-adjusted; 14.12 needs the answer.) Are the 592 verified splits the complete set for the universe or only the EPS subset?
-4. **Fundamentals**: which tables hold the quarterly/annual SEC-derived numbers (revenue, net income, EPS GAAP/adjusted, margins, ROE, shares) and can they be served point-in-time?
-5. **Ratings cadence**: will EPS/SMR be recomputed daily/weekly going forward (cron) or stay on 19 dates? Will `effective_date` history be extended?
-6. **Composite / Acc-Dis / Group RS / Sponsorship**: planned order and dates (drives when the checkup and industries pages get real data).
-7. **Freshness**: plan to automate the Stooq download? Expected data lag; `next_refresh_after` semantics.
-8. **Exact `security_master` column names** (exchange, security type, eligibility flags, cik) — contract uses proposed names in `01`.
-9. **Licensing**: Stooq redistribution / commercial display; yfinance and Alpha Vantage terms for derived EPS; 13F/news sources. Limits the free tier and the API tier.
-10. **Product decisions**: tier matrix in §7, payment provider, anonymous demo charts, whether Free may see all symbols' ratings.
-11. **Universe policy**: default screener universe (3 508 gate); when will price/dollar-volume gates be applied (`avg_dollar_volume_50` now exists)?
-12. **Auth**: JWT + refresh as in `09`, or sessions/cookies? CORS origins.
-13. **Rating honesty**: may the UI call them "EPS Rating / SMR Rating" or must they carry a different name (IBD trademarks) — legal/branding decision.
+**Still open (small; none blocks front-end work):**
+- Exact names of the index table and codes; whether `market_calendar` will exist.
+- Confirmation that the 592 verified splits (or the later full set) cover the whole universe, and that volume policy stays "as stored".
+- Whether `is_active`, `country`, `cik` and the eligibility flags are exposed as columns under those names (contract assumes yes).
+- Whether `sec_filing` will get `period_end`/8-K item columns (contract does not require them).
+- Where 13F and news will come from (GDELT, SEC 8-K, press releases per the architecture doc) — needed before 22.x is specified beyond the current contract.
+- Payment provider account and auth service configuration (see §7 decisions).
 
 ## 10. Risks
 

@@ -1,7 +1,8 @@
 # 06 — Industry groups and market state
 
 Backing: `security_master.industry_group` (**DB**); `security_industry_history`, `industry_rating_history` (**PLAN**);
-`market_state_history`, `follow_through_days`, `distribution_days`, `stalling_days`, `power_trend_history`, `market_exposure_history` (**PLAN**).
+`market_state_history`, `follow_through_days`, `distribution_days`, `stalling_days`, `power_trend_history`, `market_exposure_history` (**PLAN**; inputs: S&P 500 and Nasdaq Composite from `index_prices`, expected to exist; optional NYSE, Russell 2000, Dow). Backend design also lists `rally_attempts` (exposed inside `market/state`) and `market_calendar`.
+Industry history: membership must be stored historically (`security_industry_history`) so `as_of` group RS is survivorship-safe; the ~100–200 groups are the project's own taxonomy (SIC + description + metadata), not IBD's — never label them as IBD groups.
 
 ## 1. Industry groups
 

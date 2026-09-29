@@ -122,7 +122,7 @@ Replaces the static `*.us.txt` files with `/api/chart/...` when the backend can 
 | 13.5 | phase-13-prices-from-backend/13.5-tier-truncation-notice.md | NOT STARTED | Tier truncation notice — needs: `prices` |
 | 13.6 | phase-13-prices-from-backend/13.6-batch-ohlcv-for-compare-overlay.md | NOT STARTED | Batch OHLCV for compare overlay — needs: `prices` (batch) |
 | 13.7 | phase-13-prices-from-backend/13.7-latest-quotes-for-header-and-watchlist.md | NOT STARTED | Latest quotes for header and watchlist — needs: `prices` (quotes) |
-| 13.8 | phase-13-prices-from-backend/13.8-index-benchmark-data.md | NOT STARTED | Index benchmark data — needs: `index_prices` |
+| 13.8 | phase-13-prices-from-backend/13.8-index-benchmark-data.md | NOT STARTED | Index benchmark data — needs: `index_prices` (expected) |
 | 13.9 | phase-13-prices-from-backend/13.9-corporate-action-markers-split-dividend.md | NOT STARTED | Corporate-action markers (split/dividend) — needs: `splits`, `dividends` (DB) |
 | 13.10 | phase-13-prices-from-backend/13.10-range-clamp-by-first-last-bar-and-delisting.md | NOT STARTED | Range clamp by first/last bar and delisting — needs: `prices` |
 
@@ -139,7 +139,7 @@ Uses the backend `technical_daily` series instead of calculating in the browser,
 | 14.6 | phase-14-server-technicals/14.6-price-location-overlays.md | NOT STARTED | Price-location overlays — needs: `technicals` |
 | 14.7 | phase-14-server-technicals/14.7-ma-relation-badges.md | NOT STARTED | MA-relation badges — needs: `technicals` |
 | 14.8 | phase-14-server-technicals/14.8-weekly-10w-40w-ma-deferred-to-server.md | NOT STARTED | Weekly 10w/40w MA (deferred to server) — needs: `technical_weekly` (PLAN, low priority) |
-| 14.9 | phase-14-server-technicals/14.9-rs-line-pane-from-rs-line.md | NOT STARTED | RS-line pane from `/rs-line` — needs: `index_prices` (PLAN) — RS *ratings* exist, the RS *line* does not |
+| 14.9 | phase-14-server-technicals/14.9-rs-line-pane-from-rs-line.md | NOT STARTED | RS-line pane from `/rs-line` — needs: `index_prices` (expected to exist; endpoint to be exposed) — RS *ratings* exist, the RS *line* is computed from stock + S&P 500 |
 | 14.10 | phase-14-server-technicals/14.10-rs-line-new-high-marker.md | NOT STARTED | RS-line new-high marker — needs: `relative_strength_history` |
 | 14.12 | phase-14-server-technicals/14.12-raw-vs-adjusted-basis-check.md | NOT STARTED | Raw vs adjusted basis check — needs: `technicals` |
 | 14.11 | phase-14-server-technicals/14.11-drop-redundant-client-compute.md | NOT STARTED | Drop redundant client compute — needs: `technicals` |
@@ -171,6 +171,7 @@ IBD-style ratings shown everywhere, plus the per-stock checkup page (plan §46).
 |---|---|---|---|
 | 16.1 | phase-16-ratings-checkup/16.1-ratingsapiclient-and-types.md | NOT STARTED | RatingsApiClient and types — needs: `rs_ratings` (daily), `eps_rating`, `smr_rating` (19 dates) |
 | 16.12 | phase-16-ratings-checkup/16.12-model-rating-labelling-and-unrated-states.md | NOT STARTED | "Model rating" labelling and unrated states — needs: `ratings` |
+| 16.15 | phase-16-ratings-checkup/16.15-why-this-rating-popover.md | NOT STARTED | "Why this rating?" popover — needs: `ratings/explain` (PLAN) |
 | 16.13 | phase-16-ratings-checkup/16.13-sparse-ratings-history-step-sparkline.md | NOT STARTED | Sparse ratings history (step sparkline) — needs: `eps_rating`, `smr_rating` (19 dates) |
 | 16.14 | phase-16-ratings-checkup/16.14-valid-date-pickers-from-ratings-dates.md | NOT STARTED | Valid-date pickers from `/ratings/dates` — needs: `ratings` (dates) |
 | 16.2 | phase-16-ratings-checkup/16.2-rating-badge-component.md | NOT STARTED | Rating badge component — needs: none |
@@ -192,13 +193,13 @@ Filings can ship first (already in the DB); financials follow the XBRL pipeline.
 | 17.1 | phase-17-fundamentals-markers/17.1-filingsapiclient.md | NOT STARTED | FilingsApiClient — needs: `sec_filing` |
 | 17.2 | phase-17-fundamentals-markers/17.2-marker-layer-framework.md | NOT STARTED | Marker layer framework — needs: none |
 | 17.3 | phase-17-fundamentals-markers/17.3-filing-markers.md | NOT STARTED | Filing markers — needs: `sec_filing` |
-| 17.4 | phase-17-fundamentals-markers/17.4-earnings-markers.md | NOT STARTED | Earnings markers — needs: `financial_quarters` |
-| 17.5 | phase-17-fundamentals-markers/17.5-quarterly-fundamentals-table.md | NOT STARTED | Quarterly fundamentals table — needs: `financial_quarters` |
-| 17.6 | phase-17-fundamentals-markers/17.6-annual-table-and-cagr.md | NOT STARTED | Annual table and CAGR — needs: `financial_years` |
-| 17.7 | phase-17-fundamentals-markers/17.7-earnings-mini-charts.md | NOT STARTED | Earnings mini-charts — needs: `financial_quarters` |
-| 17.8 | phase-17-fundamentals-markers/17.8-fundamental-metrics-block.md | NOT STARTED | Fundamental metrics block — needs: `fundamental_metrics` |
+| 17.4 | phase-17-fundamentals-markers/17.4-earnings-markers.md | NOT STARTED | Earnings markers — needs: `fundamental_quarter_*` (DB) |
+| 17.5 | phase-17-fundamentals-markers/17.5-quarterly-fundamentals-table.md | NOT STARTED | Quarterly fundamentals table — needs: `fundamental_quarter_*` (DB) |
+| 17.6 | phase-17-fundamentals-markers/17.6-annual-table-and-cagr.md | NOT STARTED | Annual table and CAGR — needs: `ANNUAL_EPS_V1` (DB) |
+| 17.7 | phase-17-fundamentals-markers/17.7-earnings-mini-charts.md | NOT STARTED | Earnings mini-charts — needs: `fundamental_quarter_*` (DB) |
+| 17.8 | phase-17-fundamentals-markers/17.8-fundamental-metrics-block.md | NOT STARTED | Fundamental metrics block — needs: `fundamental_metrics` (view over SEC tables) |
 | 17.9 | phase-17-fundamentals-markers/17.9-screener-fundamentals-filters.md | NOT STARTED | Screener fundamentals filters — needs: `fundamental_metrics` |
-| 17.10 | phase-17-fundamentals-markers/17.10-restated-point-in-time-indicators.md | NOT STARTED | Restated/point-in-time indicators — needs: `financial_quarters` |
+| 17.10 | phase-17-fundamentals-markers/17.10-restated-point-in-time-indicators.md | NOT STARTED | Restated/point-in-time indicators — needs: `fundamental_quarter_*` (DB) |
 
 ### Phase 18 — CAN SLIM, patterns and trade levels
 Server-drawn overlays. The client draws what the backend computed; nothing is detected in the browser.
@@ -247,6 +248,8 @@ Ties into task 9.1. The pricing page and paywalls come from the backend, so plan
 | 20.5 | phase-20-accounts-tiers-pricing/20.5-locked-feature-ui-patterns.md | NOT STARTED | Locked-feature UI patterns — needs: none |
 | 20.6 | phase-20-accounts-tiers-pricing/20.6-billing-checkout-redirect.md | NOT STARTED | Billing checkout redirect — needs: `billing` |
 | 20.7 | phase-20-accounts-tiers-pricing/20.7-usage-and-quota-display.md | NOT STARTED | Usage and quota display — needs: `entitlements` |
+| 20.8 | phase-20-accounts-tiers-pricing/20.8-backend-controlled-display-names.md | NOT STARTED | Backend-controlled display names — needs: `meta.display_names` |
+| 20.9 | phase-20-accounts-tiers-pricing/20.9-anonymous-demo-mode-10-symbols.md | NOT STARTED | Anonymous demo mode (10 symbols) — needs: `plans` (demo_symbols) |
 
 ### Phase 21 — User data on the server
 Move watchlists, layouts, drawings, alerts and settings from localStorage to the account.

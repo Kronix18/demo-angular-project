@@ -7,7 +7,7 @@ Backing: a **daily denormalised snapshot table** `screener_snapshot` (see §5) s
 ## 1. Field catalogue — `GET /api/screener/fields`
 The front end builds the filter UI **from this response**; adding a field on the backend needs no front-end release.
 ```json
-{ "data": [ { "key": "eps_rating", "label": "EPS Rating", "group": "ratings", "type": "int", "min": 1, "max": 99, "unit": null,
+{ "data": [ { "key": "eps_rating", "label": "EPS Rating", "display_name": "EPS Rating", "group": "ratings", "type": "int", "min": 1, "max": 99, "unit": null,
               "operators": ["gte","lte","between","eq"], "sortable": true, "default_column": true,
               "min_tier": "plus", "description": "…", "dataset": "eps_rating" },
             { "key": "sector_key", "label": "Sector", "group": "classification", "type": "enum", "options_ref": "/api/universe/facets#sectors",
@@ -16,7 +16,7 @@ The front end builds the filter UI **from this response**; adding a field on the
   "meta": { "groups": ["classification","price_volume","technicals","fundamentals","ratings","canslim","patterns","institutional","events"],
             "available_datasets": ["security_master","prices"] } }
 ```
-`type`: `int | number | pct | usd | shares | bool | enum | grade | date | string`. Fields whose `dataset` is not in `available_datasets` are
+`display_name` is the **user-facing label controlled by the backend** (default = `label`), so trademark-sensitive names can be changed without a release (see `../DATA-PLAN.md` §7). `type`: `int | number | pct | usd | shares | bool | enum | grade | date | string`. Fields whose `dataset` is not in `available_datasets` are
 returned with `available:false` (greyed "coming soon" in the UI) — never omitted silently.
 
 ### Field list by group (key — type — source)

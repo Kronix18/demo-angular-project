@@ -9,7 +9,7 @@ This extends the v1 OHLCV contract in `../../API-BACKEND-SPEC.md` (`/api/chart/.
 (**the API casts to numbers**), `volume NUMERIC`; provider prices as ingested. `splits(security_id, ex_date, factor)` (4.0 = 4:1 forward, 0.5 = 1:2 reverse),
 `dividends(security_id, ex_date, amount, currency)`, `corporate_actions` (generic log). `stock_history_intraday` exists (5 / 60 min) but has no US stocks.
 
-Still needed (**PLAN**): `weekly_prices` (derived from daily, so the client never aggregates when it exists) and `index_prices(index_code, trade_date, open, high, low, close, volume)` for `SPX`, `NDX`, `COMP`, `RUT`, `DJI` (or ETF proxies `SPY`, `QQQ`, `IWM`).
+Still needed (**PLAN**): `weekly_prices` (derived from daily, so the client never aggregates when it exists) and `market_calendar` (sessions/holidays; lets the front end draw gaps correctly). **`index_prices(index_code, trade_date, open, high, low, close, volume)`** is expected to exist (Stooq): codes `SPX` (S&P 500, RS-line benchmark), `NDX`/`COMP` (Nasdaq 100 / Composite), and optional `NYA`, `RUT`, `DJI`; validated like stocks (calendar, duplicates, absurd returns). Volume for cash indices may be null.
 
 **Adjustment policy (frozen by the backend):** split-only back-adjustment derived on demand (`adjust_for_splits`, each bar before an ex-date divided by the product of later forward-split factors);
 total-return (dividend) adjustment is **rejected** for chart/pattern use; raw stored rows are never mutated; **volume is returned as stored** unless `adjust_volume=true`.
@@ -53,7 +53,7 @@ Max 25 symbols per call; free tier 5, plus 10.
 ```
 This single call replaces probing in the chart page: it says which server datasets the chart may request.
 
-### `GET /api/indices/{code}/ohlcv`  (**PLAN**) — same shape as stock OHLCV; used by RS line, compare-to-index, market view.
+### `GET /api/indices/{code}/ohlcv`  (**expected DB**, endpoint PLAN) — same shape as stock OHLCV; used by RS line, compare-to-index, market view.
 
 ### `GET /api/quotes?symbols=MSFT,AAPL`  — latest EOD quote for up to 100 symbols (`close, change, change_pct, volume, as_of`).
 The app is end-of-day; `meta.delayed = "eod"` is always set so the UI can label it.
