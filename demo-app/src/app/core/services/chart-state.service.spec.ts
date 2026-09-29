@@ -224,4 +224,21 @@ describe('ChartStateService (task 4.1)', () => {
     const again = new ChartStateService();
     expect(again.snapshot().view.crosshair).toBe(false);
   });
+
+  it('compare symbols (11.16): add / remove, cleaned, unique, capped at five, persisted, sanitised', () => {
+    const svc = TestBed.inject(ChartStateService);
+    expect(svc.snapshot().compare).toEqual([]);
+    svc.addCompare(' NVDA.US ');
+    svc.addCompare('nvda');
+    svc.addCompare('qqq');
+    svc.addCompare('!!');
+    expect(svc.snapshot().compare).toEqual(['nvda', 'qqq']);
+    for (const s of ['mu', 'pltr', 'ia', 'qqew']) svc.addCompare(s);
+    expect(svc.snapshot().compare.length).toBe(5);
+    svc.removeCompare('nvda');
+    expect(svc.snapshot().compare).toEqual(['qqq', 'mu', 'pltr', 'ia']);
+    expect(JSON.parse(sessionStorage.getItem('chart-state')!).compare).toEqual(['qqq', 'mu', 'pltr', 'ia']);
+    sessionStorage.setItem('chart-state', JSON.stringify({ compare: ['ok', 5, 'ok', 'BAD SYM'] }));
+    expect(new ChartStateService().snapshot().compare).toEqual(['ok']);
+  });
 });

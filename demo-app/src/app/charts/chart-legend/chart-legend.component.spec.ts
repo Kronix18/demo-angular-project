@@ -103,4 +103,20 @@ describe('ChartLegendComponent (10.2)', () => {
       expect(el().querySelector(s)!.getAttribute('aria-label'), s).toBeTruthy();
     }
   });
+
+  it('compare rows show colour, label, change and a remove button that emits the symbol (11.16)', () => {
+    const g = groups();
+    g[0].rows.push({ key: 'cmp:nvda', label: 'NVDA', value: '+12.30%', color: 'rgb(7, 8, 9)', hidden: false, compare: 'nvda' });
+    fixture.componentRef.setInput('groups', g);
+    fixture.detectChanges();
+    const row = el().querySelector('[data-compare-row]')!;
+    expect(row.textContent).toContain('NVDA');
+    expect(row.textContent).toContain('+12.30%');
+    expect((row.querySelector('[data-chip]') as HTMLElement).style.background).toBe('rgb(7, 8, 9)');
+    const removed: string[] = [];
+    fixture.componentInstance.compareRemove.subscribe((s) => removed.push(s));
+    (row.querySelector('[data-compare-remove]') as HTMLButtonElement).click();
+    expect(removed).toEqual(['nvda']);
+    expect(el().querySelectorAll('[data-indicator-row]').length).toBe(2); // compare rows are not indicator rows
+  });
 });

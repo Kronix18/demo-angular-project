@@ -1427,6 +1427,47 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('compare symbols (11.16)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const NVDA_ROWS = MSFT_ROWS.replace(/MSFT/g, 'NVDA').replace(',105,1000', ',210,1000').replace(',112,1200', ',224,1200').replace(',118,900', ',236,900');
+
+    it('the Compare button opens symbol search; the pick is fetched and drawn as a line normalised to the price at the first framed bar', async () => {
+      sessionStorage.clear(); localStorage.clear();
+      const st = TestBed.inject(ChartStateService); st.reset();
+      await loaded();
+      (q('[data-compare]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-symbol-search-dialog')!.textContent).toContain('Compare');
+      (q('[data-symbol-option="nvda"]') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(st.snapshot().compare).toEqual(['nvda']);
+      httpMock.expectOne('test-data/nvda.us.txt').flush(NVDA_ROWS);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const ds = chartOf().data.datasets.find((d: any) => d.label === 'NVDA');
+      expect(ds).toBeTruthy();
+      expect(ds.yAxisID).toBe('y');
+      expect(ds.data.map((p: any) => p.y)).toEqual([105, 112, 118]); // NVDA is exactly twice MSFT, so it lands on MSFT's closes
+      expect(q('[data-compare-row]')!.textContent).toContain('NVDA');
+      (q('[data-compare-remove]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().compare).toEqual([]);
+      expect(chartOf().data.datasets.find((d: any) => d.label === 'NVDA')).toBeUndefined();
+    });
+
+    it('a compare symbol that is already in the state is loaded with the chart', async () => {
+      sessionStorage.clear(); localStorage.clear();
+      const st = TestBed.inject(ChartStateService); st.reset();
+      st.addCompare('nvda');
+      await loaded();
+      httpMock.expectOne('test-data/nvda.us.txt').flush(NVDA_ROWS);
+      await fixture.whenStable();
+      expect(chartOf().data.datasets.some((d: any) => d.label === 'NVDA')).toBe(true);
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>
