@@ -2,7 +2,10 @@ import { Component, HostListener, OnDestroy, OnInit, ViewChild, ElementRef, Chan
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService, AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
-import { ChartStateService, ChartType, CHART_TYPES } from '../../core/services/chart-state.service';
+import { ChartStateService, ChartType } from '../../core/services/chart-state.service';
+import { CHART_TYPE_GROUPS, NON_TIME_TYPES } from '../../core/models/chart-type';
+import { boxSizeFor, transformBars } from '../chart-types/bar-transforms';
+import { DataBuilder, baselineFor, buildPriceSeries, lineDataset } from '../chart-types/price-series';
 import { filterByRange, aggregateWeeklyWFri } from '../../core/services/data-aggregation';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
@@ -181,6 +184,56 @@ const drawingsPlugin = {
 };
 Chart.register(drawingsPlugin);
 
+/**
+ * Point & Figure glyphs: the price dataset carries the column envelopes
+ * (o/h/l/c on the box grid) invisibly; this paints one X (rising column) or
+ * O (falling column) per box, clipped to the price pane.
+ */
+const pnfGlyphsPlugin = {
+  id: 'pnfGlyphs',
+  afterDatasetsDraw(chart: any): void {
+    const ds = chart.data?.datasets?.[0];
+    const { ctx } = chart;
+    const xs = chart.scales?.x;
+    const ys = chart.scales?.y;
+    if (!ds?.pnf || !ctx || !xs || !ys || !(ds.box > 0) || !ds.data?.length) return;
+    const box: number = ds.box;
+    const dx = ds.data.length > 1 ? Math.max(1, ds.data[1].x - ds.data[0].x) : 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chart.chartArea.left, ys.top, chart.chartArea.right - chart.chartArea.left, ys.bottom - ys.top);
+    ctx.clip();
+    ctx.lineWidth = 1.5;
+    const up = cssVar('--c-up');
+    const down = cssVar('--c-down');
+    for (const p of ds.data) {
+      if (p.x < xs.min - dx || p.x > xs.max + dx) continue;
+      const rising = p.c > p.o;
+      const cx = xs.getPixelForValue(p.x);
+      const colW = Math.abs(xs.getPixelForValue(p.x + dx) - cx);
+      const first = Math.round(p.l / box);
+      const last = Math.round(p.h / box) - 1;
+      ctx.strokeStyle = rising ? up : down;
+      for (let lvl = first; lvl <= last; lvl++) {
+        const y1 = ys.getPixelForValue(lvl * box);
+        const y2 = ys.getPixelForValue((lvl + 1) * box);
+        const cy = (y1 + y2) / 2;
+        const r = Math.max(1.5, (Math.min(colW * 0.8, Math.abs(y1 - y2)) / 2) * 0.8);
+        ctx.beginPath();
+        if (rising) {
+          ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+          ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx + r, cy - r);
+        } else {
+          ctx.ellipse(cx, cy, r, r, 0, 0, Math.PI * 2);
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  },
+};
+Chart.register(pnfGlyphsPlugin);
+
 /** Compact volume formatting (Kevin): 1,000,000 → 1M, 100,000 → 100K,
  *  1,000,000,000 → 1B, 1,500 → 1.5K, 1,000 → 1K (no trailing .0). */
 function compactVolume(v: number): string {
@@ -197,9 +250,12 @@ function compactVolume(v: number): string {
 const tooltipLabel = (item: any): string => {
   const ds = item?.dataset ?? {};
   const raw = item?.raw ?? {};
-  if (ds.type === 'candlestick' || ds.type === 'ohlc') {
+  if (ds.type === 'candlestick' || ds.type === 'ohlc' || ds.type === 'tvbar') {
     const fmt = (v: unknown) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? '-'));
     return `O ${fmt(raw.o)}  H ${fmt(raw.h)}  L ${fmt(raw.l)}  C ${fmt(raw.c)}`;
+  }
+  if (ds.type === 'bar' && ds.label === 'Price') {
+    return `Close ${typeof raw.y === 'number' ? raw.y.toFixed(2) : '-'}`;
   }
   if (ds.type === 'bar') {
     return `Vol ${typeof raw.y === 'number' ? compactVolume(raw.y) : String(raw.y ?? '-')}`;
@@ -220,9 +276,6 @@ type Computed = { index: number; resolved: ResolvedIndicator; outputs: Record<st
 /** What the legend needs to show an indicator's value at any bar. */
 interface LegendSeries { index: number; label: string; color: string; hidden: boolean; values: (number | null)[]; pane: boolean; }
 
-/** Builds the data array of one dataset from the current LOD points. */
-type DataBuilder = (pts: LodPoint[]) => any[];
-
 /**
  * Chart viewer: price candles, volume and indicator panes in ONE Chart.js
  * instance with vertically STACKED y-scales (`stack` + `stackWeight`), so they
@@ -242,9 +295,13 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         <app-chart-toolbar />
         <button type="button" class="tool-btn indicators-btn" data-indicators title="Indicators" (click)="indicatorsOpen.set(true)">ƒx Indicators</button>
         <div class="chart-tools" role="group" aria-label="Chart tools">
-          <select name="chartType" aria-label="Chart type" [value]="chartTypeValue" (change)="setChartType($any($event.target).value)">
-            @for (t of chartTypes; track t) {
-              <option [value]="t" [selected]="t === chartTypeValue">{{ typeLabels[t] }}</option>
+          <select name="chartType" aria-label="Chart type" (change)="setChartType($any($event.target).value)">
+            @for (g of typeGroups; track g.label) {
+              <optgroup [label]="g.label">
+                @for (t of g.types; track t.id) {
+                  <option [value]="t.id" [selected]="t.id === chartTypeValue">{{ t.label }}</option>
+                }
+              </optgroup>
             }
           </select>
           <button type="button" class="tool-btn" data-magnet [attr.aria-pressed]="magnetOn" title="Magnet: snap the crosshair to the bar's close" (click)="toggleMagnet()">Magnet</button>
@@ -531,8 +588,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   // ---- tools (10.5) --------------------------------------------------------------
-  readonly chartTypes = CHART_TYPES;
-  readonly typeLabels: Record<ChartType, string> = { candles: 'Candles', ohlc: 'Bars (OHLC)', line: 'Line', area: 'Area' };
+  readonly typeGroups = CHART_TYPE_GROUPS;
   chartTypeValue: ChartType = 'candles';
   magnetOn = false;
 
@@ -657,6 +713,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         const symbolChanged = s.symbol !== this.currentSymbol;
         const intervalChanged = s.interval !== this.currentInterval;
         const rangeChanged = s.range !== this.currentRange;
+        const typeChanged = s.chartType !== this.chartTypeValue;
+        const bricksInvolved = typeChanged && (NON_TIME_TYPES.includes(s.chartType) || NON_TIME_TYPES.includes(this.chartTypeValue));
         this.chartTypeValue = s.chartType;
         this.stateIndicators.set(s.indicators);
         const magnetOnly = s.magnet !== this.magnetOn && this.sameExceptMagnet(s);
@@ -677,7 +735,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
           // The file holds daily bars; weekly is aggregated client-side, so an
           // interval/range/indicator change re-renders from cache (no refetch).
           // Only indicator-only changes keep the user's current pan/zoom view.
-          const reframe = rangeChanged || intervalChanged;
+          const reframe = rangeChanged || intervalChanged || bricksInvolved;
           this.createChart(this.allData, reframe ? undefined : this.currentView());
         }
       });
@@ -779,14 +837,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     return Math.min(500, Math.max(120, Math.floor(w / 4)));
   }
 
-  private lineDataset(label: string, yAxisID: string, color: string, width: number, dash: number[], hidden = false) {
-    return {
-      type: 'line' as const, label, yAxisID, data: [] as any[], hidden,
-      borderColor: color, backgroundColor: color, borderWidth: width, borderDash: dash,
-      pointRadius: 0, pointHoverRadius: 3, tension: 0, spanGaps: false,
-      parsing: false, normalized: true,
-    };
-  }
+  private lineDataset = lineDataset;
 
   /** Value of a per-bar series sampled at the LAST bar of each bucket. */
   private lineBuilder(values: (number | null)[]): DataBuilder {
@@ -812,7 +863,10 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       return;
     }
     // Weekly aggregation applies to the whole file so pan-left shows weekly bars.
-    const bars = this.currentInterval === '1w' ? aggregateWeeklyWFri(data) : data;
+    const ctype: ChartType = this.chartState.snapshot().chartType;
+    const sourceBars = this.currentInterval === '1w' ? aggregateWeeklyWFri(data) : data;
+    // Heikin Ashi / Renko / Kagi / P&F / Range / Line break replace the bars with synthetic ones
+    const bars = transformBars(sourceBars, ctype);
     this.bars = bars;
 
     // X = bar INDEX on a LINEAR scale (root-caused in 4.3: category scales break
@@ -845,20 +899,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     this.builders = [];
     const add = (ds: any, b: DataBuilder) => { datasets.push(ds); this.builders.push(b); };
 
-    const ctype: ChartType = this.chartState.snapshot().chartType;
-    if (ctype === 'line' || ctype === 'area') {
-      add({
-        ...this.lineDataset('Price', 'y', cssVar('--c-price-line'), 2, []),
-        ...(ctype === 'area' ? { fill: 'origin', backgroundColor: cssVar('--c-price-area') } : {}),
-      }, (pts) => pts.map((p) => ({ x: p.x, y: p.c })));
-    } else {
-      add({
-        type: ctype === 'ohlc' ? 'ohlc' : 'candlestick', label: 'Price', yAxisID: 'y', data: [],
-        // token colours (the plugin's defaults are hardcoded rgba)
-        color: { up, down, unchanged: cssVar('--c-text-muted') },
-        borderColor: { up, down, unchanged: cssVar('--c-text-muted') },
-      }, (pts) => pts.map((p) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t })));
-    }
+    for (const entry of buildPriceSeries(ctype, {
+      up, down, muted: cssVar('--c-text-muted'), upFill: cssVar('--c-up-fill'), downFill: cssVar('--c-down-fill'),
+      line: cssVar('--c-price-line'), area: cssVar('--c-price-area'),
+      baseline: baselineFor(rangeSlice), box: boxSizeFor(sourceBars),
+    })) add(entry.dataset, entry.builder);
     const legendSeries: LegendSeries[] = [];
     const interval = this.currentInterval;
     overlays.forEach(({ index, resolved, outputs }, i) => {
@@ -1048,7 +1093,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       const e = (ext[id] ??= { min: Infinity, max: -Infinity });
       for (const p of ds.data) {
         if (p.x < lo || p.x > hi) continue;
-        if (ds.type === 'candlestick' || ds.type === 'ohlc') {
+        if (ds.type === 'candlestick' || ds.type === 'ohlc' || ds.type === 'tvbar') {
           if (p.l < e.min) e.min = p.l;
           if (p.h > e.max) e.max = p.h;
         } else if (typeof p.y === 'number') {

@@ -11,13 +11,8 @@
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { wilderAtr } from '../../core/indicators/indicator-math';
 
-export type ChartType =
-  | 'candles' | 'hollow' | 'ohlc' | 'hlc' | 'highlow' | 'columns'
-  | 'line' | 'markers' | 'step' | 'area' | 'hlcarea' | 'baseline'
-  | 'heikin' | 'renko' | 'linebreak' | 'kagi' | 'pnf' | 'range';
-
-/** Styles whose bars are not the source bars 1:1 (the view cannot be carried over on a switch). */
-export const NON_TIME_TYPES: ChartType[] = ['renko', 'linebreak', 'kagi', 'pnf', 'range'];
+export type { ChartType } from '../../core/models/chart-type';
+import type { ChartType } from '../../core/models/chart-type';
 
 const EPS = 1e-9;
 

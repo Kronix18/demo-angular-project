@@ -205,7 +205,7 @@ test.describe('chart panel (2.x–5.x)', () => {
       await page.selectOption('select[name="chartType"]', t);
       await page.waitForFunction((tt) => {
         const d0 = (window as any).__charts.chart.data.datasets[0];
-        return tt === 'candles' ? d0.type === 'candlestick' : tt === 'ohlc' ? d0.type === 'ohlc' : d0.type === 'line';
+        return tt === 'candles' ? d0.type === 'candlestick' : tt === 'ohlc' ? d0.type === 'tvbar' : d0.type === 'line';
       }, t);
       await page.waitForTimeout(200);
       sigs[t] = await signature();
@@ -241,5 +241,35 @@ test.describe('chart panel (2.x–5.x)', () => {
     await page.waitForTimeout(300);
     // headless chromium may deny fullscreen; the click must never throw either way
     expect(errors.filter((e) => !/fullscreen|Permissions check/i.test(e))).toEqual([]);
+  });
+
+  test('all 18 chart styles render real pixels, keep volume, and survive a reload (11.2)', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    await page.click('.range-btn:has-text("1Y")');
+    const styles = ['candles', 'hollow', 'ohlc', 'hlc', 'highlow', 'columns', 'line', 'markers', 'step', 'area', 'hlcarea', 'baseline',
+      'heikin', 'renko', 'linebreak', 'kagi', 'pnf', 'range'];
+    const sigs = new Set<number>();
+    for (const t of styles) {
+      await page.selectOption('select[name="chartType"]', t);
+      await page.waitForTimeout(250);
+      const info = await page.evaluate(() => {
+        const c = (window as any).__charts.chart;
+        const y = c.scales.y;
+        return { n: c.data.datasets[0].data.length, top: y.top, height: y.height, finite: Number.isFinite(y.min) && Number.isFinite(y.max), vol: c.data.datasets.some((d: any) => d.label === 'Volume') };
+      });
+      expect(info.n, t).toBeGreaterThan(3);
+      expect(info.finite, t).toBe(true);
+      expect(info.vol, t).toBe(true);
+      const px = await canvasPixels(page, { top: info.top, height: info.height });
+      expect(px.n, `${t} price pane pixels`).toBeGreaterThan(400);
+      sigs.add(px.n);
+    }
+    expect(sigs.size).toBeGreaterThan(14); // styles are visibly different renderings
+    await page.selectOption('select[name="chartType"]', 'pnf');
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__charts?.chart);
+    await expect(page.locator('select[name="chartType"]')).toHaveValue('pnf');
+    expect(errors).toEqual([]);
   });
 });

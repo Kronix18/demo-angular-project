@@ -599,7 +599,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(chartOf().data.datasets[0].type).toBe('candlestick');
       st.setChartType('ohlc');
       await fixture.whenStable();
-      expect(chartOf().data.datasets[0].type).toBe('ohlc');
+      expect(chartOf().data.datasets[0].type).toBe('tvbar');
       expect(chartOf().data.datasets[0].data[0]).toMatchObject({ o: 100, h: 110, l: 95, c: 105 });
       st.setChartType('line');
       await fixture.whenStable();

@@ -30,7 +30,7 @@ const defs = (block: string) => [...block.matchAll(/(--[\w-]+)\s*:/g)].map((m) =
 const SAME_IN_BOTH = [
   '--c-on-primary', '--c-on-brand', '--on-ac', '--c-shadow', '--c-neutral', '--c-nav-text',
   '--tr-purple', '--tr-pink', '--tr-gold', '--tr-orange', '--c-up', '--c-down',
-  '--c-up-fill', '--c-up-strong', '--c-down-strong', '--c-teal', '--ac', '--ac2',
+  '--c-up-fill', '--c-down-fill', '--c-up-strong', '--c-down-strong', '--c-teal', '--ac', '--ac2',
 ];
 /** color-mix() tokens derived from other tokens — they follow their source automatically. */
 const DERIVED = ['--c-primary-tint', '--c-focus-ring', '--c-nav-hover-bg', '--c-nav-surface-hover', '--c-nav-outline', '--c-crosshair'];

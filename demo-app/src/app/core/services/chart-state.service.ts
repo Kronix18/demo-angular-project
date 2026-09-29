@@ -4,8 +4,9 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
 /** Chart state shape (4.1). Indicators: {type, period, hidden?} entries (hidden = eye toggle, 10.2). */
-export type ChartType = 'candles' | 'ohlc' | 'line' | 'area';
-export const CHART_TYPES: ChartType[] = ['candles', 'ohlc', 'line', 'area'];
+import { CHART_TYPES, ChartType } from '../models/chart-type';
+export { CHART_TYPES };
+export type { ChartType };
 
 export interface ChartState {
   symbol: string;

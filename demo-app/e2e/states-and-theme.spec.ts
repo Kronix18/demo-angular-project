@@ -45,7 +45,7 @@ test.describe('theme tokens + dark mode', () => {
     const c = (window as any).__charts.chart;
     const css = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
     return {
-      up: c.data.datasets[0].color.up, cssUp: css('--c-up'), grid: c.options.scales.x.grid.color, cssGrid: css('--c-grid'),
+      up: c.data.datasets[0].backgroundColors.up, border: c.data.datasets[0].borderColors.down, cssDown: css('--c-down'), cssUp: css('--c-up'), grid: c.options.scales.x.grid.color, cssGrid: css('--c-grid'),
       rsi: c.data.datasets.find((d: any) => d.label === 'RSI').borderColor, cssViolet: css('--c-ind-violet'),
       bg: getComputedStyle(document.body).backgroundColor, panel: getComputedStyle(document.querySelector('.chart-panel')!).backgroundColor,
       theme: document.documentElement.getAttribute('data-theme'),
@@ -62,6 +62,7 @@ test.describe('theme tokens + dark mode', () => {
       expect(m.theme).toBe(theme);
       expect(m.up).toBe(m.cssUp);
       expect(m.up).not.toBe('');
+      expect(m.border).toBe(m.cssDown); // candle colours really come from the tokens
       expect(m.grid).toBe(m.cssGrid);
       expect(m.rsi).toBe(m.cssViolet);
       expect(m.bg).toBe(theme === 'dark' ? 'rgb(19, 23, 34)' : 'rgb(248, 249, 250)');
@@ -91,6 +92,7 @@ test.describe('theme tokens + dark mode', () => {
     }
     // the pricing cards actually use dark surfaces (not hardcoded white)
     await page.goto('/pricing');
+    await page.waitForSelector('[class*="plan"], [class*="card"]');
     const card = await page.evaluate(() => {
       const el = document.querySelector('[class*="plan"], [class*="card"]') as HTMLElement;
       return getComputedStyle(el).backgroundColor;

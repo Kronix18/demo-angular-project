@@ -144,6 +144,7 @@
   --tr-purple-a20: color-mix(in srgb, var(--tr-purple) 20%, transparent);
   /* chart canvas (Chart.js cannot use color-mix/var) */
   --c-up-fill: rgba(38, 166, 154, 0.1);
+  --c-down-fill: rgba(239, 83, 80, 0.1);
   --c-up-strong: rgba(38, 166, 154, 0.8);
   --c-down-strong: rgba(239, 83, 80, 0.8);
   --c-chart-bg: #ffffff;
