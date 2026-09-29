@@ -23,6 +23,8 @@ export interface MockOptions {
   errors?: Record<string, MockError>;
   /** path (without query) → custom JSON body (status 200). */
   overrides?: Record<string, unknown>;
+  /** Access tokens the mock treats as expired: non-auth requests carrying them get 401 token_expired. */
+  expiredTokens?: string[];
   /** Called for each mocked request (path incl. query). */
   onRequest?: (path: string) => void;
 }
@@ -57,6 +59,9 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<void>
     const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
       route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...headers }, body: JSON.stringify(body ?? {}) });
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (path === '/api/auth/refresh') return json(200, { access_token: 'new-token', refresh_token: 'new-refresh', expires_in: 900 });
+    const bearer = route.request().headers()['authorization']?.replace('Bearer ', '');
+    if (bearer && opts.expiredTokens?.includes(bearer)) return json(401, { error: 'token_expired', message: 'Token expired' });
     const err = opts.errors?.[path];
     if (err) return json(err.status, err.body, err.headers);
     if (opts.overrides && path in opts.overrides) return json(200, opts.overrides[path]);
