@@ -716,7 +716,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
 
     it('the sidebar has cursor, one button per tool group (with a flyout listing all its tools), measure, zoom + magnet / stay-in-drawing / lock / hide / delete-all', async () => {
       await ready();
-      expect(qa('[data-group]').map((b) => b.dataset['group'])).toEqual(['lines', 'fib', 'patterns', 'projection', 'shapes', 'text', 'icons']);
+      expect(qa('[data-group]').map((b) => b.dataset['group'])).toEqual(['cursors', 'lines', 'fib', 'patterns', 'projection', 'shapes', 'text', 'icons']);
       expect(qa('.draw-tools > [data-tool], .draw-tools [data-tool]').map((b) => b.dataset['tool'])).toEqual(
         ['cursor', 'trend', 'fib', 'xabcd', 'longpos', 'brush', 'text', 'iconup', 'measure', 'zoom']);
       for (const sel of ['[data-magnet]', '[data-keep]', '[data-lock]', '[data-hide]', '[data-tool-clear]']) expect(q(sel), sel).toBeTruthy();
@@ -958,7 +958,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       fresh();
       await loaded();
       expect(q('.chart-body > app-drawing-sidebar')).toBeTruthy();
-      expect(q('.chart-body > .chart-panel')).toBeTruthy();
+      expect(q('.chart-body > .chart-col > .chart-panel')).toBeTruthy();
       expect(q('.chart-panel app-drawing-sidebar')).toBeNull();
     });
 
@@ -988,16 +988,13 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(chartOf().options.scales.y.reverse).toBe(true);
     });
 
-    it('zoom in / out buttons change the visible span; "reset" restores the framing', async () => {
+    it('zoom in / out buttons zoom the x axis about the centre', async () => {
       fresh();
       await loaded();
-      const span = () => chartOf().scales.x.max - chartOf().scales.x.min;
-      const s0 = span();
+      const zoom = vi.spyOn(chartOf(), 'zoom');
       (q('[data-zoom-in]') as HTMLButtonElement).click();
-      expect(span()).toBeLessThan(s0);
       (q('[data-zoom-out]') as HTMLButtonElement).click();
-      (q('[data-zoom-out]') as HTMLButtonElement).click();
-      expect(span()).toBeGreaterThanOrEqual(s0 * 0.99);
+      expect(zoom.mock.calls.map((c) => (c[0] as any).x)).toEqual([1.25, 0.8]);
     });
 
     it('cursor group: cross, dot, arrow, eraser — the crosshair follows the choice', async () => {

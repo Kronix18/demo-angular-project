@@ -4,7 +4,7 @@
  * double-click) or `free` (drag). Measure and Zoom are transient and live in
  * the controller/sidebar, not here.
  */
-export type ToolGroup = 'lines' | 'fib' | 'patterns' | 'projection' | 'shapes' | 'text' | 'icons';
+export type ToolGroup = 'cursors' | 'lines' | 'fib' | 'patterns' | 'projection' | 'shapes' | 'text' | 'icons';
 
 export interface ToolDef {
   id: string;
@@ -17,6 +17,7 @@ export interface ToolDef {
 }
 
 export const TOOL_GROUPS: { id: ToolGroup; label: string; icon: string }[] = [
+  { id: 'cursors', label: 'Cursors', icon: '✛' },
   { id: 'lines', label: 'Trend lines', icon: '⟋' },
   { id: 'fib', label: 'Fib & Gann', icon: 'Fib' },
   { id: 'patterns', label: 'Patterns', icon: 'XABCD' },
@@ -97,7 +98,19 @@ export const TOOL_DEFS = [
 
 export type DrawingType = (typeof TOOL_DEFS)[number]['id'];
 
+/** Cursor modes (not drawings): the crosshair style, and the eraser. All but the eraser select / move drawings. */
+export const CURSOR_TOOLS: ToolDef[] = [
+  { id: 'cursor', label: 'Cross', icon: '✛', group: 'cursors', points: 1 },
+  { id: 'dot', label: 'Dot', icon: '•', group: 'cursors', points: 1 },
+  { id: 'pointer', label: 'Arrow', icon: '↖', group: 'cursors', points: 1 },
+  { id: 'eraser', label: 'Eraser', icon: '⌫', group: 'cursors', points: 1 },
+];
+export type CursorTool = 'cursor' | 'dot' | 'pointer' | 'eraser';
+export const isSelectTool = (t: string): boolean => t === 'cursor' || t === 'dot' || t === 'pointer';
 const BY_ID = new Map<string, ToolDef>(TOOL_DEFS.map((d) => [d.id, d]));
+const ANY_ID = new Map<string, ToolDef>([...CURSOR_TOOLS, ...TOOL_DEFS].map((d) => [d.id, d]));
 export const toolDef = (id: string): ToolDef | undefined => BY_ID.get(id);
 export const isDrawingType = (id: unknown): id is DrawingType => typeof id === 'string' && BY_ID.has(id);
-export const toolsInGroup = (g: ToolGroup): ToolDef[] => TOOL_DEFS.filter((d) => d.group === g);
+export const toolsInGroup = (g: ToolGroup): ToolDef[] => (g === 'cursors' ? CURSOR_TOOLS : TOOL_DEFS.filter((d) => d.group === g));
+/** Drawing tools and cursor modes (the sidebar's view). */
+export const anyToolDef = (id: string): ToolDef | undefined => ANY_ID.get(id);

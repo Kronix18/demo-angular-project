@@ -2,12 +2,12 @@ import type { Chart } from 'chart.js';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { Anchor, Drawing, DrawingStyle, indexForTime, measureInfo, snapToOhlc, timeForIndex } from './drawing-geometry';
 import { DrawingStore } from './drawing-store.service';
-import { DrawingType, toolDef } from './drawing-tools';
+import { DrawingType, isSelectTool, toolDef } from './drawing-tools';
 import { Env, Pt, distanceToShapes, handlePoints, shapesFor, textWidth } from './drawing-shapes';
 export { textWidth };
 
 /** Interactive tools: the cursor, every persistent drawing type, and two transient ones. */
-export type Tool = 'cursor' | DrawingType | 'measure' | 'zoom';
+export type Tool = 'cursor' | 'dot' | 'pointer' | 'eraser' | DrawingType | 'measure' | 'zoom';
 
 /** In-progress gesture (not persisted until committed). */
 /** phase 1: dragging the first segment, 2: channel offset click, 3: placing the remaining anchors one click at a time */
@@ -57,7 +57,7 @@ const TRANSIENT: Tool[] = ['measure', 'zoom'];
 /** How a tool collects its anchors. */
 function kind(tool: Tool): 'one' | 'drag' | 'channel' | 'sequence' | 'free' | 'transient' | null {
   if (TRANSIENT.includes(tool)) return 'transient';
-  if (tool === 'cursor') return null;
+  if (isSelectTool(tool) || tool === 'eraser') return null;
   if (tool === 'channel') return 'channel';
   const def = toolDef(tool);
   if (!def) return null;
@@ -90,7 +90,7 @@ export class DrawingController {
     const chart = this.deps.chart();
     const pan = (chart?.options?.plugins as any)?.zoom?.pan;
     if (!pan) return;
-    const enabled = this.deps.tool() === 'cursor';
+    const enabled = isSelectTool(this.deps.tool());
     if (pan.enabled === enabled) return;
     pan.enabled = enabled;
     // the zoom plugin caches its options per update cycle
@@ -155,7 +155,8 @@ export class DrawingController {
     if (this.measure) { this.measure = null; this.deps.changed(); }
     if (this.draft?.phase === 2) return this.commitChannel(x, y);
     if (this.draft?.phase === 3) return this.addAnchor(x, y);
-    if (tool === 'cursor') return this.selectOrGrab(x, y);
+    if (tool === 'eraser') return this.erase(x, y);
+    if (isSelectTool(tool)) return this.selectOrGrab(x, y);
     const pt = this.toData(x, y);
     if (!pt) return;
     this.selectedId = null;
@@ -390,6 +391,21 @@ export class DrawingController {
   private distance(d: Drawing, x: number, y: number): number {
     const env = this.env();
     return env ? distanceToShapes(shapesFor(d, env), x, y, env) : Infinity;
+  }
+
+  /** Eraser: removes the drawing nearest to the pointer. */
+  private erase(x: number, y: number): void {
+    if (this.deps.store.locked() || this.deps.store.hidden()) return;
+    let hit: Drawing | null = null;
+    let best = HIT;
+    for (const d of this.deps.store.list(this.deps.symbol())) {
+      const dist = this.distance(d, x, y);
+      if (dist <= best) { best = dist; hit = d; }
+    }
+    if (!hit) return;
+    this.deps.store.remove(this.deps.symbol(), hit.id);
+    if (this.selectedId === hit.id) this.selectedId = null;
+    this.deps.changed();
   }
 
   private selectOrGrab(x: number, y: number): void {

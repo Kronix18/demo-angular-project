@@ -25,6 +25,7 @@ import { SymbolSettingsDialogComponent } from '../dialogs/symbol-settings-dialog
 import { PriceSettings, VolumeSettings } from '../../core/models/symbol-settings';
 import { DrawingSidebarComponent } from '../drawings/drawing-sidebar.component';
 import { DrawingStore } from '../drawings/drawing-store.service';
+import { isSelectTool as isSelectToolFn } from '../drawings/drawing-tools';
 import { Range, fitRangeLog, panRange, scaleRange } from '../y-scale-math';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
@@ -66,18 +67,24 @@ const crosshairPlugin = {
       if (typeof v === 'number') y = chart.scales.y.getPixelForValue(v);
     }
 
+    if (chart.$cursorStyle === 'pointer') return; // plain arrow: no crosshair at all
+    const dot = chart.$cursorStyle === 'dot';
     ctx.save();
     ctx.beginPath();
     ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1;
     ctx.strokeStyle = cssVar('--c-crosshair');
-    ctx.moveTo(x, chartArea.top);
-    ctx.lineTo(x, chartArea.bottom);
-    if (y !== null && y >= chartArea.top && y <= chartArea.bottom) {
-      ctx.moveTo(chartArea.left, y);
-      ctx.lineTo(chartArea.right, y);
+    if (dot) {
+      if (y !== null) { ctx.setLineDash([]); ctx.fillStyle = cssVar('--c-crosshair'); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill(); }
+    } else {
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      if (y !== null && y >= chartArea.top && y <= chartArea.bottom) {
+        ctx.moveTo(chartArea.left, y);
+        ctx.lineTo(chartArea.right, y);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
     ctx.restore();
 
     // Price label on the y axis of the pane under the crosshair (TradingView style).
@@ -86,7 +93,8 @@ const crosshairPlugin = {
       const scale = id ? chart.scales[id] : null;
       if (scale) {
         const v = scale.getValueForPixel(y);
-        const text = id === 'yVol' ? compactVolume(v) : v.toFixed(2);
+        const base = id === 'y' && typeof chart.$percentBase === 'function' && chart.options?.scales?.y?.ticks?.callback ? chart.$percentBase() : null;
+        const text = id === 'yVol' ? compactVolume(v) : base ? `${((v / base - 1) * 100).toFixed(2)}%` : v.toFixed(2);
         ctx.save();
         ctx.font = '11px sans-serif';
         ctx.textBaseline = 'middle';
@@ -274,17 +282,15 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         <app-indicator-settings-dialog [entry]="sf.entry" (save)="saveSettings(sf.index, $event)" (closed)="settingsIndex.set(null)" />
       }
 
+      <div class="chart-body">
+      <app-drawing-sidebar [tool]="tool()" [magnet]="magnetOn" [keep]="keepDrawing()"
+        [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
+        (keepToggle)="keepDrawing.set(!keepDrawing())" (lockToggle)="drawingStore.toggleLocked()"
+        (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" />
+      <div class="chart-col">
       <div class="chart-panel" data-pane="panel">
-        <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="tool() !== 'cursor'" (dblclick)="onDblClick($event)"
+        <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="!isSelectTool(tool())" (dblclick)="onDblClick($event)"
           (mousedown)="pointer('down', $event)" (mousemove)="pointer('move', $event)" (mouseup)="pointer('up', $event)"></canvas>
-        <div class="scale-btns" role="group" aria-label="Price scale">
-          <button type="button" data-auto [attr.aria-pressed]="autoScale()" title="Auto-fit the price scale to the visible bars (drag the chart vertically to switch it off)" (click)="setAuto()">auto</button>
-          <button type="button" data-log [attr.aria-pressed]="logOn" title="Logarithmic price scale (volume too)" (click)="toggleLog()">log</button>
-        </div>
-        <app-drawing-sidebar [tool]="tool()" [magnet]="magnetOn" [keep]="keepDrawing()"
-          [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
-          (keepToggle)="keepDrawing.set(!keepDrawing())" (lockToggle)="drawingStore.toggleLocked()"
-          (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" />
         @if (selectedDrawing(); as sd) {
           <div class="draw-style" data-draw-style role="group" aria-label="Drawing style">
             <input type="color" data-draw-color aria-label="Colour" [value]="styleColor(sd)" (input)="setDrawStyle(sd.id, { color: $any($event.target).value })" />
@@ -327,6 +333,16 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           </div>
         }
       </div>
+      <div class="scale-bar" role="group" aria-label="Price scale">
+      <button type="button" data-zoom-out title="Zoom out" aria-label="Zoom out" (click)="zoomBy(1 / 1.25)">−</button>
+      <button type="button" data-zoom-in title="Zoom in" aria-label="Zoom in" (click)="zoomBy(1.25)">+</button>
+      <button type="button" data-invert [attr.aria-pressed]="invertOn" title="Invert the price scale" (click)="chartState.toggleInvertScale()">⇅</button>
+      <button type="button" data-percent [attr.aria-pressed]="percentOn" title="Percentage scale: % change from the first visible bar" (click)="chartState.togglePercentScale()">%</button>
+      <button type="button" data-auto [attr.aria-pressed]="autoScale()" title="Auto-fit the price scale to the visible bars (drag the chart vertically to switch it off)" (click)="setAuto()">auto</button>
+      <button type="button" data-log [attr.aria-pressed]="logOn" title="Logarithmic price scale (volume too)" (click)="toggleLog()">log</button>
+      </div>
+      </div>
+      </div>
     </div>
   `,
   styles: [
@@ -354,6 +370,8 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         background: var(--c-surface);
         border-bottom: 1px solid var(--c-pane-border);
       }
+      .chart-body { display: flex; flex: 1 1 auto; min-height: 0; }
+      .chart-col { display: flex; flex: 1 1 0; flex-direction: column; min-width: 0; }
       .chart-panel {
         position: relative;
         flex: 1 1 auto;
@@ -422,13 +440,13 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       .retry-btn { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
       .symbol-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
-      .scale-btns { position: absolute; right: 4px; bottom: 3px; z-index: 4; display: flex; gap: 2px; }
-      .scale-btns button {
+      .scale-bar { display: flex; flex: none; justify-content: flex-end; gap: 2px; padding: 1px 8px; background: var(--c-surface); border-top: 1px solid var(--c-pane-border); }
+      .scale-bar button {
         padding: 1px 6px; border: none; border-radius: var(--border-radius-sm); background: transparent;
         color: var(--c-text-muted); cursor: pointer; font-size: 0.75rem;
       }
-      .scale-btns button:hover { color: var(--c-text); }
-      .scale-btns button[aria-pressed='true'] { color: var(--c-primary); font-weight: 600; }
+      .scale-bar button:hover { color: var(--c-text); }
+      .scale-bar button[aria-pressed='true'] { color: var(--c-primary); font-weight: 600; }
       .draw-style {
         position: absolute; left: 50%; top: 4px; transform: translateX(-50%); z-index: 5; display: flex; gap: 4px; align-items: center;
         padding: 3px 6px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius);
@@ -522,6 +540,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   // ---- drawings (10.3) ---------------------------------------------------------------
   readonly drawingStore = inject(DrawingStore);
   readonly tool = signal<Tool>('cursor');
+  /** The select-type cursor to fall back to after a drawing (cross, dot or arrow). */
+  private cursorMode: Tool = 'cursor';
+  isSelectTool(t: Tool): boolean { return isSelectToolFn(t); }
   readonly keepDrawing = signal(false);
   readonly selectedId = signal<string | null>(null);
   readonly editingText = signal<{ id: string; x: number; y: number; value: string } | null>(null);
@@ -543,15 +564,22 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     magnet: () => this.magnetOn,
     zoomTo: (r) => this.zoomToRegion(r),
     editText: (id) => this.openTextEditor(id),
-    committed: () => { if (!this.keepDrawing()) { this.tool.set('cursor'); this.drawings.syncPan(); } },
+    committed: () => { if (!this.keepDrawing()) { this.tool.set(this.cursorMode); this.drawings.syncPan(); this.applyCursorStyle(); } },
   });
 
+  private applyCursorStyle(): void {
+    const t = this.tool();
+    if (this.chart) (this.chart as any).$cursorStyle = t === 'dot' ? 'dot' : t === 'pointer' ? 'pointer' : 'cross';
+  }
+
   setTool(t: Tool): void {
+    if (isSelectToolFn(t)) this.cursorMode = t;
     this.tool.set(t);
+    this.applyCursorStyle();
     this.drawings.cancel();
     this.selectedId.set(null);
     this.editingText.set(null);
-    if (t !== 'cursor' && this.drawingStore.hidden()) this.drawingStore.setHidden(false);
+    if (!isSelectToolFn(t) && this.drawingStore.hidden()) this.drawingStore.setHidden(false);
     this.drawings.syncPan();
     this.chart?.draw();
   }
@@ -604,8 +632,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   pointer(kind: 'down' | 'move' | 'up', e: MouseEvent): void {
-    if (this.tool() === 'cursor' && kind === 'move' && !e.buttons) return; // hover: nothing to do
-    if (kind === 'down' && this.tool() === 'cursor' && e.button === 0) this.yDrag = this.classifyYDrag(e.offsetX, e.offsetY);
+    if (isSelectToolFn(this.tool()) && kind === 'move' && !e.buttons) return; // hover: nothing to do
+    if (kind === 'down' && isSelectToolFn(this.tool()) && e.button === 0) this.yDrag = this.classifyYDrag(e.offsetX, e.offsetY);
     if (this.yDragEvent(kind, e.offsetY)) return; // price-axis scaling
     if (kind === 'down') this.drawings.pointerDown(e.offsetX, e.offsetY);
     else if (kind === 'move') this.drawings.pointerMove(e.offsetX, e.offsetY);
@@ -630,7 +658,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       this.openSearch(e.key);
       return;
     }
-    if (e.key === 'Escape') { this.tool.set('cursor'); this.drawings.syncPan(); this.editingText.set(null); }
+    if (e.key === 'Escape') { this.tool.set(this.cursorMode); this.drawings.syncPan(); this.applyCursorStyle(); this.editingText.set(null); }
     this.drawings.key(e.key);
   }
 
@@ -648,6 +676,21 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   /** Auto-fit the price pane to the visible bars; off once the user pans/scales it vertically. */
   readonly autoScale = signal(true);
   logOn = false;
+  percentOn = false;
+  invertOn = false;
+
+  /** Close of the first visible bar: the 0% of the percentage scale. */
+  percentBase(): number {
+    const x = (this.chart?.scales?.['x'] as any)?.min;
+    const bars = this.bars;
+    if (!bars.length) return 1;
+    return bars[Math.min(bars.length - 1, Math.max(0, Math.round(typeof x === 'number' ? x : 0)))].close || 1;
+  }
+
+  /** Zoom buttons: scale the visible bar span about the centre (factor > 1 zooms in). */
+  zoomBy(f: number): void {
+    try { (this.chart as any)?.zoom({ x: f }); } catch (e) { console.warn('zoom failed:', (e as Error).message?.slice(0, 80)); }
+  }
   private manualY: Range | null = null;
   private yDrag: { mode: 'axis' | 'pan'; startY: number; lastY: number; engaged: boolean } | null = null;
 
@@ -859,6 +902,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         const rangeChanged = s.range !== this.currentRange;
         const logChanged = s.logScale !== this.logOn;
         this.logOn = s.logScale;
+        this.percentOn = s.percentScale;
+        this.invertOn = s.invertScale;
         if (symbolChanged || intervalChanged || rangeChanged || logChanged) this.resetPriceScale();
         const typeChanged = s.chartType !== this.chartTypeValue;
         const bricksInvolved = typeChanged && (NON_TIME_TYPES.includes(s.chartType) || NON_TIME_TYPES.includes(this.chartTypeValue));
@@ -1131,7 +1176,11 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       y: {
         type: this.logOn ? 'logarithmic' : 'linear', position: 'right', stack: 'panel', stackWeight: PRICE_WEIGHT,
         afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
-        ticks: { includeBounds: false },
+        reverse: this.invertOn,
+        ticks: {
+          includeBounds: false,
+          ...(this.percentOn ? { callback: (v: any) => { const p = (Number(v) / this.percentBase() - 1) * 100; return `${p > 0.005 ? '+' : ''}${p.toFixed(2)}%`; } } : {}),
+        },
         paneLabel: `${this.currentSymbol.toUpperCase()} · ${this.currentInterval.toUpperCase()}`,
       },
       yVol: {
@@ -1198,6 +1247,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     });
 
     (this.chart as any).$magnet = this.chartState.snapshot().magnet;
+    (this.chart as any).$percentBase = () => this.percentBase();
+    this.applyCursorStyle();
     (this.chart as any).$drawings = this.drawings;
     this.drawings.syncPan();
     this.chart.draw(); // the constructor's first render ran before the controller was attached

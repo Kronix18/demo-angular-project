@@ -16,7 +16,7 @@ test.describe('chart page layout (5.4)', () => {
         const ids = ['y', 'yVol', 'yInd0', 'yInd1'];
         return {
           v: de.scrollHeight - innerHeight, h: de.scrollWidth - innerWidth,
-          gap: innerHeight - c.canvas.getBoundingClientRect().bottom,
+          gap: innerHeight - document.querySelector('.scale-bar')!.getBoundingClientRect().bottom,
           canvases: document.querySelectorAll('canvas').length, footer: !!document.querySelector('footer'),
           lefts: new Set(ids.map((k) => Math.round(c.scales[k].left))).size,
           contiguous: ids.every((k, i) => i === 0 || Math.abs(c.scales[k].top - c.scales[ids[i - 1]].bottom) <= 1),
@@ -32,6 +32,27 @@ test.describe('chart page layout (5.4)', () => {
       expect(m.contiguous).toBe(true);
     });
   }
+
+  test('drawing sidebar is a fixed full-height column on the left, chart fills the rest (11.8)', async ({ page }) => {
+    await page.setViewportSize({ width: 1400, height: 800 });
+    await openChart(page);
+    const r = await page.evaluate(() => {
+      const b = (sel: string) => { const e = document.querySelector(sel)!.getBoundingClientRect(); return { x: e.x, y: e.y, w: e.width, h: e.height, r: e.right, b: e.bottom }; };
+      return { side: b('app-drawing-sidebar'), panel: b('.chart-panel'), col: b('.chart-col'), header: b('.chart-header'), canvas: b('canvas') };
+    });
+    expect(r.side.x).toBe(0);
+    expect(Math.abs(r.side.y - r.panel.y)).toBeLessThanOrEqual(1);          // starts right under the chart navbar
+    expect(Math.abs(r.side.b - r.col.b)).toBeLessThanOrEqual(1);            // and runs to the bottom, beside the scale bar too
+    expect(r.panel.x).toBeGreaterThanOrEqual(r.side.r - 1);                 // the chart starts where the sidebar ends
+    expect(Math.abs(r.canvas.x - r.panel.x)).toBeLessThanOrEqual(1);
+    expect(r.side.w).toBeLessThan(60);
+    // short windows scroll the sidebar instead of overflowing the page
+    await page.setViewportSize({ width: 1400, height: 420 });
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1400, height: 800 });
+    await page.screenshot({ path: 'docs/screenshots/11.8-sidebar-column.png' });
+  });
 
   test('compact navbar on the chart page; other pages keep navbar + footer', async ({ page }) => {
     await openChart(page);

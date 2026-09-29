@@ -1,4 +1,4 @@
-import { toolDef } from '../src/app/charts/drawings/drawing-tools';
+import { anyToolDef as toolDef } from '../src/app/charts/drawings/drawing-tools';
 import { expect, Page } from '@playwright/test';
 
 /** Opens a chart and waits until the panel chart exists and loading is over. */

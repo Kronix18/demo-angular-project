@@ -20,6 +20,9 @@ export interface ChartState {
   logScale: boolean;
   /** crosshair magnet: snap the horizontal line to the hovered bar's close (10.5) */
   magnet: boolean;
+  /** price axis as % change from the first visible bar, and flipped (11.8) */
+  percentScale: boolean;
+  invertScale: boolean;
   /** symbol + volume settings from the legend (11.6) */
   price: PriceSettings;
   volume: VolumeSettings;
@@ -63,6 +66,8 @@ const DEFAULTS: ChartState = {
   chartType: 'candles',
   magnet: false,
   logScale: false,
+  percentScale: false,
+  invertScale: false,
   price: {},
   volume: {},
 };
@@ -144,6 +149,9 @@ export class ChartStateService {
     this.update({ logScale: !this.subject.value.logScale });
   }
 
+  togglePercentScale(): void { this.update({ percentScale: !this.subject.value.percentScale }); }
+  toggleInvertScale(): void { this.update({ invertScale: !this.subject.value.invertScale }); }
+
   toggleMagnet(): void {
     this.update({ magnet: !this.subject.value.magnet });
   }
@@ -198,6 +206,8 @@ export class ChartStateService {
         chartType: CHART_TYPES.includes(parsed.chartType) ? parsed.chartType : DEFAULTS.chartType,
         magnet: parsed.magnet === true,
         logScale: parsed.logScale === true,
+        percentScale: parsed.percentScale === true,
+        invertScale: parsed.invertScale === true,
         price: sanitizePrice(parsed.price),
         volume: sanitizeVolume(parsed.volume),
         indicators: Array.isArray(parsed.indicators)
