@@ -7,6 +7,7 @@ import { provideHttpClient, withFetch } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { Chart } from 'chart.js';
 import { Subject, of, throwError } from 'rxjs';
+import { ChartStateService } from '../../core/services/chart-state.service';
 import '../chart-setup'; // registerables + adapter + zoom + financial controllers (correct order)
 
 // jsdom has no ResizeObserver; Chart.js responsive mode requires one.
@@ -380,5 +381,89 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     fixture.detectChanges(); // ...then force the @if(error) re-render (no NG0100: state settled)
     const errEl = fixture.nativeElement.querySelector('.error-message');
     expect(errEl).toBeTruthy();
+  });
+
+  describe('indicators on the chart (5.2)', () => {
+    const rows = (n: number) => {
+      const out = ['<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>'];
+      for (let i = 0; i < n; i++) {
+        const d = new Date(Date.UTC(2024, 0, 1 + i)).toISOString().slice(0, 10).replace(/-/g, '');
+        const c = 100 + Math.sin(i / 3) * 5 + i * 0.2;
+        out.push(`MSFT.US,D,${d},000000,${c - 1},${c + 2},${c - 2},${c},${1000 + i},0`);
+      }
+      return out.join('\r\n');
+    };
+    let state: ChartStateService;
+
+    async function load(indicators: { type: string; period: number }[]) {
+      sessionStorage.clear();
+      state = TestBed.inject(ChartStateService);
+      state.reset();
+      state.setSymbol('msft');
+      for (const i of indicators) state.addIndicator(i);
+      stubCanvas();
+      httpMock.expectOne('test-data/msft.us.txt').flush(rows(80));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      // oscillator pane canvases appear after the first CD following the data load
+      (Array.from(fixture.nativeElement.querySelectorAll('canvas')) as HTMLCanvasElement[]).forEach((c) => {
+        c.getContext = (() => fakeCtx(c)) as unknown as typeof c.getContext;
+      });
+    }
+
+    it('overlay indicator (SMA) is a line dataset on the price chart, aligned to bar index', async () => {
+      await load([{ type: 'sma', period: 5 }]);
+      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
+      const line = price.data.datasets.find((d: any) => d.label === 'SMA 5') as any;
+      expect(line).toBeTruthy();
+      expect(line.type).toBe('line');
+      expect(line.data.length).toBe(80);
+      expect(line.data[3].y).toBeNull(); // warmup gap
+      expect(typeof line.data[4].y).toBe('number');
+      expect(line.data[4].x).toBe(4);
+    });
+
+    it('oscillator (RSI) gets its own pane canvas + chart with 0-100 range and guide lines', async () => {
+      await load([{ type: 'rsi', period: 14 }]);
+      const panes = fixture.nativeElement.querySelectorAll('[data-pane^="indicator"]');
+      expect(panes.length).toBe(1);
+      const canvas = panes[0].querySelector('canvas') as HTMLCanvasElement;
+      const chart = Chart.getChart(canvas)!;
+      expect(chart).toBeTruthy();
+      const labels = chart.data.datasets.map((d: any) => d.label);
+      expect(labels).toEqual(expect.arrayContaining(['RSI', 'Overbought', 'Oversold']));
+      expect((chart.options.scales as any).y.min).toBe(0);
+      expect((chart.options.scales as any).y.max).toBe(100);
+      // shares the price chart's x view
+      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
+      expect((chart.options.scales as any).x.min).toBe((price.options.scales as any).x.min);
+      expect((chart.options.scales as any).x.max).toBe((price.options.scales as any).x.max);
+      // overlay list untouched
+      expect(price.data.datasets.length).toBe(1);
+    });
+
+    it('removing an indicator removes its pane/dataset; no indicators = only price+volume', async () => {
+      await load([{ type: 'rsi', period: 14 }, { type: 'sma', period: 5 }]);
+      state.removeIndicator(0);
+      state.removeIndicator(0);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelectorAll('[data-pane^="indicator"]').length).toBe(0);
+      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
+      expect(price.data.datasets.length).toBe(1);
+    });
+
+    it('toggling an indicator keeps the user\'s current pan/zoom view', async () => {
+      await load([]);
+      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
+      (price.options.scales as any).x.min = 20;
+      (price.options.scales as any).x.max = 50;
+      price.update('none');
+      state.addIndicator({ type: 'sma', period: 5 });
+      await fixture.whenStable();
+      const after = Chart.getChart(component.priceCanvas!.nativeElement)!;
+      expect((after.options.scales as any).x.min).toBe(20);
+      expect((after.options.scales as any).x.max).toBe(50);
+    });
   });
 });
