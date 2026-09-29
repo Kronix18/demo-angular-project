@@ -58,10 +58,10 @@ describe('ChartSidePanelComponent (11.14)', () => {
     expect(qa('[data-obj-drawing] [data-obj-lock]')[1].getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('data window: the hovered bar\\'s date and values', () => {
+  it('data window: the hovered bar\'s date and values', () => {
     setInputs({ tab: 'data' });
     expect(q('[data-data-date]').textContent).toContain('Sep 22, 26');
-    expect(qa('[data-data-row]').map((r) => r.textContent!.replace(/\\s+/g, ' ').trim())).toEqual(['Open 100.00', 'SMA 20 99.10']);
+    expect(qa('[data-data-row]').map((r) => Array.from(r.querySelectorAll('.label, .value')).map((x) => x.textContent!.trim()).join(' '))).toEqual(['Open 100.00', 'SMA 20 99.10']);
   });
 
   it('watchlist: quotes, active symbol, pick / add / remove', () => {

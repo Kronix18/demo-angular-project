@@ -27,7 +27,7 @@ describe('WatchlistService (11.14)', () => {
     expect(w.list()).not.toContain('qqq');
     w.add('pltr');
     expect(JSON.parse(localStorage.getItem('watchlist')!)).toContain('pltr');
-    expect(new WatchlistService().list()).toContain('pltr');
+    expect(TestBed.runInInjectionContext(() => new WatchlistService()).list()).toContain('pltr');
   });
 
   it('a corrupt stored list falls back to the default', () => {

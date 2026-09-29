@@ -1,4 +1,4 @@
-import { lastPriceInfo } from './last-price';
+import { alertLines, lastPriceInfo } from './last-price';
 
 const bars = (closes: number[]) => closes.map((c, i) => ({ timestamp: i, open: c, high: c, low: c, close: c, volume: 1 }));
 const chart = (closes: number[], y = { top: 0, bottom: 300, min: 0, max: 300 }) => ({
@@ -36,5 +36,15 @@ describe('last price line (11.11)', () => {
     expect(lastPriceInfo(c)!.countdown).toBeUndefined();
     c.$countdown = () => '05:00:00';
     expect(lastPriceInfo(c)!.countdown).toBe('05:00:00');
+  });
+
+  it('alert lines: one per alert inside the pane, labelled with the price; off-scale ones are dropped', () => {
+    const c: any = chart([100, 110]);
+    c.$alerts = () => [{ price: 150, triggered: false }, { price: 5000, triggered: false }, { price: 50, triggered: true }];
+    const lines = alertLines(c);
+    expect(lines.map((l) => l.text)).toEqual(['150.00', '50.00']);
+    expect(lines.map((l) => l.y)).toEqual([150, 250]);
+    expect(lines.map((l) => l.triggered)).toEqual([false, true]);
+    expect(alertLines(chart([100, 110]) as any)).toEqual([]);
   });
 });

@@ -1313,6 +1313,118 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('side panel: objects, data window, watchlist, alerts (11.14 / 11.15)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const qa = (sel: string) => Array.from(fixture.nativeElement.querySelectorAll(sel)) as HTMLElement[];
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const ctl = () => (component as any).drawings;
+    let store: any; let alerts: any;
+    beforeEach(async () => {
+      localStorage.clear();
+      const { DrawingStore } = await import('../drawings/drawing-store.service');
+      const { AlertService } = await import('../../core/services/alert.service');
+      store = TestBed.inject(DrawingStore);
+      alerts = TestBed.inject(AlertService);
+    });
+    const ready = async () => {
+      sessionStorage.clear(); localStorage.clear();
+      const st = TestBed.inject(ChartStateService); st.reset();
+      if (store.locked()) store.toggleLocked();
+      store.setHidden(false); store.clear('msft');
+      alerts.list.set([]);
+      await loaded();
+      return st;
+    };
+    const openPanel = async (tab: string) => {
+      (q('[data-panel]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (q(`[data-tab="${tab}"]`) as HTMLButtonElement).click();
+      fixture.detectChanges();
+    };
+
+    it('the header button toggles the panel (remembered); it sits beside the chart', async () => {
+      await ready();
+      expect(q('app-chart-side-panel')).toBeNull();
+      (q('[data-panel]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('.chart-body > app-chart-side-panel')).toBeTruthy();
+      expect(JSON.parse(localStorage.getItem('chart-panel')!).open).toBe(true);
+      (q('[data-panel]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-chart-side-panel')).toBeNull();
+    });
+
+    it('object tree: indicators and drawings of this symbol; row / eye / lock / delete drive the chart', async () => {
+      const st = await ready();
+      st.addIndicator({ type: 'sma', period: 2 });
+      store.add('msft', { id: 'a', type: 'trend', a: { t: 1, p: 100 }, b: { t: 2, p: 110 } });
+      await fixture.whenStable();
+      await openPanel('objects');
+      expect(qa('[data-obj-indicator]').length).toBe(1);
+      expect(qa('[data-obj-drawing]').length).toBe(1);
+      expect(qa('[data-obj-drawing]')[0].textContent).toContain('Trend line');
+      qa('[data-obj-drawing]')[0].click();
+      fixture.detectChanges();
+      expect(ctl().view().selectedId).toBe('a');
+      (qa('[data-obj-drawing] [data-obj-lock]')[0] as HTMLButtonElement).click();
+      expect(store.list('msft')[0].locked).toBe(true);
+      (qa('[data-obj-drawing] [data-obj-eye]')[0] as HTMLButtonElement).click();
+      expect(store.list('msft')[0].hidden).toBe(true);
+      (qa('[data-obj-indicator] [data-obj-eye]')[0] as HTMLButtonElement).click();
+      expect(st.snapshot().indicators[0].hidden).toBe(true);
+      (qa('[data-obj-drawing] [data-obj-delete]')[0] as HTMLButtonElement).click();
+      expect(store.list('msft')).toEqual([]);
+      (qa('[data-obj-indicator] [data-obj-delete]')[0] as HTMLButtonElement).click();
+      expect(st.snapshot().indicators).toEqual([]);
+    });
+
+    it('data window: OHLC, volume, change and the indicators for the last bar (the hovered bar when hovering)', async () => {
+      const st = await ready();
+      st.addIndicator({ type: 'sma', period: 2 });
+      await fixture.whenStable();
+      await openPanel('data');
+      const rows = qa('[data-data-row]').map((r) => r.textContent!);
+      for (const l of ['Open', 'High', 'Low', 'Close', 'Volume', 'Change', 'SMA 2']) expect(rows.some((t) => t.includes(l)), l).toBe(true);
+      expect(q('[data-data-date]')!.textContent).not.toBe('–');
+      component.setHoverIndex(0);
+      fixture.detectChanges();
+      const bars = (component as any).bars as { open: number }[];
+      expect(qa('[data-data-row]')[0].textContent).toContain(bars[0].open.toFixed(2));
+    });
+
+    it('watchlist: lists the symbols, loads quotes for them, and a click switches the chart', async () => {
+      const st = await ready();
+      await openPanel('watchlist');
+      const wl = TestBed.inject((await import('../../core/services/watchlist.service')).WatchlistService);
+      expect(qa('[data-watch-row]').length).toBe(wl.list().length);
+      httpMock.match((r) => r.url.includes('test-data/')).forEach((r) => r.flush(MSFT_ROWS));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(qa('[data-watch-row]')[0].textContent).toMatch(/\d+\.\d\d/);
+      qa('[data-watch-row]').find((r) => r.textContent!.includes('NVDA'))!.click();
+      expect(st.snapshot().symbol).toBe('nvda');
+    });
+
+    it('alerts: add from the panel or the context menu; shown on the chart; removable', async () => {
+      await ready();
+      await openPanel('alerts');
+      const input = q('[data-alert-input]') as HTMLInputElement;
+      input.value = '480'; input.dispatchEvent(new Event('input'));
+      (q('[data-alert-add]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(alerts.forSymbol('msft').map((a: any) => a.price)).toEqual([480]);
+      expect(chartOf().$alerts().map((a: any) => a.price)).toEqual([480]);
+      component.chartCanvas!.nativeElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 120 }));
+      fixture.detectChanges();
+      (q('[data-ctx="alert"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(alerts.forSymbol('msft').length).toBe(2);
+      expect(qa('[data-alert-row]').length).toBe(2);
+      (qa('[data-alert-remove]')[0] as HTMLButtonElement).click();
+      expect(alerts.forSymbol('msft').length).toBe(1);
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>
