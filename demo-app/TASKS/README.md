@@ -96,7 +96,7 @@ No backend dataset needed: everything is built and verified against contract fix
 
 | # | File | Status | Backend dataset needed / summary |
 |---|---|---|---|
-| 12.1 | phase-12-api-foundation/12.1-typed-api-models-from-the-contract.md | NOT STARTED | Typed API models from the contract — needs: none |
+| 12.1 | phase-12-api-foundation/12.1-typed-api-models-from-the-contract.md | DONE | Typed API models from the contract — needs: none |
 | 12.2 | phase-12-api-foundation/12.2-contract-fixtures-and-mock-backend-for-e2e.md | NOT STARTED | Contract fixtures and mock backend for e2e — needs: none |
 | 12.3 | phase-12-api-foundation/12.3-apierror-mapping-and-errorinterceptor.md | NOT STARTED | ApiError mapping and errorInterceptor — needs: none |
 | 12.4 | phase-12-api-foundation/12.4-authinterceptor-with-refresh.md | NOT STARTED | authInterceptor with refresh — needs: none (mock auth); real endpoints from 9.1 |
