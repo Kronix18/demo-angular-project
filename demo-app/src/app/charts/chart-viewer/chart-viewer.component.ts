@@ -22,6 +22,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
 import { ChartStatusComponent } from '../chart-status/chart-status.component';
+import { ReplayBarComponent, ReplayState } from '../replay/replay-bar.component';
+import { ChartToastsComponent, Toast } from '../replay/chart-toasts.component';
 import { ChartSidePanelComponent, PanelTab } from '../side-panel/chart-side-panel.component';
 import { WatchlistService } from '../../core/services/watchlist.service';
 import { AlertService } from '../../core/services/alert.service';
@@ -283,7 +285,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, ChartStatusComponent, ChartSidePanelComponent, DrawingSidebarComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, ChartStatusComponent, ChartSidePanelComponent, ReplayBarComponent, ChartToastsComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -301,6 +303,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           </select>
           <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
           <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
+          <button type="button" class="tool-btn" data-replay [attr.aria-pressed]="!!replay()" title="Bar replay" aria-label="Bar replay" (click)="toggleReplay()">⏵ Replay</button>
           <button type="button" class="tool-btn" data-compare title="Compare or add symbol" aria-label="Compare symbol" (click)="openSearch('', 'compare')">＋ Compare</button>
           <button type="button" class="tool-btn" data-panel [attr.aria-pressed]="panelOpen()" title="Object tree, data window, watchlist, alerts" aria-label="Side panel" (click)="togglePanel()">☰</button>
           <button type="button" class="tool-btn" data-chart-settings title="Chart settings" aria-label="Chart settings" (click)="settingsOpen.set(true)">⚙</button>
@@ -330,6 +333,9 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         <app-indicator-settings-dialog [entry]="sf.entry" (save)="saveSettings(sf.index, $event)" (closed)="settingsIndex.set(null)" />
       }
 
+      @if (replay(); as r) {
+        <app-replay-bar [state]="r" [max]="replayMax()" [date]="replayDate()" (step)="replayStep($event)" (playToggle)="replayPlay()" (seek)="replaySeek($event)" (speed)="replaySpeed($event)" (exit)="stopReplay()" />
+      }
       <div class="chart-body">
       <app-drawing-sidebar [tool]="tool()" [magnet]="magnetOn" [keep]="keepDrawing()"
         [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
@@ -374,6 +380,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         @if (!error) {
           <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" (seriesToggle)="toggleSeries($event)" (seriesSettings)="seriesDialog.set($event)" (compareRemove)="chartState.removeCompare($event)" />
         }
+        <app-chart-toasts [toasts]="toasts()" (dismiss)="dismissToast($event)" />
         <app-chart-status [loading]="loading" [error]="error" [title]="errorTitle" [kind]="errorKind" [symbols]="availableSymbols" (pick)="pickSymbol($event)" (retry)="retry()" />
       </div>
       <div class="scale-bar" role="group" aria-label="Price scale">
@@ -843,6 +850,89 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   readonly settingsOpen = signal(false);
   readonly gotoOpen = signal(false);
 
+  // ---- bar replay + alert notifications (11.15) -------------------------------------
+  readonly replay = signal<ReplayState | null>(null);
+  readonly toasts = signal<Toast[]>([]);
+  private replayTimer: ReturnType<typeof setInterval> | null = null;
+  private toastId = 0;
+
+  private replaySlice(data: OHLCV[]): OHLCV[] {
+    const r = this.replay();
+    return r ? data.slice(0, r.index + 1) : data;
+  }
+  replayMax(): number { return Math.max(0, this.allData.length - 1); }
+  replayDate(): string { const b = this.allData[this.replay()?.index ?? -1]; return b ? this.formatBarDate(b.timestamp) : ''; }
+
+  toggleReplay(): void { if (this.replay()) this.stopReplay(); else this.startReplay(); }
+
+  startReplay(): void {
+    if (!this.allData.length) return;
+    this.replay.set({ index: Math.max(0, this.allData.length - 1 - 60), playing: false, speed: 1 });
+    this.createChart(this.allData);
+  }
+
+  stopReplay(): void {
+    this.clearReplayTimer();
+    if (!this.replay()) return;
+    this.replay.set(null);
+    if (this.allData.length) this.createChart(this.allData, this.currentView());
+  }
+
+  private clearReplayTimer(): void { if (this.replayTimer) { clearInterval(this.replayTimer); this.replayTimer = null; } }
+
+  private syncReplayTimer(): void {
+    this.clearReplayTimer();
+    const r = this.replay();
+    if (r?.playing) this.replayTimer = setInterval(() => { this.replayStep(1); this.cdr.markForCheck(); }, 1000 / r.speed);
+  }
+
+  replayPlay(): void {
+    const r = this.replay();
+    if (!r) return;
+    this.replay.set({ ...r, playing: !r.playing && r.index < this.replayMax() });
+    this.syncReplayTimer();
+  }
+
+  replaySpeed(speed: number): void {
+    const r = this.replay();
+    if (r) { this.replay.set({ ...r, speed }); this.syncReplayTimer(); }
+  }
+
+  replayStep(dir: number): void { const r = this.replay(); if (r) this.replaySeek(r.index + dir); }
+
+  /** Moves the replay to a bar; walking forward evaluates the price alerts bar by bar. */
+  replaySeek(to: number): void {
+    const r = this.replay();
+    if (!r) return;
+    const target = Math.min(this.replayMax(), Math.max(0, Math.round(to)));
+    let index = r.index;
+    let fired = false;
+    if (target > index) {
+      for (let j = index + 1; j <= target && !fired; j++) {
+        index = j;
+        for (const a of this.alerts.evaluate(this.currentSymbol, this.allData[j - 1].close, this.allData[j].close)) {
+          fired = true;
+          this.toast(`${this.currentSymbol.toUpperCase()} crossed ${a.price.toFixed(2)}`);
+        }
+      }
+    } else index = target;
+    const playing = r.playing && !fired && index < this.replayMax();
+    this.replay.set({ ...r, index, playing });
+    if (playing !== r.playing) this.syncReplayTimer();
+    const view = this.currentView();
+    // keep the span, and keep the newest bar in sight (a tiny span means the view was framed on very few bars: reframe)
+    const usable = !!view && view.max - view.min >= 5;
+    const shift = usable && index + 2 > view!.max ? index + 2 - view!.max : 0;
+    this.createChart(this.allData, usable ? { min: view!.min + shift, max: view!.max + shift } : undefined);
+  }
+
+  private toast(text: string): void {
+    const id = ++this.toastId;
+    this.toasts.update((t) => [...t, { id, text }]);
+    setTimeout(() => this.dismissToast(id), 6000);
+  }
+  dismissToast(id: number): void { this.toasts.update((t) => t.filter((x) => x.id !== id)); }
+
   // ---- side panel (11.14) ---------------------------------------------------------
   protected readonly watchlist = inject(WatchlistService);
   protected readonly alerts = inject(AlertService);
@@ -1085,6 +1175,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         this.currentInterval = s.interval;
         this.currentRange = s.range;
         // Keep the URL in sync (2.3): refresh/deep-link preserves the symbol.
+        if (symbolChanged) this.replay.set(null);
         if (symbolChanged) {
           this.router.navigate(['/charts', s.symbol], { replaceUrl: true });
         }
@@ -1218,7 +1309,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     });
   }
 
-  private createChart(data: OHLCV[], preserveView?: { min: number; max: number }): void {
+  private createChart(fullData: OHLCV[], preserveView?: { min: number; max: number }): void {
+    const data = this.replaySlice(fullData);
     // Belt-and-braces guard: never crash on a missing canvas reference.
     const el = this.chartCanvas?.nativeElement;
     if (!el) {
@@ -1547,6 +1639,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.clockTimer) clearInterval(this.clockTimer);
+    this.clearReplayTimer();
     this.destroyChart();
   }
 }
