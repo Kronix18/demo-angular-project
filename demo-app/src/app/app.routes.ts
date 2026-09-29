@@ -43,6 +43,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'diagnostics',
+    loadComponent: () => import('./features/diagnostics/diagnostics.component').then(m => m.DiagnosticsComponent),
+    data: { title: 'Data status' }
+  },
+  {
     path: 'auth',
     loadChildren: () => import('./features/auth/auth.routes').then(m => m.AUTH_ROUTES)
   },
