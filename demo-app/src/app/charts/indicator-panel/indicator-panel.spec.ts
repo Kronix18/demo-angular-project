@@ -64,4 +64,44 @@ describe('IndicatorPanel (5.2)', () => {
     (el().querySelector('[data-add]') as HTMLButtonElement).click();
     expect(state.snapshot().indicators).toEqual([]);
   });
+
+  const setPeriod = (v: string) => {
+    const period = el().querySelector('input[name="indicatorPeriod"]') as HTMLInputElement;
+    period.value = v;
+    period.dispatchEvent(new Event('input'));
+  };
+  const clickAdd = () => (el().querySelector('[data-add]') as HTMLButtonElement).click();
+  const errorText = () => el().querySelector('[data-error]')?.textContent?.trim() ?? null;
+
+  it('shows an inline error (no alert) for period < 2 or > 500 or non-integer, and does not add', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    for (const bad of ['1', '501', '2.5', '']) {
+      setPeriod(bad);
+      clickAdd();
+      fixture.detectChanges();
+      expect(errorText(), `period "${bad}"`).toMatch(/2.*500/);
+    }
+    expect(state.snapshot().indicators).toEqual([]);
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('shows an inline error on a duplicate add and clears it on the next valid add', () => {
+    setPeriod('20');
+    clickAdd();
+    clickAdd();
+    fixture.detectChanges();
+    expect(errorText()).toMatch(/already/i);
+    expect(state.snapshot().indicators.length).toBe(1);
+    setPeriod('50');
+    clickAdd();
+    fixture.detectChanges();
+    expect(errorText()).toBeNull();
+    expect(state.snapshot().indicators.length).toBe(2);
+  });
+
+  it('offers WMA and RMA moving averages too', () => {
+    const values = Array.from(el().querySelectorAll('select[name="indicatorType"] option')).map((o) => (o as HTMLOptionElement).value);
+    expect(values).toEqual(expect.arrayContaining(['sma', 'ema', 'wma', 'rma']));
+  });
 });

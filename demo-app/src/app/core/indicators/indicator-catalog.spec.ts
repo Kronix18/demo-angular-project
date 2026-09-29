@@ -33,4 +33,9 @@ describe('indicator catalog (5.2) — state entry → calculation + placement', 
     expect(new Set(types).size).toBe(types.length);
     expect(catalogItem('sma')?.defaultPeriod).toBe(20);
   });
+
+  it('wma/rma are moving-average overlays with their method', () => {
+    expect(resolveEntry({ type: 'wma', period: 10 }).params).toEqual({ method: 'WMA', source: 'close', length: 10 });
+    expect(resolveEntry({ type: 'rma', period: 14 }).kind).toBe('overlay');
+  });
 });

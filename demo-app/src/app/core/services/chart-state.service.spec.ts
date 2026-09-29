@@ -76,4 +76,13 @@ describe('ChartStateService (task 4.1)', () => {
     expect(s.range).toBe('6M');
     expect(sessionStorage.getItem('chart-state')).toBeNull();
   });
+
+  it('rehydration drops malformed indicator entries instead of crashing later', () => {
+    sessionStorage.setItem('chart-state', JSON.stringify({
+      symbol: 'msft', interval: '1d', range: '6M',
+      indicators: [{ type: 'sma', period: 20 }, { type: 5 }, null, { type: 'rsi', period: 'x' }, { type: 'ema', period: 50 }],
+    }));
+    const fresh = new ChartStateService();
+    expect(fresh.snapshot().indicators).toEqual([{ type: 'sma', period: 20 }, { type: 'ema', period: 50 }]);
+  });
 });
