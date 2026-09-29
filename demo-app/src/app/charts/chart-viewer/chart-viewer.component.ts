@@ -21,6 +21,7 @@ import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
+import { DrawingSidebarComponent } from '../drawings/drawing-sidebar.component';
 import { DrawingStore } from '../drawings/drawing-store.service';
 import { Range, fitRangeLog, panRange, scaleRange } from '../y-scale-math';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
@@ -235,7 +236,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -274,23 +275,10 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           <button type="button" data-auto [attr.aria-pressed]="autoScale()" title="Auto-fit the price scale to the visible bars (drag the chart vertically to switch it off)" (click)="setAuto()">auto</button>
           <button type="button" data-log [attr.aria-pressed]="logOn" title="Logarithmic price scale (volume too)" (click)="toggleLog()">log</button>
         </div>
-        <div class="draw-tools" role="group" aria-label="Drawing tools">
-          @for (t of drawTools; track t.id) {
-            <button type="button" class="draw-btn" [attr.data-tool]="t.id" [attr.aria-pressed]="tool() === t.id"
-              [attr.aria-label]="t.title" [title]="t.title" (click)="setTool(t.id)">{{ t.icon }}</button>
-          }
-          <span class="draw-sep" aria-hidden="true"></span>
-          <button type="button" class="draw-btn" data-magnet [attr.aria-pressed]="magnetOn" aria-label="Magnet: snap the crosshair and new drawings to the bar's OHLC"
-            title="Magnet: snap the crosshair and new drawings to the bar's OHLC" (click)="toggleMagnet()">🧲</button>
-          <button type="button" class="draw-btn" data-keep [attr.aria-pressed]="keepDrawing()" aria-label="Stay in drawing mode"
-            title="Stay in drawing mode after each drawing" (click)="keepDrawing.set(!keepDrawing())">⟳</button>
-          <button type="button" class="draw-btn" data-lock [attr.aria-pressed]="drawingStore.locked()" aria-label="Lock all drawings"
-            title="Lock all drawings (no selecting, moving or deleting)" (click)="drawingStore.toggleLocked()">🔒</button>
-          <button type="button" class="draw-btn" data-hide [attr.aria-pressed]="drawingStore.hidden()" aria-label="Hide all drawings"
-            title="Hide all drawings" (click)="drawingStore.toggleHidden(); redraw()">👁</button>
-          <button type="button" class="draw-btn" data-tool-clear aria-label="Delete all drawings on this symbol"
-            title="Delete all drawings on this symbol" (click)="clearDrawings()">⌫</button>
-        </div>
+        <app-drawing-sidebar [tools]="drawTools" [tool]="tool()" [magnet]="magnetOn" [keep]="keepDrawing()"
+          [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
+          (keepToggle)="keepDrawing.set(!keepDrawing())" (lockToggle)="drawingStore.toggleLocked()"
+          (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" />
         @if (selectedDrawing(); as sd) {
           <div class="draw-style" data-draw-style role="group" aria-label="Drawing style">
             <input type="color" data-draw-color aria-label="Colour" [value]="styleColor(sd)" (input)="setDrawStyle(sd.id, { color: $any($event.target).value })" />
@@ -435,16 +423,6 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       .scale-btns button:hover { color: var(--c-text); }
       .scale-btns button[aria-pressed='true'] { color: var(--c-primary); font-weight: 600; }
-      .draw-tools {
-        position: absolute; left: 4px; top: 50%; transform: translateY(-50%); z-index: 4;
-        display: flex; flex-direction: column; gap: 2px; padding: 2px;
-        background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius);
-      }
-      .draw-btn {
-        width: 28px; height: 28px; padding: 0; border: none; border-radius: var(--border-radius-sm);
-        background: transparent; color: var(--c-text); cursor: pointer; font-size: 1rem; line-height: 1;
-      }
-      .draw-sep { height: 1px; margin: 2px 4px; background: var(--c-border); }
       .draw-style {
         position: absolute; left: 50%; top: 4px; transform: translateX(-50%); z-index: 5; display: flex; gap: 4px; align-items: center;
         padding: 3px 6px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius);
@@ -452,8 +430,6 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       .draw-style input[type='color'] { width: 26px; height: 22px; padding: 0; border: none; background: none; cursor: pointer; }
       .draw-style select, .draw-style button { font-size: 0.75rem; padding: 1px 4px; background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); }
       .text-edit { position: absolute; z-index: 6; width: 160px; padding: 2px 4px; font-size: 0.8rem; background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-primary); border-radius: var(--border-radius-sm); }
-      .draw-btn:hover { background: var(--c-primary-tint); color: var(--c-primary); }
-      .draw-btn[aria-pressed='true'] { background: var(--c-primary); color: var(--c-on-primary); }
       .chart-tools { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
       .chart-tools select, .tool-btn {
         padding: 0.25rem 0.5rem;

@@ -17,7 +17,7 @@ Requests (with reference screenshots of TradingView):
 | 11.2 | All chart types | DONE (except volume candles / volume footprint / TPO — need intraday or per-bar widths) |
 | 11.3 | Type-to-search symbol dialog | DONE |
 | 11.4 | Auto-scale toggle, vertical pan, log price + volume | DONE |
-| 11.5 | Drawing sidebar + tools | NOT STARTED |
+| 11.5 | Drawing sidebar + tools | DONE |
 
 ## 11.1 results
 - Legend header is now `SYMBOL · 1D  O H L C  V  change` for the hovered bar (latest when idle); indicator rows sit under it (overlays) or in their own pane (oscillators). Each row: chip, live value, ⚙ settings, eye, ✕; double-click opens settings.
@@ -45,3 +45,14 @@ Requests (with reference screenshots of TradingView):
 - **Logarithmic scale** (`log`, persisted in the chart state): price **and volume** go logarithmic together (zero-volume bars are dropped, the y-fits are multiplicative). Legend, crosshair labels, magnet, drawings (anchored in price) all follow. Screenshot `docs/screenshots/11.4-log-all-dark.png`: 40 years of MSFT readable on one axis.
 - Maths in `charts/y-scale-math.ts` (pure, tested): `panRange` (linear shift / log ratio), `scaleRange` (centre-preserving, never collapses), `fitRangeLog`.
 - Tests: y-scale-math (9), state logScale, viewer "price scale" (9: log buttons + volume, log fit, vertical pan, jitter, axis scale, manual survives x-pan and indicator toggle, resets on range, dblclick axis, drawing drag), e2e price-scale flow (mouse pan/scale/auto/log/reload/ALL in log).
+
+## 11.5 results — drawing sidebar and tools
+- **Left sidebar** (`drawings/drawing-sidebar.component.ts`): cursor, trend line, arrow, ray, horizontal line, vertical line, parallel channel, rectangle, ellipse, fib retracement, brush, text, **measure**, **zoom**, then magnet (moved here from the header), stay-in-drawing-mode, lock all, hide all, delete all. After a drawing is committed the tool returns to the cursor unless *stay in drawing mode* is on; Esc leaves the tool; picking a tool un-hides drawings.
+- **Model**: anchors are still `(timestamp, price)` so every type survives interval / log / symbol changes; new fields `pts` (brush), `text`, `style {color,width,dash}`. Geometry helpers (`distToRectBorder`, `distToEllipse`, `distToPolyline`, `distToRay`, `measureInfo`, `fibPrice`, `snapToOhlc`) are pure and unit-tested; rendering lives in the `drawings` canvas plugin (`drawings-plugin.ts`).
+- **Style toolbar**: selecting a drawing shows colour / width / line style / delete (disabled while locked); the choice is stored on the drawing.
+- **Text**: click places a label and opens an inline editor (Enter saves, Esc or blank discards); double-click a label to edit.
+- **Measure** shows price change, %, bar count and time span, and is never stored. **Zoom** zooms x to the dragged region and sets a manual price range (auto off); `auto` restores.
+- **Magnet** now also snaps new drawing anchors to the bar's open/high/low/close.
+- **Lock / hide** persist (localStorage) and apply to all symbols; locked drawings cannot be selected, moved or deleted.
+- Sidebar extracted into its own component to keep the viewer's stylesheet inside the 4 kB budget (budget unchanged).
+- Tests: geometry / store / controller specs, viewer "drawing sidebar" block (9), e2e "TradingView sidebar" flow. Screenshot `docs/screenshots/11.5-drawing-tools.png`.

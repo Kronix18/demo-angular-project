@@ -42,11 +42,9 @@ test('production bundle: login → navbar → chart → toolbar → indicators, 
   await expect(page).toHaveURL(/\/charts\/nvda$/);
   await page.click('.range-btn:has-text("1Y")');
 
-  for (const [t, p] of [['sma', '20'], ['rsi', '14']] as const) {
-    await page.selectOption('select[name="indicatorType"]', t);
-    await page.fill('input[name="indicatorPeriod"]', p);
-    await page.click('[data-add]');
-  }
+  await page.click('[data-indicators]');
+  for (const t of ['sma', 'rsi']) await page.click(`[data-add-indicator="${t}"]`);
+  await page.keyboard.press('Escape');
   await expect(page.locator('[data-indicator-row]')).toHaveCount(2);
   await page.waitForTimeout(500);
   const withInd = await pixels(page);

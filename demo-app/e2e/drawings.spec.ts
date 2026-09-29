@@ -136,4 +136,80 @@ test.describe('drawing tools (10.3)', () => {
     // the ray is still drawn (time-anchored, not index-anchored)
     expect(await drawingPixels(page)).toBeGreaterThan(50);
   });
+  test('TradingView sidebar (11.5): shapes, fib, text label, style toolbar, lock/hide, zoom region, measure, stay-in-drawing', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    const p = await pane(page);
+    const at = (fx: number, fy: number) => ({ x: p.x0 + p.w * fx, y: p.y0 + p.top + (p.bottom - p.top) * fy });
+    const drag = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(to.x, to.y, { steps: 6 });
+      await page.mouse.up();
+    };
+    const types = async () => ((await stored(page)).msft ?? []).map((d: any) => d.type);
+
+    await page.click('[data-tool="rect"]');
+    await drag(at(0.2, 0.2), at(0.35, 0.4));
+    await page.click('[data-tool="fib"]');
+    await drag(at(0.5, 0.3), at(0.7, 0.6));
+    await page.click('[data-tool="hline"]');
+    await page.mouse.click(at(0.4, 0.8).x, at(0.4, 0.8).y);
+    expect(await types()).toEqual(['rect', 'fib', 'hline']);
+    await expect(page.locator('[data-tool="cursor"]')).toHaveAttribute('aria-pressed', 'true'); // back to the cursor
+
+    // style toolbar for the selected (last) drawing
+    await page.locator('[data-draw-width]').selectOption('3');
+    await page.locator('[data-draw-dash]').selectOption('dot');
+    expect((await stored(page)).msft[2].style).toMatchObject({ width: 3, dash: 'dot' });
+
+    // text label
+    await page.click('[data-tool="text"]');
+    const t = at(0.3, 0.6);
+    await page.mouse.click(t.x, t.y);
+    await page.fill('[data-text-edit]', 'breakout');
+    await page.press('[data-text-edit]', 'Enter');
+    expect((await stored(page)).msft.at(-1)).toMatchObject({ type: 'text', text: 'breakout' });
+
+    await page.screenshot({ path: 'docs/screenshots/11.5-drawing-tools.png' });
+
+    // hide / show and lock
+    const before = await drawingPixels(page);
+    expect(before).toBeGreaterThan(300);
+    await page.click('[data-hide]');
+    expect(await drawingPixels(page)).toBe(0);
+    await page.click('[data-hide]');
+    expect(await drawingPixels(page)).toBeGreaterThan(300);
+    await page.click('[data-lock]');
+    await expect(page.locator('[data-lock]')).toHaveAttribute('aria-pressed', 'true');
+    await page.click('[data-lock]');
+
+    // stay in drawing mode
+    await page.click('[data-keep]');
+    await page.click('[data-tool="vline"]');
+    await page.mouse.click(at(0.15, 0.5).x, at(0.15, 0.5).y);
+    await page.mouse.click(at(0.16, 0.5).x, at(0.16, 0.5).y);
+    await expect(page.locator('[data-tool="vline"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.click('[data-keep]');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-tool="cursor"]')).toHaveAttribute('aria-pressed', 'true');
+
+    // measure never persists
+    const n = (await types()).length;
+    await page.click('[data-tool="measure"]');
+    await drag(at(0.2, 0.3), at(0.5, 0.6));
+    expect((await types()).length).toBe(n);
+
+    // zoom region: x zooms in, price scale goes manual
+    const span = () => page.evaluate(() => { const x = (window as any).__charts.chart.scales.x; return x.max - x.min; });
+    const s0 = await span();
+    await page.click('[data-tool="zoom"]');
+    await drag(at(0.3, 0.3), at(0.5, 0.6));
+    await page.waitForTimeout(300);
+    expect(await span()).toBeLessThan(s0 * 0.6);
+    await expect(page.locator('[data-auto]')).toHaveAttribute('aria-pressed', 'false');
+    await page.click('[data-auto]');
+    await expect(page.locator('[data-auto]')).toHaveAttribute('aria-pressed', 'true');
+    expect(errors).toEqual([]);
+  });
 });
