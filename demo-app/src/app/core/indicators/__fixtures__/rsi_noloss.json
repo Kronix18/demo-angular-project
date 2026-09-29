@@ -1,0 +1,67 @@
+{
+ "description": "Golden fixture for rsi_noloss: last 120 bars of msft.us.txt",
+ "input_hash": "877ee7f81b37dbd5a8eeabdab6efc8dacf086095f4110fe829ff346b2092adfd",
+ "n": 16,
+ "params": {
+  "source": "close",
+  "length": 14,
+  "overbought": 70.0,
+  "oversold": 30.0
+ },
+ "outputs": {
+  "rsi": [
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   100.0,
+   100.0
+  ],
+  "overbought": [
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0
+  ],
+  "oversold": [
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0
+  ]
+ }
+}

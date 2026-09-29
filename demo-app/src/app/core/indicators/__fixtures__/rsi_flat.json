@@ -1,0 +1,67 @@
+{
+ "description": "Golden fixture for rsi_flat: last 120 bars of msft.us.txt",
+ "input_hash": "8ffcd5b8c09e51d36e8f848116c6f015e9ec5187eb18023241223020ad3eeab3",
+ "n": 16,
+ "params": {
+  "source": "close",
+  "length": 14,
+  "overbought": 70.0,
+  "oversold": 30.0
+ },
+ "outputs": {
+  "rsi": [
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   50.0,
+   50.0
+  ],
+  "overbought": [
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0,
+   70.0
+  ],
+  "oversold": [
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0,
+   30.0
+  ]
+ }
+}
