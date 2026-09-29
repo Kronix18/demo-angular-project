@@ -16,7 +16,7 @@ const LEGACY_CEILING: Record<string, number> = {
   'app/features/auth/registration-success/registration-success.component.scss': 22,
   'app/features/auth/verify-email/verify-email.component.scss': 31,
   'app/features/pricing/pricing.component.scss': 32,
-  'app/features/profile/profile.component.scss': 61,
+  'app/features/profile/profile.component.scss': 58,
   'app/features/screener/screener.component.scss': 37,
   'app/features/stock/candlestick-chart/candlestick-chart.component.scss': 14,
   'app/features/stock/candlestick-chart/candlestick-chart.component.ts': 10,

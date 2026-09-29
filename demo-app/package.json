@@ -9,7 +9,8 @@
     "test": "ng test",
     "test:coverage": "ng test --watch=false --coverage --coverage-reporters=text --coverage-reporters=json-summary --coverage-include=src/app/core/** --coverage-include=src/app/charts/** --coverage-include=src/app/app.ts --coverage-exclude=**/*.spec.ts --coverage-exclude=**/__fixtures__/** && node scripts/check-coverage.cjs",
     "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed"
+    "e2e:headed": "playwright test --headed",
+    "e2e:prod": "ng build --configuration production && playwright test -c playwright.prod.config.ts"
   },
   "prettier": {
     "printWidth": 100,

@@ -74,8 +74,8 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 7.2 | phase-7-testing/7.2-e2e-playwright.md | DONE | `npm run e2e`: 19 Playwright tests (auth, chart, indicators, layout x4 sizes, states, theme) |
 | 7.3 | phase-7-testing/7.3-manual-matrix.md | NOT STARTED | |
 | 8.1 | phase-8-cleanup-docs/8.1-dead-file-removal.md | DONE | 20 dead files removed; build + 14 spec files + browser scripts green |
-| 8.2 | phase-8-cleanup-docs/8.2-readme-architecture.md | NOT STARTED | |
-| 8.3 | phase-8-cleanup-docs/8.3-production-build.md | NOT STARTED | |
+| 8.2 | phase-8-cleanup-docs/8.2-readme-architecture.md | DONE | README rewritten, docs/ARCHITECTURE.md added, links checked, cold `npm ci && npm run build` verified |
+| 8.3 | phase-8-cleanup-docs/8.3-production-build.md | DONE (browser-verified) | production build clean (no warnings), `npm run e2e:prod` smoke on the static bundle |
 | 9.1 | phase-9-final/9.1-real-backend-auth.md | NOT STARTED | last task, needs backend |
 | 10.1 | phase-10-tradingview/README.md#101 | NOT STARTED | TradingView dark theme (tokens) — Kevin-approved v2 |
 | 10.2 | phase-10-tradingview/README.md#102 | NOT STARTED | legend rows + eye toggles |

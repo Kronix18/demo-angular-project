@@ -1,3 +1,8 @@
+# ⚠️ SUPERSEDED — historical planning notes
+
+> Written before the 2026-09-23 re-audit; paths and claims below are outdated.
+> Authoritative state: `TASKS/README.md`; architecture: `docs/ARCHITECTURE.md`.
+
 # PLANNING PHASE SUMMARY
 
 ## What We've Accomplished

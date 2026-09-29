@@ -5,13 +5,18 @@
 }
 
 .loading-state,
-.error-state {
+.error-state,
+.profile-card {
   background: #0b1220;
   border: 1px solid #1f2a3d;
   border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.loading-state,
+.error-state {
   padding: 3rem;
   text-align: center;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 
   p {
     color: #9fb1cc;
@@ -50,11 +55,7 @@
 }
 
 .profile-card {
-  background: #0b1220;
-  border: 1px solid #1f2a3d;
-  border-radius: 16px;
   padding: 1.75rem;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
 .profile-header {
