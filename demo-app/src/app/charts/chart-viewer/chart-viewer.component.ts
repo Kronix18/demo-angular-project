@@ -22,6 +22,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool } from '../drawings/drawing-controller';
 import { DrawingStore } from '../drawings/drawing-store.service';
+import { Range, fitRangeLog, panRange, scaleRange } from '../y-scale-math';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
 // anywhere — it registers registerables + adapter + zoom + the financial
@@ -323,8 +324,12 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
 
       <div class="chart-panel" data-pane="panel">
-        <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="tool() !== 'cursor'" (dblclick)="resetZoom()"
+        <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="tool() !== 'cursor'" (dblclick)="onDblClick($event)"
           (mousedown)="pointer('down', $event)" (mousemove)="pointer('move', $event)" (mouseup)="pointer('up', $event)"></canvas>
+        <div class="scale-btns" role="group" aria-label="Price scale">
+          <button type="button" data-auto [attr.aria-pressed]="autoScale()" title="Auto-fit the price scale to the visible bars (drag the chart vertically to switch it off)" (click)="setAuto()">auto</button>
+          <button type="button" data-log [attr.aria-pressed]="logOn" title="Logarithmic price scale (volume too)" (click)="toggleLog()">log</button>
+        </div>
         <div class="draw-tools" role="group" aria-label="Drawing tools">
           @for (t of drawTools; track t.id) {
             <button type="button" class="draw-btn" [attr.data-tool]="t.id" [attr.aria-pressed]="tool() === t.id"
@@ -454,6 +459,13 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       .retry-btn { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
       .symbol-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
+      .scale-btns { position: absolute; right: 4px; bottom: 3px; z-index: 4; display: flex; gap: 2px; }
+      .scale-btns button {
+        padding: 1px 6px; border: none; border-radius: var(--border-radius-sm); background: transparent;
+        color: var(--c-text-muted); cursor: pointer; font-size: 0.75rem;
+      }
+      .scale-btns button:hover { color: var(--c-text); }
+      .scale-btns button[aria-pressed='true'] { color: var(--c-primary); font-weight: 600; }
       .draw-tools {
         position: absolute; left: 4px; top: 50%; transform: translateY(-50%); z-index: 4;
         display: flex; flex-direction: column; gap: 2px; padding: 2px;
@@ -579,6 +591,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   pointer(kind: 'down' | 'move' | 'up', e: MouseEvent): void {
     if (this.tool() === 'cursor' && kind === 'move' && !e.buttons) return; // hover: nothing to do
+    if (kind === 'down' && this.tool() === 'cursor' && e.button === 0) this.yDrag = this.classifyYDrag(e.offsetX, e.offsetY);
+    if (this.yDragEvent(kind, e.offsetY)) return; // price-axis scaling
     if (kind === 'down') this.drawings.pointerDown(e.offsetX, e.offsetY);
     else if (kind === 'move') this.drawings.pointerMove(e.offsetX, e.offsetY);
     else this.drawings.pointerUp(e.offsetX, e.offsetY);
@@ -600,11 +614,84 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   @HostListener('window:mouseup', ['$event'])
   onWindowMouseUp(e: MouseEvent): void {
+    this.yDrag = null;
     // finish a drag that ended outside the canvas
     if (e.target !== this.chartCanvas?.nativeElement) {
       const r = this.chartCanvas?.nativeElement.getBoundingClientRect();
       if (r) this.drawings.pointerUp(e.clientX - r.left, e.clientY - r.top);
     }
+  }
+
+  // ---- price scale: auto / manual / log (11.4) -------------------------------------
+  /** Auto-fit the price pane to the visible bars; off once the user pans/scales it vertically. */
+  readonly autoScale = signal(true);
+  logOn = false;
+  private manualY: Range | null = null;
+  private yDrag: { mode: 'axis' | 'pan'; startY: number; lastY: number; engaged: boolean } | null = null;
+
+  setAuto(): void {
+    this.manualY = null;
+    this.autoScale.set(true);
+    this.chart?.update('none');
+  }
+  toggleLog(): void { this.chartState.toggleLogScale(); }
+
+  private resetPriceScale(): void {
+    this.manualY = null;
+    this.autoScale.set(true);
+  }
+
+  private enterManual(): void {
+    const y = this.chart?.scales?.['y'] as any;
+    if (!y || !this.autoScale()) return;
+    this.manualY = { min: y.min, max: y.max };
+    this.autoScale.set(false);
+  }
+
+  private applyManual(next: Range): void {
+    this.manualY = next;
+    this.chart?.update('none');
+  }
+
+  private classifyYDrag(x: number, y: number): typeof this.yDrag {
+    const c = this.chart as any;
+    const ys = c?.scales?.y;
+    if (!c || !ys || !c.chartArea) return null;
+    const inPane = y >= ys.top && y <= ys.bottom;
+    if (inPane && x > c.chartArea.right) return { mode: 'axis', startY: y, lastY: y, engaged: false };
+    if (inPane && x >= c.chartArea.left && x <= c.chartArea.right) return { mode: 'pan', startY: y, lastY: y, engaged: false };
+    return null;
+  }
+
+  /** Returns true when the event was consumed by the price-scale interaction. */
+  private yDragEvent(kind: 'down' | 'move' | 'up', y: number): boolean {
+    const d = this.yDrag;
+    const ys = (this.chart as any)?.scales?.y;
+    if (!d || !ys) return false;
+    if (kind === 'up') { this.yDrag = null; return d.mode === 'axis' && d.engaged; }
+    if (kind !== 'move') return false;
+    const dy = y - d.lastY;
+    d.lastY = y;
+    if (d.mode === 'axis') {
+      d.engaged = true;
+      this.enterManual();
+      const cur = this.manualY ?? { min: ys.min, max: ys.max };
+      this.applyManual(scaleRange(cur, dy, this.logOn));
+      return true;
+    }
+    // pan: a drag that started on a drawing belongs to the drawing
+    if (this.drawings.isDragging()) { this.yDrag = null; return false; }
+    if (!d.engaged && Math.abs(y - d.startY) < 8) return false; // ignore jitter of a horizontal drag
+    if (!d.engaged) { d.engaged = true; this.enterManual(); }
+    const cur = this.manualY ?? { min: ys.min, max: ys.max };
+    this.applyManual(panRange(cur, dy, ys.bottom - ys.top, this.logOn));
+    return false;
+  }
+
+  onDblClick(e: MouseEvent): void {
+    const c = this.chart as any;
+    if (c?.chartArea && e.offsetX > c.chartArea.right) this.setAuto(); // double-click the price axis: back to auto
+    else this.resetZoom();
   }
 
   // ---- tools (10.5) --------------------------------------------------------------
@@ -733,8 +820,12 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         const symbolChanged = s.symbol !== this.currentSymbol;
         const intervalChanged = s.interval !== this.currentInterval;
         const rangeChanged = s.range !== this.currentRange;
+        const logChanged = s.logScale !== this.logOn;
+        this.logOn = s.logScale;
+        if (symbolChanged || intervalChanged || rangeChanged || logChanged) this.resetPriceScale();
         const typeChanged = s.chartType !== this.chartTypeValue;
         const bricksInvolved = typeChanged && (NON_TIME_TYPES.includes(s.chartType) || NON_TIME_TYPES.includes(this.chartTypeValue));
+        if (bricksInvolved) this.resetPriceScale();
         this.chartTypeValue = s.chartType;
         this.stateIndicators.set(s.indicators);
         const magnetOnly = s.magnet !== this.magnetOn && this.sameExceptMagnet(s);
@@ -942,7 +1033,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       type: 'bar', label: 'Volume', yAxisID: 'yVol', data: [], parsing: false, normalized: true,
       barPercentage: 1, categoryPercentage: 0.9,
       backgroundColor: (ctx: any) => (ctx.raw?.up ? up : down),
-    }, (pts) => pts.map((p) => ({ x: p.x, y: p.v, up: p.up, t: p.t })));
+    }, (pts) => pts.map((p) => ({ x: p.x, y: this.logOn && !(p.v > 0) ? null : p.v, up: p.up, t: p.t })));
 
     const paneScales: Record<string, any> = {};
     panes.forEach(({ index, resolved, outputs }, i) => {
@@ -994,14 +1085,14 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         },
       },
       y: {
-        type: 'linear', position: 'right', stack: 'panel', stackWeight: PRICE_WEIGHT,
+        type: this.logOn ? 'logarithmic' : 'linear', position: 'right', stack: 'panel', stackWeight: PRICE_WEIGHT,
         afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
         ticks: { includeBounds: false },
         paneLabel: `${this.currentSymbol.toUpperCase()} · ${this.currentInterval.toUpperCase()}`,
       },
       yVol: {
-        type: 'linear', position: 'right', stack: 'panel', stackWeight: VOLUME_WEIGHT,
-        beginAtZero: true, min: 0, afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
+        type: this.logOn ? 'logarithmic' : 'linear', position: 'right', stack: 'panel', stackWeight: VOLUME_WEIGHT,
+        ...(this.logOn ? {} : { beginAtZero: true, min: 0 }), afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
         ticks: { maxTicksLimit: 3, includeBounds: false, callback: (v: any) => compactVolume(Number(v)) },
         paneLabel: 'Volume',
       },
@@ -1108,15 +1199,19 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const lo = min - bucket;
     const hi = max + bucket;
     const ext: Record<string, { min: number; max: number }> = {};
+    const isLog = (id: string) => chart.options.scales[id]?.type === 'logarithmic';
     for (const ds of chart.data.datasets) {
       const id = ds.yAxisID as string;
+      const log = isLog(id);
       const e = (ext[id] ??= { min: Infinity, max: -Infinity });
       for (const p of ds.data) {
         if (p.x < lo || p.x > hi) continue;
         if (ds.type === 'candlestick' || ds.type === 'ohlc' || ds.type === 'tvbar') {
+          if (log && !(p.l > 0)) continue;
           if (p.l < e.min) e.min = p.l;
           if (p.h > e.max) e.max = p.h;
         } else if (typeof p.y === 'number') {
+          if (log && !(p.y > 0)) continue;
           if (p.y < e.min) e.min = p.y;
           if (p.y > e.max) e.max = p.y;
         }
@@ -1124,8 +1219,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     }
     for (const [id, e] of Object.entries(ext)) {
       const cfg = chart.options.scales[id];
-      if (!cfg || cfg.fixedRange || !isFinite(e.min) || !isFinite(e.max)) continue;
-      const r = id === 'yVol' ? { min: 0, max: e.max > 0 ? e.max * 1.1 : 1 } : fitRange(e.min, e.max, 0.06);
+      if (!cfg || cfg.fixedRange) continue;
+      let r: Range;
+      if (id === 'y' && !this.autoScale() && this.manualY) {
+        r = this.manualY; // user-scaled price pane: keep their range while panning in x
+      } else {
+        if (!isFinite(e.min) || !isFinite(e.max)) continue;
+        if (id === 'yVol') r = isLog(id) ? fitRangeLog(e.min * 0.6, e.max * 1.2, 0) : { min: 0, max: e.max > 0 ? e.max * 1.1 : 1 };
+        else r = isLog(id) ? fitRangeLog(e.min, e.max, 0.06) : fitRange(e.min, e.max, 0.06);
+      }
       // write the config (persists across updates) AND the live scale: Chart.js
       // caches the user bounds at init (_userMin/_userMax), before our hook runs,
       // so without this the fit would apply one update late.

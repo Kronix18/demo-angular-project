@@ -305,4 +305,84 @@ test.describe('chart panel (2.x–5.x)', () => {
     await expect(page.locator('app-symbol-search-dialog')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
+
+  test('price scale (11.4): auto by default, vertical drag pans price + turns auto off, axis drag scales, Auto restores, log includes volume', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    await page.click('.range-btn:has-text("1Y")');
+    const yr = () => page.evaluate(() => { const y = (window as any).__charts.chart.scales.y; return { min: y.min, max: y.max, top: y.top, bottom: y.bottom }; });
+    const box = (await page.locator('canvas').boundingBox())!;
+    const right = await page.evaluate(() => (window as any).__charts.chart.chartArea.right);
+    await expect(page.locator('[data-auto]')).toHaveAttribute('aria-pressed', 'true');
+    const start = await yr();
+    const my = box.y + start.top + (start.bottom - start.top) * 0.4;
+
+    // a horizontal pan keeps auto on
+    await page.mouse.move(box.x + 500, my);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 560, my + 2, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.locator('[data-auto]')).toHaveAttribute('aria-pressed', 'true');
+
+    // drag the chart DOWN: auto turns off and higher prices come into view
+    const before = await yr();
+    await page.mouse.move(box.x + 500, my);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 500, my + 60, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.locator('[data-auto]')).toHaveAttribute('aria-pressed', 'false');
+    const panned = await yr();
+    expect(panned.min).toBeGreaterThan(before.min);
+    expect(panned.max - panned.min).toBeCloseTo(before.max - before.min, 0);
+
+    // drag UP by a lot: you can pan the price below the data (this is what auto used to forbid)
+    await page.mouse.move(box.x + 500, my + 100);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 500, my - 120, { steps: 10 });
+    await page.mouse.up();
+    expect((await yr()).max).toBeLessThan(before.max);
+
+    // horizontal pan / zoom keep the manual range
+    const manual = await yr();
+    await page.mouse.move(box.x + 500, my);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 560, my, { steps: 4 });
+    await page.mouse.up();
+    expect((await yr()).min).toBeCloseTo(manual.min, 4);
+
+    // drag on the price axis scales around the centre
+    const span = manual.max - manual.min;
+    await page.mouse.move(box.x + right + 30, box.y + manual.top + 60);
+    await page.mouse.down();
+    await page.mouse.move(box.x + right + 30, box.y + manual.top + 160, { steps: 8 });
+    await page.mouse.up();
+    const scaled = await yr();
+    expect(scaled.max - scaled.min).toBeGreaterThan(span);
+    expect((scaled.min + scaled.max) / 2).toBeCloseTo((manual.min + manual.max) / 2, 3);
+
+    // Auto restores the fit
+    await page.click('[data-auto]');
+    await expect(page.locator('[data-auto]')).toHaveAttribute('aria-pressed', 'true');
+    const fit = await yr();
+    expect(Math.abs(fit.max - fit.min - (start.max - start.min))).toBeLessThan((start.max - start.min) * 0.35);
+
+    // log: price AND volume scales go logarithmic, survive reload; volume bars stay visible
+    await page.click('[data-log]');
+    await expect(page.locator('[data-log]')).toHaveAttribute('aria-pressed', 'true');
+    const types = await page.evaluate(() => { const o = (window as any).__charts.chart.options.scales; return [o.y.type, o.yVol.type]; });
+    expect(types).toEqual(['logarithmic', 'logarithmic']);
+    const px = await canvasPixels(page, await page.evaluate(() => { const s = (window as any).__charts.chart.scales.yVol; return { top: s.top, height: s.height }; }));
+    expect(px.n).toBeGreaterThan(1500);
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__charts?.chart);
+    await expect(page.locator('[data-log]')).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => (window as any).__charts.chart.options.scales.y.type)).toBe('logarithmic');
+    // ALL history in log: the 1986 prices are readable (linear would flatten them)
+    await page.click('.range-btn:has-text("ALL")');
+    await page.waitForTimeout(300);
+    const all = await yr();
+    expect(all.min).toBeGreaterThan(0);
+    expect(all.max / all.min).toBeGreaterThan(20);
+    expect(errors).toEqual([]);
+  });
 });

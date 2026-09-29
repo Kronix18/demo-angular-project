@@ -16,7 +16,7 @@ Requests (with reference screenshots of TradingView):
 | 11.1 | OHLCV header, indicator rows, Indicators picker dialog, indicator settings (inputs/style/visibility) | DONE |
 | 11.2 | All chart types | DONE (except volume candles / volume footprint / TPO — need intraday or per-bar widths) |
 | 11.3 | Type-to-search symbol dialog | DONE |
-| 11.4 | Auto-scale toggle, vertical pan, log price + volume | NOT STARTED |
+| 11.4 | Auto-scale toggle, vertical pan, log price + volume | DONE |
 | 11.5 | Drawing sidebar + tools | NOT STARTED |
 
 ## 11.1 results
@@ -39,3 +39,9 @@ Requests (with reference screenshots of TradingView):
 - Live filter over the demo symbols (exact > prefix > contains, case-insensitive; `MSFT.US` style input is cleaned), ↑/↓ with wrap, Enter picks the highlighted (or the first match), click picks, Esc closes. An unknown query offers **Go to AAPL**, which opens the chart's unknown-symbol card. Enter on an empty box does nothing.
 - Picking calls the existing state path (`setSymbol` → URL sync, refetch); the toolbar input + datalist still work for mouse users.
 - Tests: dialog spec (7), legend (+1), viewer type-to-search (5), e2e "type-to-search".
+
+## 11.4 results — price scale
+- **Why you could not pan up/down**: the price pane was always auto-fit to the visible bars, with no way out. Now `auto` (bottom-right, like TradingView) is on by default and **switches off when you drag the chart vertically** (an 8px dead-zone stops a slightly diagonal horizontal drag from switching it off). In manual mode the price range is yours: pan freely (also below/above the data), horizontal pan/zoom and indicator changes keep it, and clicking `auto` — or double-clicking the price axis — re-fits. Dragging **on the price axis** scales the range around its centre (drag down = zoom out). A drag that started on a drawing moves the drawing, not the scale. Manual scale resets on symbol / range / interval / log / brick-style changes.
+- **Logarithmic scale** (`log`, persisted in the chart state): price **and volume** go logarithmic together (zero-volume bars are dropped, the y-fits are multiplicative). Legend, crosshair labels, magnet, drawings (anchored in price) all follow. Screenshot `docs/screenshots/11.4-log-all-dark.png`: 40 years of MSFT readable on one axis.
+- Maths in `charts/y-scale-math.ts` (pure, tested): `panRange` (linear shift / log ratio), `scaleRange` (centre-preserving, never collapses), `fitRangeLog`.
+- Tests: y-scale-math (9), state logScale, viewer "price scale" (9: log buttons + volume, log fit, vertical pan, jitter, axis scale, manual survives x-pan and indicator toggle, resets on range, dblclick axis, drawing drag), e2e price-scale flow (mouse pan/scale/auto/log/reload/ALL in log).

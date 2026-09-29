@@ -15,6 +15,8 @@ export interface ChartState {
   indicators: IndicatorEntry[];
   /** price series rendering (10.5) */
   chartType: ChartType;
+  /** logarithmic price (and volume) scale (11.4) */
+  logScale: boolean;
   /** crosshair magnet: snap the horizontal line to the hovered bar's close (10.5) */
   magnet: boolean;
 }
@@ -56,6 +58,7 @@ const DEFAULTS: ChartState = {
   indicators: [],
   chartType: 'candles',
   magnet: false,
+  logScale: false,
 };
 
 /**
@@ -117,6 +120,10 @@ export class ChartStateService {
     if (CHART_TYPES.includes(chartType)) this.update({ chartType });
   }
 
+  toggleLogScale(): void {
+    this.update({ logScale: !this.subject.value.logScale });
+  }
+
   toggleMagnet(): void {
     this.update({ magnet: !this.subject.value.magnet });
   }
@@ -170,6 +177,7 @@ export class ChartStateService {
         range: typeof parsed.range === 'string' ? parsed.range : DEFAULTS.range,
         chartType: CHART_TYPES.includes(parsed.chartType) ? parsed.chartType : DEFAULTS.chartType,
         magnet: parsed.magnet === true,
+        logScale: parsed.logScale === true,
         indicators: Array.isArray(parsed.indicators)
           ? parsed.indicators.map(sanitizeIndicator).filter((i: IndicatorEntry | null): i is IndicatorEntry => i !== null)
           : [],

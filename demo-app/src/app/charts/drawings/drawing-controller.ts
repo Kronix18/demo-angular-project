@@ -58,6 +58,11 @@ export class DrawingController {
     chart!.update('none');
   }
 
+  /** True while a drawing (or one of its handles) is being dragged. */
+  isDragging(): boolean {
+    return this.drag !== null;
+  }
+
   cancel(): void {
     this.draft = null;
     this.drag = null;
