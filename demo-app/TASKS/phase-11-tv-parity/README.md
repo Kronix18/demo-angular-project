@@ -25,6 +25,12 @@ Requests (with reference screenshots of TradingView):
 | 11.9 | Second wave of drawing tools (90+ total) | DONE |
 | 11.10 | Undo / redo, clone, Alt shortcuts, remove menu | DONE |
 | 11.11 | Last price line, chart settings, context menu, keyboard navigation | DONE |
+| 11.12 | Per-drawing lock / hide / z-order, anchored text, table, emoji picker, ghost feed, anchored volume profile | DONE |
+| 11.13 | Demo cursor, go to date, lock scale, fit all, clock + timezone + session, bar countdown | DONE |
+| 11.14 | Side panel: object tree, data window, watchlist | DONE |
+| 11.15 | Price alerts, bar replay, toasts | DONE |
+| 11.16 | Compare symbols | DONE |
+| 11.17 | Saved layouts, indicator templates | DONE |
 
 ## 11.1 results
 - Legend header is now `SYMBOL · 1D  O H L C  V  change` for the hovered bar (latest when idle); indicator rows sit under it (overlays) or in their own pane (oscillators). Each row: chip, live value, ⚙ settings, eye, ✕; double-click opens settings.
@@ -107,7 +113,7 @@ Requests (with reference screenshots of TradingView):
 | Drawing management | undo / redo, clone, lock / hide all, remove drawings / indicators, style toolbar, keyboard shortcuts | ✅ (per-drawing lock/hide, object tree, templates, z-order: not built) |
 | Scale controls | %, log, auto, invert, zoom in / out, reset | ✅ (lock-scale to the right of the price, scale-to-time not built) |
 | Chart | last price line + label, grid / crosshair / status line settings, context menu, arrow-key / +/- / End navigation, snapshot, fullscreen | ✅ |
-| Not built (backlog) | compare / overlay symbols, symbol countdown, replay, alerts, layouts / save, indicator templates, watchlist, data window / object tree, timezone + session, go-to-date | — |
+| Not built (backlog) | (was: compare, countdown, replay, alerts, layouts, templates, watchlist, data window / object tree, timezone + session, go-to-date — all built in round 4, see below) | ✅ |
 
 ### What changed
 - **Layout**: the sidebar is a real column (`.chart-body` = sidebar + chart column) from under the chart navbar to the bottom; the scale controls moved out of the plot into a strip under the chart, so they no longer cover the time axis. Verified by e2e at 1400×800 and on a 420 px tall window (no page scrollbar).
@@ -118,3 +124,30 @@ Requests (with reference screenshots of TradingView):
 - **11.11**: dashed last-price line with a coloured axis label (clamped to the pane edge when off scale); chart settings (status line OHLC, last price line, vertical / horizontal grid, crosshair) persisted in the chart state; right-click menu (reset view, horizontal line at the price, remove drawings, settings); ← → pan, + − zoom, End jumps to the latest bar.
 - **Bug found by the screenshot**: the last-price label briefly showed percentages on the linear scale (Chart.js fills in a default tick callback, so "has a callback" is not "percent mode"); it now uses an explicit flag.
 - The viewer's loading skeleton and error card moved into `ChartStatusComponent` to keep its stylesheet inside the 4 kB budget (unchanged).
+
+## Round 4 — everything that was on the backlog (11.12–11.17)
+
+The whole "not built" list from round 3 is now built:
+
+| Backlog item | Where / how |
+|---|---|
+| Per-drawing lock / hide, z-order | style toolbar (lock, hide, *Order…* menu) and the object tree; a locked drawing can be selected but not moved, deleted or handle-dragged; hidden ones are neither painted nor hit-tested; `DrawingStore.move()` is undoable |
+| Anchored text, table, emoji picker | tools `anchoredtext` (fixed spot of the pane, stored as fractions, moves by pixels), `table` (`a|b;c|d` cells, edited inline), `emoji` (48-glyph grid in the Icons flyout; the picked glyph is stamped on click) |
+| Ghost feed, anchored volume profile | `ghostfeed` (the bars between two anchors repeated after the second, translucent), `avp` (volume-by-price from the anchor to the latest bar); the fixed-range profile and bars pattern share the same helpers |
+| Cursor demonstration mode | fifth cursor: a red laser dot with a fading trail |
+| Go to date | 📅 button and Alt+G: date box (clamped into the data), centres the view on the nearest bar keeping the span |
+| Lock scale / fit all | 🔒 freezes the price range (auto, axis drags and vertical panning are inert), ⤢ fits every bar |
+| Clock, timezone, session, countdown | bottom-left clock (exchange = New York with its UTC offset, UTC or browser local); settings pick the zone, the session (regular 16:00 / extended 20:00 close) and switch on the *countdown to bar close* under the last-price label (daily → next weekday close, weekly → Friday). `charts/market-time.ts`, DST-safe via `Intl` |
+| Object tree, data window | ☰ opens the right panel: **Objects** (indicators and this symbol's drawings: select, eye, lock, delete, bring to front), **Data** (the hovered bar's date, OHLC, volume, change and every indicator value) |
+| Watchlist | third tab; symbols in localStorage, quotes (last close, % change) fetched lazily only while the tab is open; click switches the chart |
+| Alerts | fourth tab, the context menu (*Add alert at price*) — crossing alerts, drawn as dashed bell-labelled lines on the chart. The demo data is static, so they fire **during replay** (toast, pause, marked triggered), not in real time |
+| Replay | **⏵ Replay** cuts the history at a start bar (60 bars back); step ⏮ ⏭, play / pause at 1x / 3x / 10x / 30x, position slider, exit. Indicators, drawings and volume follow; the daily file is sliced before weekly aggregation |
+| Compare symbols | **＋ Compare** opens symbol search; the compared symbols are lines on the price pane, scaled to start at the price's own value at the first framed bar (so they read as relative performance); legend rows show the change and a remove ✕; up to five, persisted |
+| Layouts | **▤** dialog: save the whole chart (state + all symbols' drawings) under a name, load, overwrite, delete; the current layout's name is on the button |
+| Indicator templates | in the Indicators dialog: save the chart's indicators (with inputs, styles, visibility) under a name, apply (replaces), delete |
+
+Other changes
+- Header buttons for snapshot / fullscreen / reset zoom are icons now (titles + aria-labels kept) so the header fits on one row.
+- The loading skeleton / error card, side panel, replay bar and toasts are their own components (viewer stylesheet still under the 4 kB budget).
+- Honest limits: session only changes which close the countdown targets (the demo data has no intraday bars); alerts and replay are the only place price "moves" because the files are static; compare uses daily closes aligned by date.
+- Tests: about 65 new unit specs (registry/shapes, controller, store, panel, services, dialogs, viewer) and the e2e `platform.spec.ts`. Screenshots: `docs/screenshots/11.14-side-panel.png`, `11.15-replay.png`, `11.9-more-tools.png`.

@@ -303,16 +303,16 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
               </optgroup>
             }
           </select>
-          <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
-          <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
-          <button type="button" class="tool-btn" data-layouts title="Layouts: save / load chart setups" aria-label="Layouts" (click)="layoutsOpen.set(true)">▤ {{ layouts.current() || 'Layouts' }}</button>
+          <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">📷</button>
+          <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">⛶</button>
+          <button type="button" class="tool-btn" data-layouts title="Layouts: save / load chart setups" aria-label="Layouts" (click)="layoutsOpen.set(true)">▤{{ layouts.current() ? ' ' + layouts.current() : '' }}</button>
           <button type="button" class="tool-btn" data-replay [attr.aria-pressed]="!!replay()" title="Bar replay" aria-label="Bar replay" (click)="toggleReplay()">⏵ Replay</button>
           <button type="button" class="tool-btn" data-compare title="Compare or add symbol" aria-label="Compare symbol" (click)="openSearch('', 'compare')">＋ Compare</button>
           <button type="button" class="tool-btn" data-panel [attr.aria-pressed]="panelOpen()" title="Object tree, data window, watchlist, alerts" aria-label="Side panel" (click)="togglePanel()">☰</button>
           <button type="button" class="tool-btn" data-chart-settings title="Chart settings" aria-label="Chart settings" (click)="settingsOpen.set(true)">⚙</button>
           <button type="button" class="tool-btn" data-undo title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!drawingStore.canUndo(currentSymbol)" (click)="undo()">↶</button>
           <button type="button" class="tool-btn" data-redo title="Redo (Ctrl+Y)" aria-label="Redo" [disabled]="!drawingStore.canRedo(currentSymbol)" (click)="redo()">↷</button>
-          <button type="button" class="reset-zoom-btn" (click)="resetZoom()">Reset zoom</button>
+          <button type="button" class="reset-zoom-btn" title="Reset zoom" aria-label="Reset zoom" (click)="resetZoom()">↺</button>
         </div>
       </header>
 
