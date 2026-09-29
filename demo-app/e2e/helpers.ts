@@ -6,11 +6,22 @@ export async function openChart(page: Page, symbol = 'msft'): Promise<void> {
   await page.waitForFunction(() => !document.querySelector('.loading-overlay') && (window as any).__charts?.chart);
 }
 
-/** Adds an indicator through the panel UI. */
+const DEFAULT_PERIOD: Record<string, number> = { sma: 20, ema: 21, wma: 10, rma: 14, rsi: 14, atr: 14 };
+
+/** Adds an indicator through the Indicators dialog (and edits its length via the settings dialog when it differs from the default). */
 export async function addIndicator(page: Page, type: string, period?: number): Promise<void> {
-  await page.selectOption('select[name="indicatorType"]', type);
-  if (period !== undefined) await page.fill('input[name="indicatorPeriod"]', String(period));
-  await page.click('[data-add]');
+  await page.click('[data-indicators]');
+  await page.click(`[data-add-indicator="${type}"]`);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('app-indicators-dialog')).toHaveCount(0);
+  if (period !== undefined && period !== DEFAULT_PERIOD[type]) {
+    const row = page.locator('[data-indicator-row]').last();
+    await row.hover();
+    await row.locator('[data-settings]').click();
+    await page.fill('[data-param="length"]', String(period));
+    await page.click('[data-ok]');
+    await expect(page.locator('app-indicator-settings-dialog')).toHaveCount(0);
+  }
 }
 
 /** Non-blank canvas proof: drawn pixel count + colour variance inside a pixel-space box. */

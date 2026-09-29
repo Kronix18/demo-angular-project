@@ -18,7 +18,7 @@ export interface LegendGroup {
   header?: {
     symbol: string;
     interval: string;
-    ohlc: { o: string; h: string; l: string; c: string; change: string; up: boolean } | null;
+    ohlc: { o: string; h: string; l: string; c: string; v: string; change: string; up: boolean } | null;
   };
   rows: LegendRow[];
 }
@@ -45,6 +45,7 @@ export interface LegendGroup {
                 <span>H <b>{{ b.h }}</b></span>
                 <span>L <b>{{ b.l }}</b></span>
                 <span>C <b>{{ b.c }}</b></span>
+                <span data-vol>V <b>{{ b.v }}</b></span>
                 <span class="change">{{ b.change }}</span>
               </span>
             }
@@ -52,13 +53,15 @@ export interface LegendGroup {
         }
         @for (r of g.rows; track r.key) {
           @if (r.index !== undefined) {
-            <div class="row" data-indicator-row [class.hidden]="r.hidden">
+            <div class="row" data-indicator-row [class.hidden]="r.hidden" (dblclick)="settings.emit(r.index!)">
               <span class="chip" data-chip [style.background]="r.color"></span>
               <span class="label">{{ r.label }}</span>
               <span class="value">{{ r.value }}</span>
               <button type="button" class="ctl" data-eye [attr.aria-pressed]="!r.hidden"
                 [attr.aria-label]="(r.hidden ? 'Show ' : 'Hide ') + r.label"
                 [title]="r.hidden ? 'Show' : 'Hide'" (click)="toggle.emit(r.index!)">{{ r.hidden ? '◌' : '◉' }}</button>
+              <button type="button" class="ctl" data-settings [attr.aria-label]="'Settings for ' + r.label"
+                title="Settings" (click)="settings.emit(r.index!)">⚙</button>
               <button type="button" class="ctl" data-remove [attr.aria-label]="'Remove ' + r.label"
                 title="Remove" (click)="remove.emit(r.index!)">×</button>
             </div>
@@ -102,4 +105,5 @@ export class ChartLegendComponent {
   readonly groups = input.required<LegendGroup[]>();
   readonly toggle = output<number>();
   readonly remove = output<number>();
+  readonly settings = output<number>();
 }

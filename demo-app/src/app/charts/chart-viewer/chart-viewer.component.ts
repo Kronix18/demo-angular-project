@@ -7,10 +7,11 @@ import { filterByRange, aggregateWeeklyWFri } from '../../core/services/data-agg
 import { ActivatedRoute, Router } from '@angular/router';
 import { OHLCV } from '../../core/models/ohlcv.model';
 import { ChartToolbarComponent } from '../chart-toolbar/chart-toolbar.component';
-import { IndicatorPanel } from '../indicator-panel/indicator-panel';
+import { IndicatorsDialogComponent } from '../dialogs/indicators-dialog.component';
+import { IndicatorSettingsDialogComponent } from '../dialogs/indicator-settings-dialog.component';
 import { ChartLegendComponent, LegendGroup, LegendRow } from '../chart-legend/chart-legend.component';
 import { IndicatorCalculationService } from '../../core/services/indicator-calculation.service';
-import { ResolvedIndicator, resolveEntry } from '../../core/indicators/indicator-catalog';
+import { IndicatorEntry, ResolvedIndicator, catalogItem, resolveEntry } from '../../core/indicators/indicator-catalog';
 import { OutputSpec } from '../../core/indicators/indicator-definitions';
 import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -234,12 +235,12 @@ type DataBuilder = (pts: LodPoint[]) => any[];
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, IndicatorPanel, ChartLegendComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
         <app-chart-toolbar />
-        <app-indicator-panel />
+        <button type="button" class="tool-btn indicators-btn" data-indicators title="Indicators" (click)="indicatorsOpen.set(true)">ƒx Indicators</button>
         <div class="chart-tools" role="group" aria-label="Chart tools">
           <select name="chartType" aria-label="Chart type" [value]="chartTypeValue" (change)="setChartType($any($event.target).value)">
             @for (t of chartTypes; track t) {
@@ -253,6 +254,13 @@ type DataBuilder = (pts: LodPoint[]) => any[];
         </div>
       </header>
 
+      @if (indicatorsOpen()) {
+        <app-indicators-dialog (add)="addIndicatorType($event)" (closed)="indicatorsOpen.set(false)" />
+      }
+      @if (settingsFor(); as sf) {
+        <app-indicator-settings-dialog [entry]="sf.entry" (save)="saveSettings(sf.index, $event)" (closed)="settingsIndex.set(null)" />
+      }
+
       <div class="chart-panel" data-pane="panel">
         <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="tool() !== 'cursor'" (dblclick)="resetZoom()"
           (mousedown)="pointer('down', $event)" (mousemove)="pointer('move', $event)" (mouseup)="pointer('up', $event)"></canvas>
@@ -265,7 +273,7 @@ type DataBuilder = (pts: LodPoint[]) => any[];
             title="Delete all drawings on this symbol" (click)="clearDrawings()">⌫</button>
         </div>
         @if (!error) {
-          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" />
+          <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" />
         }
         @if (loading) {
           <div class="loading-overlay skeleton" role="status" aria-live="polite">
@@ -452,6 +460,24 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private allData: OHLCV[] = [];
   /** Bars the chart indexes into (weekly-aggregated when interval = 1w). */
   private bars: OHLCV[] = [];
+  // ---- indicator dialogs -----------------------------------------------------------
+  readonly indicatorsOpen = signal(false);
+  readonly settingsIndex = signal<number | null>(null);
+  readonly settingsFor = computed(() => {
+    const i = this.settingsIndex();
+    const entry = i === null ? undefined : this.stateIndicators()[i];
+    return entry ? { index: i as number, entry } : null;
+  });
+  /** signal mirror of the persisted indicator list (state$ is an Observable) */
+  private readonly stateIndicators = signal<IndicatorEntry[]>([]);
+
+  addIndicatorType(type: string): void {
+    const item = catalogItem(type);
+    if (item) this.chartState.addIndicator({ type: item.type, period: item.defaultPeriod });
+  }
+  openSettings(index: number): void { this.indicatorsOpen.set(false); this.settingsIndex.set(index); }
+  saveSettings(index: number, patch: Partial<IndicatorEntry>): void { this.chartState.updateIndicator(index, patch); }
+
   // ---- drawings (10.3) ---------------------------------------------------------------
   private drawingStore = inject(DrawingStore);
   readonly tool = signal<Tool>('cursor');
@@ -572,7 +598,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const f2 = (v: number) => v.toFixed(2);
     const diff = prev ? bar.close - prev.close : 0;
     const ohlc = {
-      o: f2(bar.open), h: f2(bar.high), l: f2(bar.low), c: f2(bar.close),
+      o: f2(bar.open), h: f2(bar.high), l: f2(bar.low), c: f2(bar.close), v: compactVolume(bar.volume),
       change: prev ? `${diff >= 0 ? '+' : ''}${f2(diff)} (${diff >= 0 ? '+' : ''}${f2((diff / prev.close) * 100)}%)` : '',
       up: bar.close >= bar.open,
     };
@@ -586,7 +612,6 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         header: { symbol: this.currentSymbol.toUpperCase(), interval: this.currentInterval.toUpperCase(), ohlc },
         rows: src.series.filter((s) => !s.pane).map(row),
       },
-      { key: 'volume', top: tops['yVol'] ?? 0, rows: [{ key: 'vol', label: 'Volume', value: compactVolume(bar.volume), color: '', hidden: false }] },
     ];
     src.series.filter((s) => s.pane).forEach((s, k) => {
       groups.push({ key: `yInd${k}`, top: tops[`yInd${k}`] ?? 0, rows: [row(s)] });
@@ -633,6 +658,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         const intervalChanged = s.interval !== this.currentInterval;
         const rangeChanged = s.range !== this.currentRange;
         this.chartTypeValue = s.chartType;
+        this.stateIndicators.set(s.indicators);
         const magnetOnly = s.magnet !== this.magnetOn && this.sameExceptMagnet(s);
         this.magnetOn = s.magnet;
         this.lastKey = this.keyOf(s);
@@ -834,13 +860,18 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       }, (pts) => pts.map((p) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t })));
     }
     const legendSeries: LegendSeries[] = [];
+    const interval = this.currentInterval;
     overlays.forEach(({ index, resolved, outputs }, i) => {
-      const color = cssVar(`--c-indicator-${(i % 4) + 1}`);
-      const first = Object.values(outputs)[0];
-      if (first) {
-        add(this.lineDataset(resolved.label, 'y', color, 1.5, [], resolved.hidden), this.lineBuilder(first));
-        legendSeries.push({ index, label: resolved.label, color, hidden: resolved.hidden, values: first, pane: false });
-      }
+      const key = Object.keys(outputs)[0];
+      const values = key ? outputs[key] : undefined;
+      if (!values) return;
+      const st = resolved.styles[key] ?? {};
+      const color = st.color ?? cssVar(`--c-indicator-${(i % 4) + 1}`);
+      const hidden = resolved.hidden || !resolved.visibleOn(interval) || st.visible === false;
+      // a moving average OF VOLUME belongs on the volume scale
+      const axis = resolved.params['source'] === 'volume' ? 'yVol' : 'y';
+      add(this.lineDataset(resolved.label, axis, color, st.width ?? 1.5, st.dash ? DASHES[st.dash] : [], hidden), this.lineBuilder(values));
+      legendSeries.push({ index, label: resolved.label, color, hidden: resolved.hidden || !resolved.visibleOn(interval), values, pane: false });
     });
     add({
       type: 'bar', label: 'Volume', yAxisID: 'yVol', data: [], parsing: false, normalized: true,
@@ -853,12 +884,15 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       const id = `yInd${i}`;
       const def = this.indicatorCalc.definition(resolved.definitionId);
       let main = true;
+      const rowHidden = resolved.hidden || !resolved.visibleOn(interval);
       for (const o of def.outputs) {
         if (!outputs[o.key]) continue;
-        add(this.lineDataset(o.label, id, resolveColor(o.defaultColor), o.defaultWidth, DASHES[o.defaultLineStyle], resolved.hidden),
+        const st = resolved.styles[o.key] ?? {};
+        const color = st.color ?? resolveColor(o.defaultColor);
+        add(this.lineDataset(o.label, id, color, st.width ?? o.defaultWidth, DASHES[st.dash ?? o.defaultLineStyle], rowHidden || st.visible === false),
           this.lineBuilder(outputs[o.key]));
         if (main) {
-          legendSeries.push({ index, label: resolved.label, color: resolveColor(o.defaultColor), hidden: resolved.hidden, values: outputs[o.key], pane: true });
+          legendSeries.push({ index, label: resolved.label, color, hidden: rowHidden, values: outputs[o.key], pane: true });
           main = false;
         }
       }

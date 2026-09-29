@@ -509,6 +509,85 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('indicators dialog + settings', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const label = (l: string) => chartOf().data.datasets.find((d: any) => d.label === l);
+
+    it('the Indicators button opens the picker; adding from it puts the indicator on the chart; Esc closes', async () => {
+      const st = fresh();
+      await loaded();
+      expect(q('app-indicators-dialog')).toBeNull();
+      (q('[data-indicators]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-indicators-dialog')).toBeTruthy();
+      (q('[data-add-indicator="rsi"]') as HTMLButtonElement).click();
+      (q('[data-add-indicator="rsi"]') as HTMLButtonElement).click(); // TradingView lets you add the same one twice
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().indicators.map((i) => i.type)).toEqual(['rsi', 'rsi']);
+      expect(q('app-indicators-dialog')).toBeTruthy(); // stays open for more
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+      expect(q('app-indicators-dialog')).toBeNull();
+    });
+
+    it('gear opens the settings dialog; OK applies inputs, colour, width, dash and hides on unchecked timeframes', async () => {
+      const st = fresh();
+      st.addIndicator({ type: 'sma', period: 2 });
+      await loaded();
+      (q('[data-settings]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const dlg = () => q('app-indicator-settings-dialog')!;
+      expect(dlg()).toBeTruthy();
+      const setInput = (s: string, v: string) => { const i = dlg().querySelector(s) as HTMLInputElement; i.value = v; i.dispatchEvent(new Event('input')); fixture.detectChanges(); };
+      setInput('[data-param="length"]', '3');
+      (dlg().querySelector('[data-tab="style"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      setInput('[data-style-color="ma"]', '#123456');
+      const w = dlg().querySelector('[data-style-width="ma"]') as HTMLSelectElement;
+      w.value = '3'; w.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      (dlg().querySelector('[data-ok]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const e = st.snapshot().indicators[0];
+      expect(e.period).toBe(3);
+      expect(e.styles!['ma']).toMatchObject({ color: '#123456', width: 3 });
+      const ds = label('SMA 3');
+      expect(ds).toBeTruthy(); // label follows the edited length
+      expect(ds.borderColor).toBe('#123456');
+      expect(ds.borderWidth).toBe(3);
+      expect(q('app-indicator-settings-dialog')).toBeNull(); // closed after OK
+    });
+
+    it('per-output visibility and per-timeframe visibility hide the series', async () => {
+      const st = fresh();
+      st.addIndicator({ type: 'rsi', period: 14, styles: { overbought: { visible: false } } });
+      st.addIndicator({ type: 'sma', period: 2, intervals: ['1w'] });
+      await loaded();
+      expect(label('Overbought').hidden).toBe(true);
+      expect(label('RSI').hidden).toBeFalsy();
+      expect(label('SMA 2').hidden).toBe(true); // interval is 1d, indicator only on 1w
+      expect(q('[data-indicator-row].hidden')).toBeTruthy();
+    });
+
+    it('a moving average of VOLUME plots on the volume scale', async () => {
+      const st = fresh();
+      st.addIndicator({ type: 'sma', period: 2, params: { source: 'volume', method: 'SMA', length: 2 } });
+      await loaded();
+      expect(label('SMA 2').yAxisID).toBe('yVol');
+    });
+
+    it('unknown settings never break rendering (stale style keys are ignored)', async () => {
+      const st = fresh();
+      st.addIndicator({ type: 'sma', period: 2, styles: { nonsense: { color: '#000000' } }, params: { bogus: 1 } });
+      await loaded();
+      expect(label('SMA 2')).toBeTruthy();
+    });
+  });
+
   describe('chart types + tools (10.5)', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const fresh = () => { sessionStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
@@ -661,7 +740,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(chart).toBeTruthy();
     });
 
-    it('volume row follows the hovered bar; indicator rows show their value at that bar', async () => {
+    it('header volume follows the hovered bar; indicator rows show their value at that bar', async () => {
       const st = TestBed.inject(ChartStateService);
       sessionStorage.clear();
       st.reset();
@@ -669,7 +748,8 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       const chart: any = await loaded();
       component.setHoverIndex(1);
       fixture.detectChanges();
-      expect(q('[data-legend-group="volume"]')!.textContent).toContain('1.2K');
+      expect(q('[data-legend-header]')!.textContent).toMatch(/V\s*1\.2K/); // OHLCV next to the symbol, like TradingView
+      expect(q('[data-legend-group="volume"]')).toBeNull();
       const row = q('[data-indicator-row]')!;
       expect(row.textContent).toContain('SMA 2');
       expect(row.textContent).toContain('108.50'); // (105+112)/2

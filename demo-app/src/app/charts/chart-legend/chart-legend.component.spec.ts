@@ -4,7 +4,7 @@ import { ChartLegendComponent, LegendGroup } from './chart-legend.component';
 const groups = (): LegendGroup[] => [
   {
     key: 'price', top: 0,
-    header: { symbol: 'MSFT', interval: '1D', ohlc: { o: '100.00', h: '110.00', l: '95.00', c: '105.00', change: '+5.00 (+5.00%)', up: true } },
+    header: { symbol: 'MSFT', interval: '1D', ohlc: { o: '100.00', h: '110.00', l: '95.00', c: '105.00', v: '1.2M', change: '+5.00 (+5.00%)', up: true } },
     rows: [{ key: 'sma', label: 'SMA 20', value: '101.25', color: 'rgb(1, 2, 3)', hidden: false, index: 0 }],
   },
   { key: 'volume', top: 300, rows: [{ key: 'vol', label: 'Volume', value: '1.2M', color: 'rgb(9, 9, 9)', hidden: false }] },
@@ -25,7 +25,7 @@ describe('ChartLegendComponent (10.2)', () => {
     const head = el().querySelector('[data-legend-header]')!;
     expect(head.textContent).toContain('MSFT');
     expect(head.textContent).toContain('1D');
-    for (const v of ['100.00', '110.00', '95.00', '105.00', '+5.00 (+5.00%)']) expect(head.textContent).toContain(v);
+    for (const v of ['100.00', '110.00', '95.00', '105.00', '1.2M', '+5.00 (+5.00%)']) expect(head.textContent).toContain(v);
     expect(el().querySelector('[data-ohlc]')!.classList.contains('up')).toBe(true);
   });
 
@@ -62,5 +62,14 @@ describe('ChartLegendComponent (10.2)', () => {
     expect(eyes.map((e) => e.getAttribute('aria-pressed'))).toEqual(['true', 'false']); // pressed = visible
     expect(eyes[0].getAttribute('aria-label')).toMatch(/hide SMA 20/i);
     expect(eyes[1].getAttribute('aria-label')).toMatch(/show RSI 14/i);
+  });
+
+  it('gear button and double-clicking a row emit the settings request for that indicator', () => {
+    const asked: number[] = [];
+    fixture.componentInstance.settings.subscribe((i) => asked.push(i));
+    (el().querySelectorAll('[data-settings]')[1] as HTMLButtonElement).click();
+    (el().querySelectorAll('[data-indicator-row]')[0] as HTMLElement).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(asked).toEqual([1, 0]);
+    expect(el().querySelectorAll('[data-settings]')[0].getAttribute('aria-label')).toMatch(/Settings for SMA 20/);
   });
 });

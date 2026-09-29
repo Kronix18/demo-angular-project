@@ -37,19 +37,20 @@ test.describe('chart panel (2.x–5.x)', () => {
     await page.waitForFunction((d) => (window as any).__charts.chart.scales.x.max < d / 3, daily);
   });
 
-  test('indicators: overlay + stacked panes render, persist across refresh, validate input', async ({ page }) => {
+  test('indicators: picker dialog, overlay + stacked panes render, persist across refresh', async ({ page }) => {
     const errors = collectErrors(page);
     await openChart(page);
-    // validation (5.3)
-    await page.selectOption('select[name="indicatorType"]', 'sma');
-    await page.fill('input[name="indicatorPeriod"]', '1');
-    await page.click('[data-add]');
-    await expect(page.locator('[data-error]')).toContainText(/2.*500/);
-    await addIndicator(page, 'sma', 20);
-    await page.click('[data-add]');
-    await expect(page.locator('[data-error]')).toContainText(/already/i);
-    await addIndicator(page, 'rsi', 14);
-    await addIndicator(page, 'atr', 14);
+    // picker: search, category headers, add several in a row, Esc closes
+    await page.click('[data-indicators]');
+    await expect(page.locator('[data-category]')).toContainText(['Trend', 'Momentum', 'Volatility', 'IBD / CANSLIM']);
+    await page.fill('input[type="search"]', 'moment');
+    await expect(page.locator('[data-add-indicator]')).toHaveCount(1);
+    await page.fill('input[type="search"]', '');
+    await page.click('[data-add-indicator="sma"]');
+    await page.click('[data-add-indicator="rsi"]');
+    await page.click('[data-add-indicator="atr"]');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('app-indicators-dialog')).toHaveCount(0);
     await expect(page.locator('[data-indicator-row]')).toHaveCount(3);
     const info = await page.evaluate(() => {
       const c = (window as any).__charts.chart;
@@ -67,8 +68,69 @@ test.describe('chart panel (2.x–5.x)', () => {
     await page.reload();
     await expect(page.locator('[data-indicator-row]')).toHaveCount(3);
     await page.waitForFunction(() => Object.keys((window as any).__charts.chart.scales).includes('yInd1'));
-    for (let i = 0; i < 3; i++) await page.click('[data-remove]');
+    for (let i = 0; i < 3; i++) {
+      await page.locator('[data-indicator-row]').first().hover();
+      await page.locator('[data-indicator-row]').first().locator('[data-remove]').click();
+    }
     await expect(page.locator('[data-indicator-row]')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('indicator settings: inputs (validated), colour/width/line style, per-output + per-timeframe visibility', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    await addIndicator(page, 'sma');
+    await addIndicator(page, 'rsi');
+    const ds = (label: string) => page.evaluate((l) => {
+      const d = (window as any).__charts.chart.data.datasets.find((x: any) => x.label === l);
+      return d ? { color: d.borderColor, width: d.borderWidth, dash: d.borderDash, hidden: !!d.hidden } : null;
+    }, label);
+    const openSettings = async (n: number) => {
+      const row = page.locator('[data-indicator-row]').nth(n);
+      await row.hover();
+      await row.locator('[data-settings]').click();
+    };
+
+    // Inputs: validation blocks OK, a valid length relabels the series
+    await openSettings(0);
+    await page.fill('[data-param="length"]', '0');
+    await expect(page.locator('[data-error="length"]')).toBeVisible();
+    await expect(page.locator('[data-ok]')).toBeDisabled();
+    await page.fill('[data-param="length"]', '50');
+    await page.selectOption('[data-param="method"]', 'EMA');
+    // Style: colour, width, line style
+    await page.click('[data-tab="style"]');
+    await page.fill('[data-style-color="ma"]', '#ff0000');
+    await page.selectOption('[data-style-width="ma"]', '3');
+    await page.selectOption('[data-style-dash="ma"]', 'dash');
+    await page.click('[data-ok]');
+    await expect(page.locator('app-indicator-settings-dialog')).toHaveCount(0);
+    await expect.poll(() => ds('EMA 50')).toMatchObject({ color: '#ff0000', width: 3, dash: [6, 4] });
+    await expect(page.locator('[data-indicator-row]').first()).toContainText('EMA 50');
+    expect(await ds('SMA 20')).toBeNull();
+
+    // per-output visibility: hide the RSI overbought guide line only
+    await openSettings(1);
+    await page.click('[data-tab="style"]');
+    await page.click('[data-style-visible="overbought"]');
+    await page.click('[data-ok]');
+    await expect.poll(() => ds('Overbought')).toMatchObject({ hidden: true });
+    expect(await ds('RSI')).toMatchObject({ hidden: false });
+
+    // settings persist across refresh
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__charts?.chart);
+    expect(await ds('EMA 50')).toMatchObject({ color: '#ff0000', width: 3 });
+    expect(await ds('Overbought')).toMatchObject({ hidden: true });
+
+    // per-timeframe visibility: EMA only on weekly -> hidden on daily, shown after switching
+    await openSettings(0);
+    await page.click('[data-tab="visibility"]');
+    await page.click('[data-interval="1d"]');
+    await page.click('[data-ok]');
+    await expect.poll(() => ds('EMA 50')).toMatchObject({ hidden: true });
+    await page.selectOption('#interval', '1w');
+    await expect.poll(() => ds('EMA 50')).toMatchObject({ hidden: false });
     expect(errors).toEqual([]);
   });
 
