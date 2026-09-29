@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { API_URL } from '../api-url';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError, of } from 'rxjs';
 import { catchError, retry, timeout } from 'rxjs/operators';
@@ -8,7 +9,7 @@ import { timer } from 'rxjs';
   providedIn: 'root'
 })
 export class ApiService {
-  private apiUrl = 'http://192.168.1.111:3000';
+  private apiUrl = inject(API_URL);
   private readonly maxRetries = 3;
   private readonly timeoutMs = 10000;
 

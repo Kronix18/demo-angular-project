@@ -72,6 +72,27 @@ test.describe('chart page layout (5.4)', () => {
     expect(r.n).toBeGreaterThan(15);
   });
 
+  test('dragging the border between price and volume resizes the panes and the sizes survive a reload (11.19)', async ({ page }) => {
+    await openChart(page);
+    const geo = () => page.evaluate(() => { const c = (window as any).__charts.chart; return { y: c.scales.y.bottom - c.scales.y.top, v: c.scales.yVol.bottom - c.scales.yVol.top, top: c.scales.yVol.top, x: c.chartArea.left + 100 }; });
+    const before = await geo();
+    const box = (await page.locator('canvas').boundingBox())!;
+    await page.mouse.move(box.x + before.x, box.y + before.top + 1);
+    expect(await page.evaluate(() => document.querySelector('canvas')!.style.cursor)).toBe('ns-resize');
+    await page.mouse.down();
+    await page.mouse.move(box.x + before.x, box.y + before.top - 60, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const after = await geo();
+    expect(after.v).toBeGreaterThan(before.v + 40);
+    expect(after.y).toBeLessThan(before.y - 40);
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__charts?.chart);
+    await page.waitForTimeout(300);
+    const again = await geo();
+    expect(Math.abs(again.v - after.v)).toBeLessThan(4);
+  });
+
   test('compact navbar on the chart page; other pages keep navbar + footer', async ({ page }) => {
     await openChart(page);
     const nav = await page.locator('nav.navbar').boundingBox();

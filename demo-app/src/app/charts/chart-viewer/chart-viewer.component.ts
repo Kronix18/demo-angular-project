@@ -33,6 +33,7 @@ import { LayoutsDialogComponent } from '../dialogs/layouts-dialog.component';
 import { LayoutService } from '../../core/services/layout.service';
 import { GotoDateDialogComponent } from '../dialogs/goto-date-dialog.component';
 import { barCountdown, formatClock } from '../market-time';
+import { paneBoundaryAt, resizeWeights } from '../pane-resize';
 import { ChartSettingsDialogComponent } from '../dialogs/chart-settings-dialog.component';
 import '../last-price';
 import { SymbolSettingsDialogComponent } from '../dialogs/symbol-settings-dialog.component';
@@ -669,7 +670,38 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     this.drawings.cancel();
   }
 
+  /** Pane sizes the user dragged (scale id -> stack weight), remembered across sessions. */
+  private paneWeights: Record<string, number> = ((): Record<string, number> => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('pane-weights') ?? '{}');
+      return Object.fromEntries(Object.entries(raw).filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && (v as number) > 0)) as Record<string, number>;
+    } catch { return {}; }
+  })();
+  private paneDrag: { index: number; ids: string[]; lastY: number } | null = null;
+
+  private dragPanes(y: number): void {
+    const d = this.paneDrag;
+    const c = this.chart as any;
+    if (!d || !c?.chartArea) return;
+    const ws = d.ids.map((id) => c.options.scales[id]?.stackWeight ?? 1);
+    const next = resizeWeights(ws, d.index, y - d.lastY, c.chartArea.bottom - c.chartArea.top);
+    d.ids.forEach((id, i) => { if (c.options.scales[id]) { c.options.scales[id].stackWeight = next[i]; this.paneWeights[id] = next[i]; } });
+    d.lastY = y;
+    try { localStorage.setItem('pane-weights', JSON.stringify(this.paneWeights)); } catch { /* per-session only */ }
+    c.update('none');
+  }
+
   pointer(kind: 'down' | 'move' | 'up', e: MouseEvent): void {
+    if (isSelectToolFn(this.tool()) && this.chart) {
+      if (this.paneDrag) {
+        if (kind === 'move') this.dragPanes(e.offsetY);
+        else if (kind === 'up') this.paneDrag = null;
+        return;
+      }
+      const b = paneBoundaryAt(this.chart, e.offsetY);
+      if (kind === 'move' && !e.buttons && this.chartCanvas) this.chartCanvas.nativeElement.style.cursor = b ? 'ns-resize' : '';
+      if (kind === 'down' && e.button === 0 && b) { this.paneDrag = { ...b, lastY: e.offsetY }; return; }
+    }
     if (isSelectToolFn(this.tool()) && kind === 'move' && !e.buttons) return; // hover: nothing to do
     if (e.button !== 0 && kind !== 'move') return; // right / middle button: never draws (the context menu handles right-click)
     if (kind === 'down') this.ctxMenu.set(null);
@@ -723,6 +755,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   @HostListener('window:mouseup', ['$event'])
   onWindowMouseUp(e: MouseEvent): void {
     this.yDrag = null;
+    this.paneDrag = null;
     // finish a drag that ended outside the canvas
     if (e.target !== this.chartCanvas?.nativeElement) {
       const r = this.chartCanvas?.nativeElement.getBoundingClientRect();
@@ -1451,7 +1484,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         }
       }
       paneScales[id] = {
-        type: 'linear', position: 'right', stack: 'panel', stackWeight: PANE_WEIGHT,
+        type: 'linear', position: 'right', stack: 'panel', stackWeight: this.paneWeights[id] ?? PANE_WEIGHT,
         afterFit: (s: any) => { s.width = Y_WIDTH; },
         grid,
         ticks: { includeBounds: false },
@@ -1482,7 +1515,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         },
       },
       y: {
-        type: this.logOn ? 'logarithmic' : 'linear', position: 'right', stack: 'panel', stackWeight: PRICE_WEIGHT,
+        type: this.logOn ? 'logarithmic' : 'linear', position: 'right', stack: 'panel', stackWeight: this.paneWeights['y'] ?? PRICE_WEIGHT,
         afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
         reverse: this.invertOn,
         ticks: {
@@ -1492,7 +1525,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         paneLabel: `${this.currentSymbol.toUpperCase()} · ${this.currentInterval.toUpperCase()}`,
       },
       yVol: {
-        type: this.logOn ? 'logarithmic' : 'linear', position: 'right', stack: 'panel', stackWeight: VOLUME_WEIGHT,
+        type: this.logOn ? 'logarithmic' : 'linear', position: 'right', stack: 'panel', stackWeight: this.paneWeights['yVol'] ?? VOLUME_WEIGHT,
         ...(this.logOn ? {} : { beginAtZero: true, min: 0 }), afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
         ticks: { maxTicksLimit: 3, includeBounds: false, callback: (v: any) => compactVolume(Number(v)) },
         paneLabel: 'Volume',

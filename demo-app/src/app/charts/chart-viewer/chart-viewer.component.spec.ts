@@ -1620,6 +1620,46 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('pane borders can be dragged (11.19)', () => {
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+    const ev = (y: number, buttons = 1) => ({ offsetX: 100, offsetY: y, button: 0, buttons }) as MouseEvent;
+
+    it('dragging the separator between price and volume moves weight between them (and remembers it)', async () => {
+      sessionStorage.clear(); localStorage.clear();
+      TestBed.inject(ChartStateService).reset();
+      await loaded();
+      const c = chartOf();
+      c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
+      c.scales.y.top = 0; c.scales.y.bottom = 380; c.scales.yVol.top = 380; c.scales.yVol.bottom = 500;
+      const before = { y: c.options.scales.y.stackWeight, v: c.options.scales.yVol.stackWeight };
+      component.pointer('move', ev(381, 0));
+      expect(component.chartCanvas!.nativeElement.style.cursor).toBe('ns-resize');
+      component.pointer('down', ev(381));
+      component.pointer('move', ev(351));
+      component.pointer('up', ev(351));
+      expect(c.options.scales.y.stackWeight).toBeLessThan(before.y);
+      expect(c.options.scales.yVol.stackWeight).toBeGreaterThan(before.v);
+      expect(c.options.scales.y.stackWeight + c.options.scales.yVol.stackWeight).toBeCloseTo(before.y + before.v, 9);
+      expect(JSON.parse(localStorage.getItem('pane-weights')!).y).toBeCloseTo(c.options.scales.y.stackWeight, 9);
+      component.pointer('move', ev(200, 0));
+      expect(component.chartCanvas!.nativeElement.style.cursor).not.toBe('ns-resize');
+    });
+
+    it('a rebuilt chart (e.g. another chart type) keeps the pane sizes', async () => {
+      sessionStorage.clear(); localStorage.clear();
+      const st = TestBed.inject(ChartStateService); st.reset();
+      await loaded();
+      const c = chartOf();
+      c.chartArea = { left: 0, right: 900, top: 0, bottom: 500 };
+      c.scales.y.top = 0; c.scales.y.bottom = 380; c.scales.yVol.top = 380; c.scales.yVol.bottom = 500;
+      component.pointer('down', ev(381)); component.pointer('move', ev(331)); component.pointer('up', ev(331));
+      const dragged = c.options.scales.y.stackWeight;
+      st.setChartType('line');
+      await fixture.whenStable();
+      expect(chartOf().options.scales.y.stackWeight).toBeCloseTo(dragged, 9);
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>

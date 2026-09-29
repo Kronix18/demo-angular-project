@@ -8,7 +8,7 @@ candlesticks, volume and technical indicators in one zoomable panel — ported f
 ```bash
 npm ci
 npm start                 # ng serve → http://localhost:4200
-npm test                  # unit tests (Vitest via ng test), 471 specs
+npm test                  # unit tests (Vitest via ng test), 480 specs
 npm run test:coverage     # unit tests + 80% coverage gate on core/, charts/, app.ts
 npm run e2e               # Playwright suite (starts ng serve itself)
 npm run e2e:prod          # production build + smoke tests against the static bundle (:4300)

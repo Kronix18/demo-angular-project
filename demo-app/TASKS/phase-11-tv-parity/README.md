@@ -32,6 +32,7 @@ Requests (with reference screenshots of TradingView):
 | 11.16 | Compare symbols | DONE |
 | 11.17 | Saved layouts, indicator templates | DONE |
 | 11.18 | Drawn (SVG) icons everywhere instead of emoji / symbol characters | DONE |
+| 11.19 | Drag pane borders to resize price / volume / indicator panes | DONE |
 
 ## 11.1 results
 - Legend header is now `SYMBOL · 1D  O H L C  V  change` for the hovered bar (latest when idle); indicator rows sit under it (overlays) or in their own pane (oscillators). Each row: chip, live value, ⚙ settings, eye, ✕; double-click opens settings.
@@ -161,3 +162,9 @@ Every icon in the app is now a **drawing** (SVG line art on a 24×24 grid, like 
 - **The canvas uses the same path data**: the icon stamps on the chart (arrow, check, star, flag, heart, thumb, fire, rocket, warning, bulb, bell, dollar) and the bell of price alerts are painted with `Path2D` (`drawIcon`), so they no longer depend on the OS emoji font and follow the drawing colour.
 - The emoji picker became a **stamp picker** (28 drawn stamps in the Icons flyout); the `emoji` tool is now `stamp`.
 - Guards: `icons.spec` (every tool / cursor / toolbar button has an icon, paths are plain path data, no two tools share the same drawing, every stamp exists) and `icons-guard.spec` (no emoji, arrow, dingbat or geometric-shape character anywhere in the app sources) plus an e2e check that no chart button shows a symbol character.
+
+## Round 6 — next steps (11.19)
+- **Pane resizing** (the item deferred since 10.4): hover a separator between two panes (the cursor becomes ↕), drag to move weight between the neighbours; the panes keep a minimum size, the total is conserved, the sizes survive chart rebuilds and reloads (localStorage `pane-weights`). Only with the cursor tools, so it never fights a drawing tool. Pure maths in `charts/pane-resize.ts` (`resizeWeights`, `paneBoundaryAt`).
+- **Backend URL** is configurable (`<meta name="api-url">`), preparing the last task (9.1, still blocked on a backend that implements the auth endpoints; see its task file).
+- The status headers of the phase 0–4 task files said NOT STARTED although the index marks them done; they now point at the index.
+- Still not built: volume candles / footprint / TPO (they need intraday or per-bar-width data the demo files don't have) and the real backend (9.1).
