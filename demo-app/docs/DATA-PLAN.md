@@ -34,7 +34,7 @@ Consequences after the second batch:
 | # | Backend deliverable | Unlocks in the front end | Front-end tasks |
 |---|---|---|---|
 | B1 | `/api/meta`, `/api/chart/{symbol}/meta`, `/api/stocks/search`, `/api/stocks/{symbol}`, `/api/universe/facets` (DB only) | search, header, capability discovery, industry counts, screener universe selector | 12.8, 12.9, 15.13, 16.9, 19.1 |
-| B2 | OHLCV endpoint over `stock_history` (`adjust=none|split`) + `splits` / `dividends` endpoints + batch + quotes | prices from the backend, split-adjusted toggle, corp-action markers, watchlist quotes | 13.1–13.3, 13.6, 13.7, 13.9, 13.11 |
+| B2 | OHLCV endpoint over `stock_history` (split-adjusted only) + `splits` / `dividends` endpoints + batch + quotes | prices from the backend, split-adjusted label, corp-action markers, watchlist quotes | 13.1–13.3, 13.6, 13.7, 13.9, 13.11 |
 | B3 | `/technicals` over `technical_daily` (23 stored columns) | server SMA 10/50/200, EMA 21, ATR14, volume averages, 52w/ATH lines, screener technical filters | 14.1–14.7, 14.12 |
 | B4 | `/ratings` over `rs_rating_history`, `eps_rating_history`, `smr_rating_history`, `/ratings/dates` | badges, checkup ratings block, screener rating columns/filters (as-of limited to 19 dates for EPS/SMR) | 16.x |
 | B5 | `screener_snapshot` + `screener/fields`, `run` v2, `count`, presets (technical + rating + classification fields) | screener v2 | 15.x |
