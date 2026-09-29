@@ -223,7 +223,7 @@ test.describe('drawing tools (10.3)', () => {
 
     // flyout lists the whole group
     await page.click('[data-flyout="fib"]');
-    await expect(page.locator('[data-flyout-tool]')).toHaveCount(9);
+    await expect(page.locator('[data-flyout-tool]')).toHaveCount(18);
     await page.screenshot({ path: 'docs/screenshots/11.7-flyout.png' });
     await page.keyboard.press('Escape');
     await page.click('[data-flyout="fib"]'); // Esc leaves the tool, not the menu: toggle it shut
@@ -254,6 +254,75 @@ test.describe('drawing tools (10.3)', () => {
     await page.waitForTimeout(300);
     expect(await types()).toHaveLength(7);
     expect(await drawingPixels(page)).toBeGreaterThan(1500);
+    expect(errors).toEqual([]);
+  });
+
+  test('second wave (11.9-11.11): more tools, eraser, undo/redo, clone, context menu, settings, percent scale', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openChart(page);
+    const p = await pane(page);
+    const at = (fx: number, fy: number) => ({ x: p.x0 + p.w * fx, y: p.y0 + p.top + (p.bottom - p.top) * fy });
+    const click = async (fx: number, fy: number) => { const a = at(fx, fy); await page.mouse.click(a.x, a.y); };
+    const drag = async (f: [number, number], t: [number, number]) => {
+      const a = at(...f), b = at(...t);
+      await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 5 }); await page.mouse.up();
+    };
+    const types = async () => ((await stored(page)).msft ?? []).map((d: any) => d.type);
+
+    await pickTool(page, 'gannfan'); await drag([0.2, 0.7], [0.35, 0.5]);
+    await pickTool(page, 'avwap'); await click(0.3, 0.5);
+    await pickTool(page, 'volprofile'); await drag([0.55, 0.2], [0.75, 0.8]);
+    await pickTool(page, 'iconrocket'); await click(0.85, 0.2);
+    expect(await types()).toEqual(['gannfan', 'avwap', 'volprofile', 'iconrocket']);
+    await page.screenshot({ path: 'docs/screenshots/11.9-more-tools.png' });
+
+    // undo / redo (buttons + shortcuts) and clone
+    await page.click('[data-undo]');
+    expect(await types()).toHaveLength(3);
+    await page.keyboard.press('Control+y');
+    expect(await types()).toHaveLength(4);
+    await page.keyboard.press('Control+z');
+    expect(await types()).toHaveLength(3);
+    await pickTool(page, 'cursor');
+    await click(0.9, 0.9); // deselect
+    const a = at(0.3, 0.5);
+    await page.mouse.click(a.x, a.y + 0); // the VWAP starts here: selects something
+    await page.keyboard.press('Control+d');
+
+    // eraser removes the drawing under the pointer
+    const before = (await types()).length;
+    await pickTool(page, 'eraser');
+    const l = at(0.28, 0.6);
+    for (let i = 0; i < 3; i++) await page.mouse.click(l.x + i * 30, l.y - i * 12);
+    expect((await types()).length).toBeLessThanOrEqual(before);
+    await pickTool(page, 'cursor');
+
+    // alt shortcuts
+    await page.keyboard.press('Alt+h');
+    await expect(page.locator('[data-group="lines"]')).toHaveAttribute('data-tool', 'hline');
+
+    // context menu: add a horizontal line at the price
+    const n0 = (await types()).length;
+    const c = at(0.6, 0.85);
+    await page.mouse.click(c.x, c.y, { button: 'right' });
+    await page.click('[data-ctx="hline"]');
+    expect((await types()).length).toBe(n0 + 1);
+
+    // percent scale + last price label on the axis
+    await page.click('[data-percent]');
+    await expect(page.locator('[data-percent]')).toHaveAttribute('aria-pressed', 'true');
+    const label = await page.evaluate(() => (window as any).__charts.chart.options.scales.y.ticks.callback(100));
+    expect(label).toMatch(/%$/);
+    await page.click('[data-percent]');
+
+    // settings: last price line off removes its label pixels
+    await page.click('[data-chart-settings]');
+    await page.locator('[data-view="lastPrice"]').uncheck();
+    await page.locator('[data-view="gridV"]').uncheck();
+    await page.click('[data-ok]');
+    expect(await page.evaluate(() => (window as any).__charts.chart.$lastPriceOn)).toBe(false);
+    expect(await page.evaluate(() => (window as any).__charts.chart.options.scales.x.grid.display)).toBe(false);
+    await page.screenshot({ path: 'docs/screenshots/11.11-settings.png' });
     expect(errors).toEqual([]);
   });
 });

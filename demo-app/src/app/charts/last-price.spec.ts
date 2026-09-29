@@ -23,8 +23,10 @@ describe('last price line (11.11)', () => {
   it('percent scale shows % from the base; no bars, no line', () => {
     const c: any = chart([100, 110]);
     c.$percentBase = () => 100;
-    c.options = { scales: { y: { ticks: { callback: () => '' } } } };
+    c.$percentOn = true;
     expect(lastPriceInfo(c)!.text).toBe('+10.00%');
+    c.$percentOn = false;
+    expect(lastPriceInfo(c)!.text).toBe('110.00'); // the base alone does not switch the label
     expect(lastPriceInfo(chart([]) as any)).toBeNull();
     expect(lastPriceInfo({ chartArea: null } as any)).toBeNull();
   });

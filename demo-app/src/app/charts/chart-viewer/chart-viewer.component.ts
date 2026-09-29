@@ -21,11 +21,15 @@ import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
+import { ChartStatusComponent } from '../chart-status/chart-status.component';
+import { ChartSettingsDialogComponent } from '../dialogs/chart-settings-dialog.component';
+import '../last-price';
 import { SymbolSettingsDialogComponent } from '../dialogs/symbol-settings-dialog.component';
 import { PriceSettings, VolumeSettings } from '../../core/models/symbol-settings';
 import { DrawingSidebarComponent } from '../drawings/drawing-sidebar.component';
 import { DrawingStore } from '../drawings/drawing-store.service';
 import { isSelectTool as isSelectToolFn } from '../drawings/drawing-tools';
+import { timeForIndex } from '../drawings/drawing-geometry';
 import { Range, fitRangeLog, panRange, scaleRange } from '../y-scale-math';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
@@ -67,7 +71,7 @@ const crosshairPlugin = {
       if (typeof v === 'number') y = chart.scales.y.getPixelForValue(v);
     }
 
-    if (chart.$cursorStyle === 'pointer') return; // plain arrow: no crosshair at all
+    if (chart.$cursorStyle === 'pointer' || chart.$crosshairOn === false) return; // plain arrow / crosshair switched off
     const dot = chart.$cursorStyle === 'dot';
     ctx.save();
     ctx.beginPath();
@@ -93,7 +97,7 @@ const crosshairPlugin = {
       const scale = id ? chart.scales[id] : null;
       if (scale) {
         const v = scale.getValueForPixel(y);
-        const base = id === 'y' && typeof chart.$percentBase === 'function' && chart.options?.scales?.y?.ticks?.callback ? chart.$percentBase() : null;
+        const base = id === 'y' && chart.$percentOn && typeof chart.$percentBase === 'function' ? chart.$percentBase() : null;
         const text = id === 'yVol' ? compactVolume(v) : base ? `${((v / base - 1) * 100).toFixed(2)}%` : v.toFixed(2);
         ctx.save();
         ctx.font = '11px sans-serif';
@@ -248,7 +252,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, DrawingSidebarComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, ChartStatusComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -266,6 +270,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           </select>
           <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
           <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
+          <button type="button" class="tool-btn" data-chart-settings title="Chart settings" aria-label="Chart settings" (click)="settingsOpen.set(true)">⚙</button>
           <button type="button" class="tool-btn" data-undo title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!drawingStore.canUndo(currentSymbol)" (click)="undo()">↶</button>
           <button type="button" class="tool-btn" data-redo title="Redo (Ctrl+Y)" aria-label="Redo" [disabled]="!drawingStore.canRedo(currentSymbol)" (click)="redo()">↷</button>
           <button type="button" class="reset-zoom-btn" (click)="resetZoom()">Reset zoom</button>
@@ -277,6 +282,9 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       @if (searchOpen()) {
         <app-symbol-search-dialog [initial]="searchInitial()" [current]="currentSymbol" (pick)="pickFromSearch($event)" (closed)="searchOpen.set(false)" />
+      }
+      @if (settingsOpen()) {
+        <app-chart-settings-dialog [view]="chartState.snapshot().view" (save)="chartState.setViewSettings($event)" (closed)="settingsOpen.set(false)" />
       }
       @if (seriesDialog(); as k) {
         <app-symbol-settings-dialog [kind]="k" [settings]="k === 'price' ? chartState.snapshot().price : chartState.snapshot().volume" [lineLike]="lineLike()"
@@ -295,7 +303,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       <div class="chart-col">
       <div class="chart-panel" data-pane="panel">
         <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="!isSelectTool(tool())" (dblclick)="onDblClick($event)"
-          (mousedown)="pointer('down', $event)" (mousemove)="pointer('move', $event)" (mouseup)="pointer('up', $event)"></canvas>
+          (contextmenu)="onContextMenu($event)" (mousedown)="pointer('down', $event)" (mousemove)="pointer('move', $event)" (mouseup)="pointer('up', $event)"></canvas>
         @if (selectedDrawing(); as sd) {
           <div class="draw-style" data-draw-style role="group" aria-label="Drawing style">
             <input type="color" data-draw-color aria-label="Colour" [value]="styleColor(sd)" (input)="setDrawStyle(sd.id, { color: $any($event.target).value })" />
@@ -309,6 +317,14 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             <button type="button" data-draw-delete aria-label="Delete drawing" title="Delete drawing" [disabled]="drawingStore.locked()" (click)="deleteSelected()">🗑</button>
           </div>
         }
+        @if (ctxMenu(); as m) {
+          <div class="ctx-menu" data-ctx-menu role="menu" [style.left.px]="m.x" [style.top.px]="m.y">
+            <button type="button" role="menuitem" data-ctx="reset" (click)="ctxDo('reset')">Reset chart view</button>
+            <button type="button" role="menuitem" data-ctx="hline" (click)="ctxDo('hline')">Add horizontal line at {{ m.price.toFixed(2) }}</button>
+            <button type="button" role="menuitem" data-ctx="clear" (click)="ctxDo('clear')">Remove drawings</button>
+            <button type="button" role="menuitem" data-ctx="settings" (click)="ctxDo('settings')">Settings…</button>
+          </div>
+        }
         @if (editingText(); as et) {
           <input class="text-edit" data-text-edit aria-label="Label text" [style.left.px]="et.x" [style.top.px]="et.y" [value]="et.value"
             (input)="et.value = $any($event.target).value" (keydown)="textKey($event, et)" (blur)="commitText(et)" />
@@ -316,28 +332,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         @if (!error) {
           <app-chart-legend [groups]="legendGroups()" (toggle)="toggleIndicator($event)" (remove)="removeIndicator($event)" (settings)="openSettings($event)" (symbolClick)="openSearch('')" (seriesToggle)="toggleSeries($event)" (seriesSettings)="seriesDialog.set($event)" />
         }
-        @if (loading) {
-          <div class="loading-overlay skeleton" role="status" aria-live="polite">
-            <span class="skeleton-label">Loading chart...</span>
-          </div>
-        }
-        @if (error && !loading) {
-          <div class="error-message">
-            <div class="error-card" role="alert">
-              <h2>{{ errorTitle }}</h2>
-              <p>{{ error }}</p>
-              @if (errorKind === 'unknown-symbol') {
-                <p class="hint">Available symbols:</p>
-                <div class="symbol-list">
-                  @for (s of availableSymbols; track s) {
-                    <button type="button" class="symbol-btn" [attr.data-symbol]="s" (click)="pickSymbol(s)">{{ s }}</button>
-                  }
-                </div>
-              }
-              <button type="button" class="retry-btn" data-retry (click)="retry()">Retry</button>
-            </div>
-          </div>
-        }
+        <app-chart-status [loading]="loading" [error]="error" [title]="errorTitle" [kind]="errorKind" [symbols]="availableSymbols" (pick)="pickSymbol($event)" (retry)="retry()" />
       </div>
       <div class="scale-bar" role="group" aria-label="Price scale">
       <button type="button" data-zoom-out title="Zoom out" aria-label="Zoom out" (click)="zoomBy(1 / 1.25)">−</button>
@@ -391,61 +386,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         inset: 0;
         display: block;
       }
-      .loading-overlay {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--c-surface);
-        z-index: 5;
-      }
       canvas[hidden] { display: none; }
-      /* CSS-only shimmer skeleton: pane-shaped placeholder while loading */
-      .skeleton {
-        background: linear-gradient(
-          100deg,
-          var(--c-surface) 30%,
-          var(--c-grid) 50%,
-          var(--c-surface) 70%
-        );
-        background-size: 200% 100%;
-        animation: shimmer 1.4s linear infinite;
-      }
-      .skeleton-label { color: var(--c-text-muted); font-size: 0.875rem; }
-      @keyframes shimmer { to { background-position: -200% 0; } }
-      .error-message {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 6;
-      }
-      .error-card {
-        max-width: 32rem;
-        padding: 1.25rem 1.5rem;
-        text-align: center;
-        border: 1px solid var(--c-pane-border);
-        border-radius: var(--border-radius);
-        background: var(--c-surface);
-        color: var(--c-text);
-      }
-      .error-card h2 { margin: 0 0 0.5rem; font-size: 1.125rem; color: var(--auth-error-color); }
-      .error-card p { margin: 0.25rem 0; }
-      .hint { color: var(--c-text-muted); font-size: 0.8125rem; }
-      .symbol-list { display: flex; flex-wrap: wrap; gap: 0.375rem; justify-content: center; margin: 0.5rem 0 0.75rem; }
-      .symbol-btn, .retry-btn {
-        padding: 0.25rem 0.75rem;
-        border: 1px solid var(--c-border);
-        border-radius: var(--border-radius-sm);
-        background: var(--c-surface);
-        color: var(--c-text);
-        cursor: pointer;
-        font-size: 0.8125rem;
-      }
-      .retry-btn { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
-      .symbol-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
       .scale-bar { display: flex; flex: none; justify-content: flex-end; gap: 2px; padding: 1px 8px; background: var(--c-surface); border-top: 1px solid var(--c-pane-border); }
       .scale-bar button {
         padding: 1px 6px; border: none; border-radius: var(--border-radius-sm); background: transparent;
@@ -453,6 +394,9 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       .scale-bar button:hover { color: var(--c-text); }
       .scale-bar button[aria-pressed='true'] { color: var(--c-primary); font-weight: 600; }
+      .ctx-menu { position: absolute; z-index: 8; display: flex; flex-direction: column; min-width: 12rem; padding: 4px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius); box-shadow: var(--shadow-elevation-low); }
+      .ctx-menu button { padding: 4px 10px; border: none; background: transparent; color: var(--c-text); text-align: left; cursor: pointer; font-size: 0.8125rem; border-radius: var(--border-radius-sm); }
+      .ctx-menu button:hover { background: var(--c-primary-tint); color: var(--c-primary); }
       .draw-style {
         position: absolute; left: 50%; top: 4px; transform: translateX(-50%); z-index: 5; display: flex; gap: 4px; align-items: center;
         padding: 3px 6px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius);
@@ -644,6 +588,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   pointer(kind: 'down' | 'move' | 'up', e: MouseEvent): void {
     if (isSelectToolFn(this.tool()) && kind === 'move' && !e.buttons) return; // hover: nothing to do
+    if (e.button !== 0 && kind !== 'move') return; // right / middle button: never draws (the context menu handles right-click)
+    if (kind === 'down') this.ctxMenu.set(null);
     if (kind === 'down' && isSelectToolFn(this.tool()) && e.button === 0) this.yDrag = this.classifyYDrag(e.offsetX, e.offsetY);
     if (this.yDragEvent(kind, e.offsetY)) return; // price-axis scaling
     if (kind === 'down') this.drawings.pointerDown(e.offsetX, e.offsetY);
@@ -664,6 +610,14 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       if (k === 'y') { e.preventDefault(); this.redo(); return; }
       if (k === 'd') { e.preventDefault(); this.cloneSelected(); return; }
     }
+    if (!ctrl && !e.altKey && !this.searchOpen() && !this.indicatorsOpen() && this.settingsIndex() === null && !this.seriesDialog() && !this.settingsOpen()) {
+      const c = this.chart as any;
+      const nav: Record<string, () => void> = {
+        ArrowLeft: () => c?.pan({ x: 40 }, undefined, 'none'), ArrowRight: () => c?.pan({ x: -40 }, undefined, 'none'),
+        '+': () => this.zoomBy(1.25), '=': () => this.zoomBy(1.25), '-': () => this.zoomBy(1 / 1.25), End: () => this.scrollToLatest(),
+      };
+      if (nav[e.key] && !this.drawings.view().draft) { e.preventDefault(); nav[e.key](); return; }
+    }
     if (e.altKey && !ctrl && ALT_TOOLS[e.code]) { e.preventDefault(); this.setTool(ALT_TOOLS[e.code]); return; }
     // keystrokes typed while the search dialog is still opening must not be lost
     if (this.searchOpen() && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
@@ -678,7 +632,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       this.openSearch(e.key);
       return;
     }
-    if (e.key === 'Escape') { this.tool.set(this.cursorMode); this.drawings.syncPan(); this.applyCursorStyle(); this.editingText.set(null); }
+    if (e.key === 'Escape') { this.ctxMenu.set(null); this.tool.set(this.cursorMode); this.drawings.syncPan(); this.applyCursorStyle(); this.editingText.set(null); }
     this.drawings.key(e.key);
   }
 
@@ -817,6 +771,39 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     if (this.hoverIndex() !== i) this.hoverIndex.set(i);
   }
   readonly seriesDialog = signal<'price' | 'volume' | null>(null);
+  readonly settingsOpen = signal(false);
+  readonly ctxMenu = signal<{ x: number; y: number; price: number; t: number } | null>(null);
+
+  onContextMenu(e: MouseEvent): void {
+    e.preventDefault();
+    const canvas = this.chartCanvas?.nativeElement;
+    const c = this.chart as any;
+    if (!canvas || !c?.scales?.y) return;
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const price = c.scales.y.getValueForPixel(y);
+    const idx = c.scales.x.getValueForPixel(x);
+    this.ctxMenu.set({ x, y, price: Number.isFinite(price) ? price : 0, t: this.bars.length ? timeForIndex(this.bars, idx) : 0 });
+  }
+
+  ctxDo(what: 'reset' | 'hline' | 'clear' | 'settings'): void {
+    const m = this.ctxMenu();
+    this.ctxMenu.set(null);
+    if (what === 'reset') { this.resetZoom(); this.setAuto(); }
+    else if (what === 'hline' && m) { this.drawingStore.add(this.currentSymbol, { id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, type: 'hline', a: { t: m.t, p: m.price } }); this.redraw(); }
+    else if (what === 'clear') this.clearDrawings();
+    else this.settingsOpen.set(true);
+  }
+
+  /** End key: scroll so the latest bar is at the right edge (the visible span stays). */
+  scrollToLatest(): void {
+    const c = this.chart as any;
+    const x = c?.scales?.x;
+    if (!x || !this.bars.length) return;
+    const span = x.max - x.min;
+    const end = this.bars.length - 1 + 1;
+    try { c.zoomScale('x', { min: end - span, max: end }, 'none'); } catch { /* limits */ }
+  }
   lineLike(): boolean { return ['line', 'markers', 'step', 'area'].includes(this.chartTypeValue); }
   toggleSeries(k: 'price' | 'volume'): void { if (k === 'price') this.chartState.togglePriceHidden(); else this.chartState.toggleVolumeHidden(); }
   saveSeriesSettings(k: 'price' | 'volume', s: PriceSettings | VolumeSettings): void {
@@ -869,7 +856,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     const groups: LegendGroup[] = [
       {
         key: 'price', top: tops['y'] ?? 0,
-        header: { symbol: this.currentSymbol.toUpperCase(), interval: this.currentInterval.toUpperCase(), ohlc, hidden: src.priceHidden },
+        header: { symbol: this.currentSymbol.toUpperCase(), interval: this.currentInterval.toUpperCase(), ohlc: this.chartState.snapshot().view.ohlc ? ohlc : null, hidden: src.priceHidden },
         rows: [
           ...src.series.filter((s) => !s.pane).map(row),
           { key: 'volume', label: 'Volume', value: compactVolume(bar.volume), color: src.volumeColor, hidden: src.volumeHidden, builtin: 'volume' as const },
@@ -1144,6 +1131,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       backgroundColor: (ctx: any) => (ctx.raw?.up ? volUp : volDown),
     }, (pts) => pts.map((p) => ({ x: p.x, y: this.logOn && !(p.v > 0) ? null : p.v, up: vs.byPrevClose ? p.upPc : p.up, t: p.t })));
 
+    const view = this.chartState.snapshot().view;
+    const gridV = { color: cssVar('--c-grid'), display: view.gridV };
+    const grid = { color: cssVar('--c-grid'), display: view.gridH };
     const paneScales: Record<string, any> = {};
     panes.forEach(({ index, resolved, outputs }, i) => {
       const id = `yInd${i}`;
@@ -1164,7 +1154,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       paneScales[id] = {
         type: 'linear', position: 'right', stack: 'panel', stackWeight: PANE_WEIGHT,
         afterFit: (s: any) => { s.width = Y_WIDTH; },
-        grid: { color: cssVar('--c-grid') },
+        grid,
         ticks: { includeBounds: false },
         paneLabel: resolved.label,
         ...(def.defaultYRange
@@ -1182,10 +1172,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     });
 
     // ---- scales: one x, stacked y's ------------------------------------------
-    const grid = { color: cssVar('--c-grid') };
     const scales: Record<string, any> = {
       x: {
-        type: 'linear', position: 'bottom', min: viewMin, max: viewMax, grid,
+        type: 'linear', position: 'bottom', min: viewMin, max: viewMax, grid: gridV,
         ticks: {
           maxRotation: 0, autoSkip: true, maxTicksLimit: 8,
           // First arg is the VALUE = the bar index on this linear scale
@@ -1268,6 +1257,10 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
     (this.chart as any).$magnet = this.chartState.snapshot().magnet;
     (this.chart as any).$percentBase = () => this.percentBase();
+    (this.chart as any).$percentOn = this.percentOn;
+    (this.chart as any).$lastBars = () => this.bars;
+    (this.chart as any).$crosshairOn = view.crosshair;
+    (this.chart as any).$lastPriceOn = view.lastPrice;
     this.applyCursorStyle();
     (this.chart as any).$drawings = this.drawings;
     this.drawings.syncPan();

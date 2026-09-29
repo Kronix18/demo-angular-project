@@ -21,6 +21,10 @@ Requests (with reference screenshots of TradingView):
 | 11.6 | Symbol + volume settings from the legend | DONE |
 | 11.7 | Full TradingView drawing tool set (7 groups, 50+ tools) | DONE |
 | — | Bug: indicator lines clipped short while panning | FIXED |
+| 11.8 | Full-height sidebar column, bottom scale bar (zoom, invert, %, log, auto), cursor group + eraser | DONE |
+| 11.9 | Second wave of drawing tools (90+ total) | DONE |
+| 11.10 | Undo / redo, clone, Alt shortcuts, remove menu | DONE |
+| 11.11 | Last price line, chart settings, context menu, keyboard navigation | DONE |
 
 ## 11.1 results
 - Legend header is now `SYMBOL · 1D  O H L C  V  change` for the hovered bar (latest when idle); indicator rows sit under it (overlays) or in their own pane (oscillators). Each row: chip, live value, ⚙ settings, eye, ✕; double-click opens settings.
@@ -83,3 +87,34 @@ Requests (with reference screenshots of TradingView):
 
 ### Also fixed
 - Characters typed while the symbol-search dialog was still opening were lost (the first key opens it, the next ones raced its render). They are now appended / forwarded to the box.
+
+## Round 3 — layout, official-list gap analysis (11.8–11.11)
+
+**Note on "missing" items**: measure (the ruler), log and auto already existed but were easy to miss (a tiny ⇔ icon; two text buttons over the x axis labels, and a stale dev-server build shows none of it). They now have obvious homes: 📏 *Measure (ruler)*, and a proper bottom scale bar.
+
+### Deep search: TradingView features vs. this chart
+| Area | TradingView | Here |
+|---|---|---|
+| Left toolbar | fixed full-height column | ✅ column beside the chart, scrolls on short windows, flyouts open beside it |
+| Cursors | cross / dot / arrow / demo / eraser | ✅ cross, dot, arrow, eraser (demonstration mode not built) |
+| Trend lines | trend, ray, info, extended, angle, h-line, h-ray, v-line, cross, channel, regression, flat top/bottom, disjoint | ✅ all, plus cyclic lines, sine, time cycles |
+| Fib & Gann | retracement, extension, channel, time zones, fan, circles, arcs, spiral, wedge, trend-based time, Gann box / fan / square, pitchfork family, pitchfan | ✅ all listed (pitchfork, Schiff, modified Schiff, inside) |
+| Patterns | XABCD, cypher, ABCD, triangle, three drives, head & shoulders, Elliott waves | ✅ all (Elliott impulse, correction, triangle, double and triple combo) |
+| Forecasting / measuring | long / short position, forecast, bars pattern, ghost feed, projection, anchored VWAP, volume profiles, date / price range, measure | ✅ except ghost feed and anchored (as opposed to fixed-range) volume profile |
+| Shapes | brush, highlighter, rectangle, rotated rectangle, path, circle, ellipse, polyline, triangle, arc, curve, double curve | ✅ all |
+| Text & notes | text, anchored text, note, price note, pin, table, callout, comment, price label, signpost, flag | ✅ all but anchored text and table |
+| Icons / emoji | sticker picker | ✅ 14 icons / emoji (no full picker) |
+| Drawing management | undo / redo, clone, lock / hide all, remove drawings / indicators, style toolbar, keyboard shortcuts | ✅ (per-drawing lock/hide, object tree, templates, z-order: not built) |
+| Scale controls | %, log, auto, invert, zoom in / out, reset | ✅ (lock-scale to the right of the price, scale-to-time not built) |
+| Chart | last price line + label, grid / crosshair / status line settings, context menu, arrow-key / +/- / End navigation, snapshot, fullscreen | ✅ |
+| Not built (backlog) | compare / overlay symbols, symbol countdown, replay, alerts, layouts / save, indicator templates, watchlist, data window / object tree, timezone + session, go-to-date | — |
+
+### What changed
+- **Layout**: the sidebar is a real column (`.chart-body` = sidebar + chart column) from under the chart navbar to the bottom; the scale controls moved out of the plot into a strip under the chart, so they no longer cover the time axis. Verified by e2e at 1400×800 and on a 420 px tall window (no page scrollbar).
+- **Scale bar**: − / + zoom about the centre, invert (⇅), percentage (%: axis, crosshair label and last-price label read % change from the first visible bar; drawings stay in price), log, auto.
+- **Cursors**: the sidebar's first group. Cross / dot / arrow change the crosshair (`$cursorStyle`); the eraser deletes the drawing under the pointer and stays active. After drawing, the tool falls back to the cursor mode you picked.
+- **Tools 11.9**: 34 more, each a registry line + a builder in the shared shape pipeline (bars pattern, volume profile and anchored VWAP use the loaded bars).
+- **11.10**: per-symbol undo/redo (100 steps; a drag is one step) with header buttons and Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z; Ctrl+D and a toolbar button clone; Alt+T / H / V / C / F pick tools; the trash has a menu (drawings / indicators / both). Right / middle mouse buttons never draw.
+- **11.11**: dashed last-price line with a coloured axis label (clamped to the pane edge when off scale); chart settings (status line OHLC, last price line, vertical / horizontal grid, crosshair) persisted in the chart state; right-click menu (reset view, horizontal line at the price, remove drawings, settings); ← → pan, + − zoom, End jumps to the latest bar.
+- **Bug found by the screenshot**: the last-price label briefly showed percentages on the linear scale (Chart.js fills in a default tick callback, so "has a callback" is not "percent mode"); it now uses an explicit flag.
+- The viewer's loading skeleton and error card moved into `ChartStatusComponent` to keep its stylesheet inside the 4 kB budget (unchanged).

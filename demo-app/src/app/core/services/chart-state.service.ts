@@ -5,6 +5,7 @@ import { distinctUntilChanged, map } from 'rxjs/operators';
 
 /** Chart state shape (4.1). Indicators: {type, period, hidden?} entries (hidden = eye toggle, 10.2). */
 import { CHART_TYPES, ChartType } from '../models/chart-type';
+import { ViewSettings, defaultView, sanitizeView } from '../models/view-settings';
 import { PriceSettings, VolumeSettings, sanitizePrice, sanitizeVolume } from '../models/symbol-settings';
 export { CHART_TYPES };
 export type { ChartType };
@@ -23,6 +24,8 @@ export interface ChartState {
   /** price axis as % change from the first visible bar, and flipped (11.8) */
   percentScale: boolean;
   invertScale: boolean;
+  /** grid / crosshair / last price / status line options (11.11) */
+  view: ViewSettings;
   /** symbol + volume settings from the legend (11.6) */
   price: PriceSettings;
   volume: VolumeSettings;
@@ -70,6 +73,7 @@ const DEFAULTS: ChartState = {
   invertScale: false,
   price: {},
   volume: {},
+  view: defaultView(),
 };
 
 /**
@@ -149,6 +153,8 @@ export class ChartStateService {
     this.update({ logScale: !this.subject.value.logScale });
   }
 
+  setViewSettings(view: ViewSettings): void { this.update({ view: sanitizeView(view) }); }
+
   togglePercentScale(): void { this.update({ percentScale: !this.subject.value.percentScale }); }
   toggleInvertScale(): void { this.update({ invertScale: !this.subject.value.invertScale }); }
 
@@ -178,7 +184,7 @@ export class ChartStateService {
   /** Restore defaults and clear the persisted state. */
   reset(): void {
     sessionStorage.removeItem(STORAGE_KEY);
-    this.subject.next({ ...DEFAULTS, indicators: [], price: {}, volume: {} });
+    this.subject.next({ ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView() });
   }
 
   private update(partial: Partial<ChartState>): void {
@@ -199,7 +205,7 @@ export class ChartStateService {
   private readPersisted(): ChartState {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...DEFAULTS, indicators: [], price: {}, volume: {} };
+      if (!raw) return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView() };
       const parsed = JSON.parse(raw);
       return {
         symbol: typeof parsed.symbol === 'string' ? parsed.symbol : DEFAULTS.symbol,
@@ -210,6 +216,7 @@ export class ChartStateService {
         logScale: parsed.logScale === true,
         percentScale: parsed.percentScale === true,
         invertScale: parsed.invertScale === true,
+        view: sanitizeView(parsed.view),
         price: sanitizePrice(parsed.price),
         volume: sanitizeVolume(parsed.volume),
         indicators: Array.isArray(parsed.indicators)
@@ -217,7 +224,7 @@ export class ChartStateService {
           : [],
       };
     } catch {
-      return { ...DEFAULTS, indicators: [], price: {}, volume: {} };
+      return { ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView() };
     }
   }
 }
