@@ -104,7 +104,7 @@ No backend dataset needed: everything is built and verified against contract fix
 | 12.6 | phase-12-api-foundation/12.6-retryinterceptor.md | DONE | retryInterceptor — needs: none |
 | 12.7 | phase-12-api-foundation/12.7-entitlementinterceptor-and-upgrade-event.md | DONE | entitlementInterceptor and upgrade event — needs: none (mock 402) |
 | 12.8 | phase-12-api-foundation/12.8-metaservice-api-meta-with-dataset-signals.md | DONE | MetaService (`/api/meta`) with dataset signals — needs: `meta` |
-| 12.9 | phase-12-api-foundation/12.9-symbolcapabilities-api-chart-symbol-meta.md | NOT STARTED | SymbolCapabilities (`/api/chart/{symbol}/meta`) — needs: `prices` |
+| 12.9 | phase-12-api-foundation/12.9-symbolcapabilities-api-chart-symbol-meta.md | DONE | SymbolCapabilities (`/api/chart/{symbol}/meta`) — needs: `prices` |
 | 12.10 | phase-12-api-foundation/12.10-appifdataset-appiffeature-structural-directives.md | NOT STARTED | `*appIfDataset` / `*appIfFeature` structural directives — needs: none |
 | 12.12 | phase-12-api-foundation/12.12-freshness-indicator.md | NOT STARTED | Freshness indicator — needs: `meta` |
 | 12.11 | phase-12-api-foundation/12.11-data-info-popover-as-of-model-versions.md | NOT STARTED | "Data info" popover (as_of, model versions) — needs: `meta` |
