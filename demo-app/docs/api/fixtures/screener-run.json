@@ -1,0 +1,34 @@
+{
+  "data": [
+    {
+      "security_id": 4821,
+      "symbol": "MSFT",
+      "company_name": "Microsoft Corporation",
+      "price": 427.31,
+      "change_pct": 0.75,
+      "rs_rating": 94,
+      "eps_rating": 97
+    },
+    {
+      "security_id": 1207,
+      "symbol": "AAPL",
+      "company_name": "Apple Inc.",
+      "price": 232.1,
+      "change_pct": -0.4,
+      "rs_rating": 81,
+      "eps_rating": 88
+    }
+  ],
+  "meta": {
+    "as_of": "2026-09-22",
+    "total": 143,
+    "limit": 50,
+    "next_cursor": null,
+    "universe": "gate",
+    "took_ms": 38,
+    "limits": {
+      "max_results": 500,
+      "truncated": false
+    }
+  }
+}

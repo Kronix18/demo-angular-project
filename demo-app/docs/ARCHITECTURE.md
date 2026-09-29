@@ -97,3 +97,9 @@ real Python calculators (`scripts/gen_indicator_fixtures.py`), matched within 1e
 - Feature pages (screener/stock/profile/auth) still carry hardcoded colours (ratchet in `src/styles.spec.ts`) and depend on a backend that
   isn't in this repo; auth is client-side demo auth (task 9.1). `ApiService` hardcodes a LAN backend URL.
 - Indicator editing beyond add/remove (recolour, reorder, per-interval visibility, parameters for Webby/Bob Marley) is v2.
+
+## Contract fixtures and mock backend (task 12.2)
+`docs/api/fixtures/*.json` are example responses of the v2 API contract (`docs/api/`). `e2e/mock-api.ts` exposes
+`mockApi(page, { datasets, tier, errors, overrides, onRequest })`, which fulfils `/api/**` from them in Playwright so
+front-end tasks are verified without a backend (toggle datasets, tier, inject 402/429/503). Unit checks of the fixtures'
+conventions live in `src/app/core/api/fixtures.spec.ts`. The same fixtures become the backend's contract tests (task 23.2).

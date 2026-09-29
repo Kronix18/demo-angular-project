@@ -1,0 +1,39 @@
+{
+  "tier": "pro",
+  "status": "active",
+  "renews_at": "2026-10-20",
+  "limits": {
+    "history_years_daily": 10,
+    "screener_max_results": 500,
+    "watchlists": 10,
+    "stocks_per_watchlist": 100,
+    "alerts": 50,
+    "saved_screens": 20,
+    "saved_layouts": 20,
+    "batch_symbols": 25,
+    "api_calls_per_day": 0,
+    "export_rows": 500
+  },
+  "features": {
+    "technicals_server": true,
+    "ratings": true,
+    "rs_line": true,
+    "canslim": true,
+    "patterns": true,
+    "trade_levels": true,
+    "sell_signals": true,
+    "fundamentals": true,
+    "institutional_summary": true,
+    "institutional_holders": false,
+    "events": true,
+    "market_state": true,
+    "industries": true,
+    "screener_as_of": false,
+    "backtest": false,
+    "export": true,
+    "api_access": false
+  },
+  "usage": {
+    "api_calls_today": 0
+  }
+}

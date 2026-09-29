@@ -1,0 +1,72 @@
+{
+  "data": [
+    {
+      "tier": "free",
+      "name": "Free",
+      "description": "Free plan",
+      "price_monthly": 0,
+      "price_yearly": 0,
+      "currency": "USD",
+      "popular": false,
+      "coming_soon": [
+        "api_access"
+      ],
+      "features": {},
+      "limits": {}
+    },
+    {
+      "tier": "plus",
+      "name": "Plus",
+      "description": "Plus plan",
+      "price_monthly": 9.99,
+      "price_yearly": 99.9,
+      "currency": "USD",
+      "popular": false,
+      "coming_soon": [
+        "api_access"
+      ],
+      "features": {},
+      "limits": {}
+    },
+    {
+      "tier": "pro",
+      "name": "Pro",
+      "description": "Pro plan",
+      "price_monthly": 29.99,
+      "price_yearly": 299.9,
+      "currency": "USD",
+      "popular": true,
+      "coming_soon": [
+        "api_access"
+      ],
+      "features": {},
+      "limits": {}
+    },
+    {
+      "tier": "ultimate",
+      "name": "Ultimate",
+      "description": "Ultimate plan",
+      "price_monthly": 99.99,
+      "price_yearly": 999.9,
+      "currency": "USD",
+      "popular": false,
+      "coming_soon": [
+        "api_access"
+      ],
+      "features": {},
+      "limits": {}
+    }
+  ],
+  "demo_symbols": [
+    "MSFT",
+    "AAPL",
+    "NVDA",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "TSLA",
+    "AMD",
+    "SPY",
+    "QQQ"
+  ]
+}
