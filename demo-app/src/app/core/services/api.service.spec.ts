@@ -80,20 +80,12 @@ describe('ApiService (coverage gate 7.1)', () => {
     http.match(() => true); // discard the cancelled request
   });
 
-  it('GET retries with backoff, then surfaces the error', () => {
-    vi.useFakeTimers();
+  it('GET does not retry by itself any more: retrying lives in retryInterceptor (task 12.6)', () => {
     let err: any;
     api.get('flaky').subscribe({ error: (e) => (err = e) });
-    // 1 initial attempt + 3 retries (backoff 1s, 2s, 4s), then the error surfaces
-    for (let attempt = 0; attempt < 3; attempt++) {
-      http.expectOne(`${BASE}/flaky`).flush('x', { status: 503, statusText: 'Unavailable' });
-      expect(err, `still retrying after attempt ${attempt + 1}`).toBeUndefined();
-      vi.advanceTimersByTime(Math.pow(2, attempt) * 1000 + 1);
-    }
     http.expectOne(`${BASE}/flaky`).flush('x', { status: 503, statusText: 'Unavailable' });
-    expect(err, 'error must surface after the last retry (was: silent completion)').toBeDefined();
     expect(err.status).toBe(503);
-    http.match(() => true);
+    http.verify();
   });
 
   it('handleError tolerates non-Http errors', () => {
