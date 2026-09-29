@@ -11,7 +11,6 @@ const LITERAL = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|(?<![\w-])(?:white|blac
 
 /** File -> max allowed literals. Lower these as pages are migrated; never raise. */
 const LEGACY_CEILING: Record<string, number> = {
-  'app/features/auth/login/login.component.scss': 34,
   'app/features/auth/login/login.component.ts': 1,
   'app/features/auth/register/register.component.scss': 23,
   'app/features/auth/registration-success/registration-success.component.scss': 22,
