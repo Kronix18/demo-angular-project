@@ -1260,6 +1260,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       const iso = new Date(bars[1].timestamp).toISOString().slice(0, 10);
       const input = q('[data-goto-input]') as HTMLInputElement;
       input.value = iso; input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
       (q('[data-ok]') as HTMLButtonElement).click();
       fixture.detectChanges();
       expect(q('app-goto-date-dialog')).toBeNull();

@@ -1,7 +1,7 @@
 import { Chart } from 'chart.js';
 import { cssVar } from './chart-theme';
 
-export interface LastPriceInfo { y: number; text: string; up: boolean; clamped: boolean; }
+export interface LastPriceInfo { y: number; text: string; up: boolean; clamped: boolean; countdown?: string; }
 
 /**
  * Geometry of the last-price line: at the last close (clamped to the price pane when
@@ -20,7 +20,8 @@ export function lastPriceInfo(chart: any): LastPriceInfo | null {
   const y = Math.min(hi, Math.max(lo, raw));
   const base = chart.$percentOn && typeof chart.$percentBase === 'function' ? chart.$percentBase() : null;
   const pct = base ? (last / base - 1) * 100 : 0;
-  return { y, text: base ? `${pct > 0.005 ? '+' : ''}${pct.toFixed(2)}%` : last.toFixed(2), up: last >= prev, clamped: y !== raw };
+  const countdown: string | undefined = chart.$countdown?.() || undefined;
+  return { y, ...(countdown ? { countdown } : {}), text: base ? `${pct > 0.005 ? '+' : ''}${pct.toFixed(2)}%` : last.toFixed(2), up: last >= prev, clamped: y !== raw };
 }
 
 export const lastPricePlugin = {
@@ -48,6 +49,12 @@ export const lastPricePlugin = {
     ctx.font = '11px sans-serif';
     ctx.textBaseline = 'middle';
     ctx.fillText(info.text, chartArea.right + 6, info.y);
+    if (info.countdown) {
+      ctx.fillStyle = color;
+      ctx.fillRect(chartArea.right, info.y + 9, 62, 16);
+      ctx.fillStyle = cssVar('--c-on-primary');
+      ctx.fillText(info.countdown, chartArea.right + 4, info.y + 17);
+    }
     ctx.restore();
   },
 };

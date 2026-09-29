@@ -7,7 +7,7 @@ import { Env, Pt, distanceToShapes, handlePoints, shapesFor, textWidth } from '.
 export { textWidth };
 
 /** Interactive tools: the cursor, every persistent drawing type, and two transient ones. */
-export type Tool = 'cursor' | 'dot' | 'pointer' | 'eraser' | DrawingType | 'measure' | 'zoom';
+export type Tool = 'cursor' | 'dot' | 'pointer' | 'demo' | 'eraser' | DrawingType | 'measure' | 'zoom';
 
 /** In-progress gesture (not persisted until committed). */
 /** phase 1: dragging the first segment, 2: channel offset click, 3: placing the remaining anchors one click at a time */

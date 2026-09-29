@@ -22,6 +22,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
 import { ChartStatusComponent } from '../chart-status/chart-status.component';
+import { GotoDateDialogComponent } from '../dialogs/goto-date-dialog.component';
+import { barCountdown, formatClock } from '../market-time';
 import { ChartSettingsDialogComponent } from '../dialogs/chart-settings-dialog.component';
 import '../last-price';
 import { SymbolSettingsDialogComponent } from '../dialogs/symbol-settings-dialog.component';
@@ -29,7 +31,7 @@ import { PriceSettings, VolumeSettings } from '../../core/models/symbol-settings
 import { DrawingSidebarComponent } from '../drawings/drawing-sidebar.component';
 import { DrawingStore } from '../drawings/drawing-store.service';
 import { isSelectTool as isSelectToolFn } from '../drawings/drawing-tools';
-import { timeForIndex } from '../drawings/drawing-geometry';
+import { indexForTime, timeForIndex } from '../drawings/drawing-geometry';
 import { Range, fitRangeLog, panRange, scaleRange } from '../y-scale-math';
 import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
@@ -49,9 +51,11 @@ const crosshairPlugin = {
   afterEvent(chart: any, args: any): void {
     const e = args.event;
     if (e?.type === 'mousemove' && typeof e.x === 'number') {
+      if (chart.$cursorStyle === 'demo') { const tr = (chart.$trail ??= []); tr.push({ x: e.x, y: e.y }); if (tr.length > 14) tr.shift(); }
       chart.$crosshairX = e.x;
       chart.$crosshairY = e.y;
     } else if (e?.type === 'mouseout') {
+      chart.$trail = [];
       chart.$crosshairX = null;
       chart.$crosshairY = null;
     }
@@ -71,6 +75,13 @@ const crosshairPlugin = {
       if (typeof v === 'number') y = chart.scales.y.getPixelForValue(v);
     }
 
+    if (chart.$cursorStyle === 'demo') { // laser pointer: a glowing red dot with a short fading trail
+      const tr: { x: number; y: number }[] = chart.$trail ?? [];
+      ctx.save();
+      tr.forEach((p, i) => { ctx.globalAlpha = ((i + 1) / tr.length) * 0.5; ctx.fillStyle = cssVar('--c-down'); ctx.beginPath(); ctx.arc(p.x, p.y, 2 + (i / tr.length) * 6, 0, Math.PI * 2); ctx.fill(); });
+      ctx.restore();
+      return;
+    }
     if (chart.$cursorStyle === 'pointer' || chart.$crosshairOn === false) return; // plain arrow / crosshair switched off
     const dot = chart.$cursorStyle === 'dot';
     ctx.save();
@@ -252,7 +263,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, ChartStatusComponent, DrawingSidebarComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, ChartStatusComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -282,6 +293,9 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       @if (searchOpen()) {
         <app-symbol-search-dialog [initial]="searchInitial()" [current]="currentSymbol" (pick)="pickFromSearch($event)" (closed)="searchOpen.set(false)" />
+      }
+      @if (gotoOpen() && bars.length) {
+        <app-goto-date-dialog [min]="bars[0].timestamp" [max]="bars[bars.length - 1].timestamp" (pick)="goToDate($event)" (closed)="gotoOpen.set(false)" />
       }
       @if (settingsOpen()) {
         <app-chart-settings-dialog [view]="chartState.snapshot().view" (save)="chartState.setViewSettings($event)" (closed)="settingsOpen.set(false)" />
@@ -340,6 +354,10 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         <app-chart-status [loading]="loading" [error]="error" [title]="errorTitle" [kind]="errorKind" [symbols]="availableSymbols" (pick)="pickSymbol($event)" (retry)="retry()" />
       </div>
       <div class="scale-bar" role="group" aria-label="Price scale">
+      <button type="button" class="clock" data-clock title="Chart time (click to change the time zone)" (click)="settingsOpen.set(true)">{{ clockText() }}</button>
+      <button type="button" data-goto title="Go to date (Alt+G)" aria-label="Go to date" (click)="gotoOpen.set(true)">📅</button>
+      <button type="button" data-fit title="Fit all data" aria-label="Fit all data" (click)="fitAll()">⤢</button>
+      <button type="button" data-lock-scale [attr.aria-pressed]="scaleLocked()" title="Lock the price scale (no auto-fit, no vertical drag)" aria-label="Lock price scale" (click)="toggleLockScale()">🔒</button>
       <button type="button" data-zoom-out title="Zoom out" aria-label="Zoom out" (click)="zoomBy(1 / 1.25)">−</button>
       <button type="button" data-zoom-in title="Zoom in" aria-label="Zoom in" (click)="zoomBy(1.25)">+</button>
       <button type="button" data-invert [attr.aria-pressed]="invertOn" title="Invert the price scale" (click)="chartState.toggleInvertScale()">⇅</button>
@@ -393,6 +411,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       }
       canvas[hidden] { display: none; }
       .scale-bar { display: flex; flex: none; justify-content: flex-end; gap: 2px; padding: 1px 8px; background: var(--c-surface); border-top: 1px solid var(--c-pane-border); }
+      .scale-bar .clock { margin-right: auto; font-variant-numeric: tabular-nums; }
       .scale-bar button {
         padding: 1px 6px; border: none; border-radius: var(--border-radius-sm); background: transparent;
         color: var(--c-text-muted); cursor: pointer; font-size: 0.75rem;
@@ -464,7 +483,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   /** All bars fetched for the current symbol (one fetch per symbol, 4.3). */
   private allData: OHLCV[] = [];
   /** Bars the chart indexes into (weekly-aggregated when interval = 1w). */
-  private bars: OHLCV[] = [];
+  protected bars: OHLCV[] = [];
   // ---- symbol search (type anywhere) ------------------------------------------------
   readonly searchOpen = signal(false);
   readonly searchInitial = signal('');
@@ -525,7 +544,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   private applyCursorStyle(): void {
     const t = this.tool();
-    if (this.chart) (this.chart as any).$cursorStyle = t === 'dot' ? 'dot' : t === 'pointer' ? 'pointer' : 'cross';
+    if (this.chart) (this.chart as any).$cursorStyle = t === 'dot' ? 'dot' : t === 'pointer' ? 'pointer' : t === 'demo' ? 'demo' : 'cross';
   }
 
   setTool(t: Tool): void {
@@ -631,6 +650,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       };
       if (nav[e.key] && !this.drawings.view().draft) { e.preventDefault(); nav[e.key](); return; }
     }
+    if (e.altKey && !ctrl && e.code === 'KeyG') { e.preventDefault(); this.gotoOpen.set(true); return; }
     if (e.altKey && !ctrl && ALT_TOOLS[e.code]) { e.preventDefault(); this.setTool(ALT_TOOLS[e.code]); return; }
     // keystrokes typed while the search dialog is still opening must not be lost
     if (this.searchOpen() && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
@@ -639,7 +659,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
       else { e.preventDefault(); this.searchInitial.update((v) => v + e.key); }
       return;
     }
-    const dialogOpen = this.searchOpen() || this.indicatorsOpen() || this.settingsIndex() !== null || this.seriesDialog() !== null;
+    const dialogOpen = this.searchOpen() || this.indicatorsOpen() || this.settingsIndex() !== null || this.seriesDialog() !== null || this.gotoOpen() || this.settingsOpen();
     if (!dialogOpen && !e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z0-9]$/i.test(e.key)) {
       e.preventDefault();
       this.openSearch(e.key);
@@ -682,6 +702,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private yDrag: { mode: 'axis' | 'pan'; startY: number; lastY: number; engaged: boolean } | null = null;
 
   setAuto(): void {
+    if (this.scaleLocked()) return;
     this.manualY = null;
     this.autoScale.set(true);
     this.chart?.update('none');
@@ -689,6 +710,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   toggleLog(): void { this.chartState.toggleLogScale(); }
 
   private resetPriceScale(): void {
+    this.scaleLocked.set(false);
     this.manualY = null;
     this.autoScale.set(true);
   }
@@ -708,7 +730,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private classifyYDrag(x: number, y: number): typeof this.yDrag {
     const c = this.chart as any;
     const ys = c?.scales?.y;
-    if (!c || !ys || !c.chartArea) return null;
+    if (!c || !ys || !c.chartArea || this.scaleLocked()) return null;
     const inPane = y >= ys.top && y <= ys.bottom;
     if (inPane && x > c.chartArea.right) return { mode: 'axis', startY: y, lastY: y, engaged: false };
     if (inPane && x >= c.chartArea.left && x <= c.chartArea.right) return { mode: 'pan', startY: y, lastY: y, engaged: false };
@@ -785,6 +807,38 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
   readonly seriesDialog = signal<'price' | 'volume' | null>(null);
   readonly settingsOpen = signal(false);
+  readonly gotoOpen = signal(false);
+  readonly scaleLocked = signal(false);
+  readonly clockText = signal('');
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
+
+  private tick(): void {
+    const view = this.chartState.snapshot().view;
+    this.clockText.set(formatClock(new Date(), view.timezone));
+    if (view.countdown) this.chart?.draw();
+  }
+
+  toggleLockScale(): void {
+    if (!this.scaleLocked()) this.enterManual(); // freeze the range as it is
+    this.scaleLocked.update((v) => !v);
+  }
+
+  fitAll(): void {
+    const c = this.chart as any;
+    if (!c || !this.bars.length) return;
+    try { c.zoomScale('x', { min: 0, max: this.bars.length - 1 }, 'none'); } catch { /* limits */ }
+    this.setAuto();
+  }
+
+  /** Centre the view on the bar nearest to a date (the visible span stays). */
+  goToDate(ts: number): void {
+    const c = this.chart as any;
+    const x = c?.scales?.x;
+    if (!x || !this.bars.length) return;
+    const i = indexForTime(this.bars, ts);
+    const half = (x.max - x.min) / 2;
+    try { c.zoomScale('x', { min: i - half, max: i + half }, 'none'); } catch { /* limits */ }
+  }
   readonly ctxMenu = signal<{ x: number; y: number; price: number; t: number } | null>(null);
 
   onContextMenu(e: MouseEvent): void {
@@ -904,6 +958,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.tick();
+    this.clockTimer = setInterval(() => { this.tick(); this.cdr.markForCheck(); }, 1000);
     // 4.2 wiring: the toolbar writes to ChartStateService; the viewer derives
     // its data loads from state changes. Route param seeds the state ONCE.
     this.route.params.subscribe((params) => {
@@ -924,6 +980,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         this.logOn = s.logScale;
         this.percentOn = s.percentScale;
         this.invertOn = s.invertScale;
+        this.clockText.set(formatClock(new Date(), s.view.timezone));
         if (symbolChanged || intervalChanged || rangeChanged || logChanged) this.resetPriceScale();
         const typeChanged = s.chartType !== this.chartTypeValue;
         const bricksInvolved = typeChanged && (NON_TIME_TYPES.includes(s.chartType) || NON_TIME_TYPES.includes(this.chartTypeValue));
@@ -1272,6 +1329,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     (this.chart as any).$percentBase = () => this.percentBase();
     (this.chart as any).$percentOn = this.percentOn;
     (this.chart as any).$lastBars = () => this.bars;
+    (this.chart as any).$countdown = () => { const v = this.chartState.snapshot().view; return v.countdown ? barCountdown(new Date(), this.currentInterval, v.session) : undefined; };
     (this.chart as any).$crosshairOn = view.crosshair;
     (this.chart as any).$lastPriceOn = view.lastPrice;
     this.applyCursorStyle();
@@ -1377,6 +1435,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.clockTimer) clearInterval(this.clockTimer);
     this.destroyChart();
   }
 }

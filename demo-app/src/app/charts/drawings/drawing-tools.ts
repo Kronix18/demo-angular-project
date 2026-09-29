@@ -144,10 +144,11 @@ export const CURSOR_TOOLS: ToolDef[] = [
   { id: 'cursor', label: 'Cross', icon: '✛', group: 'cursors', points: 1 },
   { id: 'dot', label: 'Dot', icon: '•', group: 'cursors', points: 1 },
   { id: 'pointer', label: 'Arrow', icon: '↖', group: 'cursors', points: 1 },
+  { id: 'demo', label: 'Demonstration (laser pointer)', icon: '🔴', group: 'cursors', points: 1 },
   { id: 'eraser', label: 'Eraser', icon: '⌫', group: 'cursors', points: 1 },
 ];
-export type CursorTool = 'cursor' | 'dot' | 'pointer' | 'eraser';
-export const isSelectTool = (t: string): boolean => t === 'cursor' || t === 'dot' || t === 'pointer';
+export type CursorTool = 'cursor' | 'dot' | 'pointer' | 'demo' | 'eraser';
+export const isSelectTool = (t: string): boolean => t === 'cursor' || t === 'dot' || t === 'pointer' || t === 'demo';
 const BY_ID = new Map<string, ToolDef>(TOOL_DEFS.map((d) => [d.id, d]));
 const ANY_ID = new Map<string, ToolDef>([...CURSOR_TOOLS, ...TOOL_DEFS].map((d) => [d.id, d]));
 export const toolDef = (id: string): ToolDef | undefined => BY_ID.get(id);
