@@ -2,6 +2,7 @@ import { Chart } from 'chart.js';
 import { cssVar } from '../chart-theme';
 import { Drawing } from './drawing-geometry';
 import { DrawingController } from './drawing-controller';
+import { drawIcon } from '../../shared/icons/canvas-icon';
 import { Env, Role, Shape, handlePoints, shapesFor, textBox } from './drawing-shapes';
 
 const dashOf = (style?: string): number[] => (style === 'dash' ? [6, 4] : style === 'dot' ? [2, 3] : []);
@@ -93,6 +94,9 @@ export const drawingsPlugin = {
           case 'curve':
             ctx.beginPath(); ctx.moveTo(s.pts[0].x, s.pts[0].y); ctx.quadraticCurveTo(s.pts[1].x, s.pts[1].y, s.pts[2].x, s.pts[2].y);
             stroke();
+            break;
+          case 'icon':
+            drawIcon(ctx, s.name, s.x, s.y, s.size, color, d.style?.width ?? 1.7);
             break;
           case 'text': {
             const size = s.size ?? 12;

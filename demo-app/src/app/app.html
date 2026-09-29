@@ -18,7 +18,7 @@
           (click)="theme.cycle()"
           [attr.aria-label]="'Theme: ' + theme.mode() + ' (click to change)'"
           [title]="'Theme: ' + theme.mode()"
-        >{{ themeIcon[theme.mode()] }}</button>
+        ><app-icon [name]="themeIcon[theme.mode()]" [size]="18" /></button>
         <a
           *ngIf="isAuthenticated"
           routerLink="/profile"

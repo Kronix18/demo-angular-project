@@ -1,3 +1,4 @@
+import { IconComponent } from '../../../shared/icons/icon.component';
 import { cssVar } from '../../../charts/chart-theme';
 import { Component, Input, OnInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -12,7 +13,7 @@ Chart.register(...registerables, CandlestickController, CandlestickElement, Ohlc
 @Component({
   selector: 'app-candlestick-chart',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconComponent],
   templateUrl: './candlestick-chart.component.html',
   styleUrl: './candlestick-chart.component.scss'
 })

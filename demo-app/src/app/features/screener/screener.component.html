@@ -61,31 +61,31 @@
         <thead>
           <tr>
             <th class="sortable" (click)="sortBy('ticker')">
-              Symbol <span class="sort-icon">{{ getSortIcon('ticker') }}</span>
+              Symbol <span class="sort-icon"><app-icon [name]="getSortIcon('ticker')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('name')">
-              Name <span class="sort-icon">{{ getSortIcon('name') }}</span>
+              Name <span class="sort-icon"><app-icon [name]="getSortIcon('name')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('price')">
-              Price <span class="sort-icon">{{ getSortIcon('price') }}</span>
+              Price <span class="sort-icon"><app-icon [name]="getSortIcon('price')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('change_percent')">
-              Change % <span class="sort-icon">{{ getSortIcon('change_percent') }}</span>
+              Change % <span class="sort-icon"><app-icon [name]="getSortIcon('change_percent')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('volume')">
-              Volume <span class="sort-icon">{{ getSortIcon('volume') }}</span>
+              Volume <span class="sort-icon"><app-icon [name]="getSortIcon('volume')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('market_cap')">
-              Market Cap <span class="sort-icon">{{ getSortIcon('market_cap') }}</span>
+              Market Cap <span class="sort-icon"><app-icon [name]="getSortIcon('market_cap')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('sector')">
-              Sector <span class="sort-icon">{{ getSortIcon('sector') }}</span>
+              Sector <span class="sort-icon"><app-icon [name]="getSortIcon('sector')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('industry')">
-              Industry <span class="sort-icon">{{ getSortIcon('industry') }}</span>
+              Industry <span class="sort-icon"><app-icon [name]="getSortIcon('industry')" [size]="14" /></span>
             </th>
             <th class="sortable" (click)="sortBy('date')">
-              Date <span class="sort-icon">{{ getSortIcon('date') }}</span>
+              Date <span class="sort-icon"><app-icon [name]="getSortIcon('date')" [size]="14" /></span>
             </th>
             <th>Action</th>
           </tr>

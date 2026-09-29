@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { LayoutService } from '../../core/services/layout.service';
+import { IconComponent } from '../../shared/icons/icon.component';
 import { ModalComponent } from './modal.component';
 
 /** Layouts: save the current chart (state + drawings) under a name, load or delete saved ones. */
 @Component({
   selector: 'app-layouts-dialog',
   standalone: true,
-  imports: [ModalComponent],
+  imports: [ModalComponent, IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal title="Layouts" (closed)="closed.emit()">
@@ -19,7 +20,7 @@ import { ModalComponent } from './modal.component';
           <button type="button" class="name" (click)="name.set(l.name)" title="Use this name (to overwrite it)">{{ l.name }}</button>
           <span class="when">{{ when(l.savedAt) }}</span>
           <button type="button" data-layout-load (click)="load.emit(l.name)">Load</button>
-          <button type="button" data-layout-delete aria-label="Delete layout" (click)="remove.emit(l.name)">×</button>
+          <button type="button" data-layout-delete aria-label="Delete layout" (click)="remove.emit(l.name)"><app-icon name="close" [size]="14" /></button>
         </div>
       } @empty { <p class="empty">No saved layouts yet.</p> }
     </app-modal>

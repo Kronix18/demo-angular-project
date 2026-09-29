@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { INDICATOR_CATALOG, CatalogItem, IndicatorEntry } from '../../core/indicators/indicator-catalog';
 import { IndicatorTemplateService } from '../../core/services/indicator-template.service';
+import { IconComponent } from '../../shared/icons/icon.component';
 import { ModalComponent } from './modal.component';
 
 /**
@@ -11,7 +12,7 @@ import { ModalComponent } from './modal.component';
 @Component({
   selector: 'app-indicators-dialog',
   standalone: true,
-  imports: [ModalComponent],
+  imports: [ModalComponent, IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal title="Indicators" (closed)="closed.emit()">
@@ -25,7 +26,7 @@ import { ModalComponent } from './modal.component';
           <div class="tpl-row" data-tpl-row>
             <button type="button" class="tpl-name" data-tpl-apply title="Replace the chart's indicators with this template" (click)="applyTemplate.emit(t.indicators)">{{ t.name }}</button>
             <span class="tpl-n">{{ t.indicators.length }} {{ t.indicators.length === 1 ? 'indicator' : 'indicators' }}</span>
-            <button type="button" class="tpl-del" data-tpl-delete aria-label="Delete template" (click)="templates.remove(t.name)">×</button>
+            <button type="button" class="tpl-del" data-tpl-delete aria-label="Delete template" (click)="templates.remove(t.name)"><app-icon name="close" [size]="14" /></button>
           </div>
         }
       </section>
@@ -37,7 +38,7 @@ import { ModalComponent } from './modal.component';
           <button type="button" class="item" [attr.data-add-indicator]="c.type" (click)="add.emit(c.type)">
             <span class="name">{{ c.label }}</span>
             <span class="desc">{{ c.description }}</span>
-            <span class="plus" aria-hidden="true">+</span>
+            <span class="plus" aria-hidden="true"><app-icon name="plus" [size]="16" /></span>
           </button>
         }
       } @empty {
@@ -55,11 +56,12 @@ import { ModalComponent } from './modal.component';
       .item:hover, .item:focus-visible { background: var(--c-primary-tint); }
       .name { flex: none; min-width: 6.5rem; font-weight: 600; }
       .desc { flex: 1; color: var(--c-text-muted); }
-      .plus { color: var(--c-primary); font-size: 1.1rem; }
+      .plus { display: inline-flex; color: var(--c-primary); }
       .empty { color: var(--c-text-muted); }
       .tpl { margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--c-border); }
       .tpl-save { display: flex; gap: 0.5rem; }
       .tpl-save input { flex: 1; padding: 0.3rem 0.6rem; border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); background: var(--c-bg); color: var(--c-text); }
+      .tpl-del { display: inline-flex; align-items: center; }
       .tpl-save button, .tpl-del { padding: 0.25rem 0.6rem; border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); background: var(--c-surface); color: var(--c-text); cursor: pointer; }
       .tpl-save button:disabled { opacity: 0.5; cursor: default; }
       .tpl-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }

@@ -25,6 +25,7 @@ export type Shape =
   | (Common & { k: 'ellipse'; cx: number; cy: number; rx: number; ry: number; fill?: number })
   | (Common & { k: 'arrow'; x1: number; y1: number; x2: number; y2: number })
   | (Common & { k: 'curve'; pts: [Pt, Pt, Pt] })
+  | (Common & { k: 'icon'; x: number; y: number; name: string; size: number })
   | (Common & { k: 'text'; x: number; y: number; text: string; align?: 'left' | 'center'; box?: 'surface' | 'note'; size?: number; chart?: boolean });
 
 export const TEXT_H = 18;
@@ -95,10 +96,11 @@ function pitchfork(P: Pt[], start: Pt): Shape[] {
 
 const FIB_TIME = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144];
 const GANN = [[8, '1x8'], [4, '1x4'], [3, '1x3'], [2, '1x2'], [1, '1x1'], [1 / 2, '2x1'], [1 / 3, '3x1'], [1 / 4, '4x1'], [1 / 8, '8x1']] as const;
-const ICON: Record<string, [string, Role | undefined]> = {
-  iconup: ['▲', 'up'], icondown: ['▼', 'down'], iconcheck: ['✔', 'up'], iconcross: ['✖', 'down'], iconstar: ['★', undefined], iconflag: ['⚑', undefined],
-  iconheart: ['❤', 'down'], iconthumb: ['👍', undefined], iconfire: ['🔥', undefined], iconrocket: ['🚀', undefined],
-  iconwarn: ['⚠', undefined], iconbulb: ['💡', undefined], iconbell: ['🔔', undefined], icondollar: ['$', 'up'],
+/** Icon stamps: drawn from the icon registry (`icons/icons.ts`); the role picks the up / down colour. */
+const ICON: Record<string, Role | undefined> = {
+  iconup: 'up', icondown: 'down', iconcheck: 'up', iconcross: 'down', iconstar: undefined, iconflag: undefined,
+  iconheart: 'down', iconthumb: undefined, iconfire: undefined, iconrocket: undefined,
+  iconwarn: undefined, iconbulb: undefined, iconbell: undefined, icondollar: 'up',
 };
 
 /** Least-squares line through the closes between two anchors: fitted end prices and the residual σ. */
@@ -540,7 +542,7 @@ const BUILDERS: Record<string, Builder> = {
     }
     return out;
   },
-  emoji: ({ d, P }) => [label(P[0], d.text || '⭐', { align: 'center', size: 24 })],
+  stamp: ({ d, P }) => [{ k: 'icon', x: P[0].x, y: P[0].y, name: d.text || 'iconstar', size: 26 }],
   pricelabel: ({ A, P, env }) => [label({ x: P[0].x + 4, y: P[0].y }, env.fmt(A[0].p), { box: 'surface' })],
 };
 
@@ -568,10 +570,10 @@ export function shapesFor(d: Drawing, env: Env): Shape[] {
   const A = anchorsOf(d);
   const P = A.map((a) => env.px(a));
   const id = d.type as string;
-  if (ICON[id]) {
+  if (id in ICON) {
     if (!P.length) return [];
-    const [glyph, role] = ICON[id];
-    return [label(P[0], glyph, { align: 'center', size: 20, ...(role ? { role } : {}) })];
+    const role = ICON[id];
+    return [{ k: 'icon', x: P[0].x, y: P[0].y, name: id, size: 22, ...(role ? { role } : {}) }];
   }
   const builder = BUILDERS[id];
   if (!builder || !P.length) return [];
@@ -626,6 +628,11 @@ export function distanceToShapes(shapes: Shape[], x: number, y: number, _env?: E
         const [p0, c, p1] = s.pts;
         const pts = Array.from({ length: 25 }, (_, i) => { const t = i / 24; return { x: (1 - t) ** 2 * p0.x + 2 * (1 - t) * t * c.x + t * t * p1.x, y: (1 - t) ** 2 * p0.y + 2 * (1 - t) * t * c.y + t * t * p1.y }; });
         d = distToPolyline(x, y, pts);
+        break;
+      }
+      case 'icon': {
+        const h = s.size / 2;
+        d = Math.abs(x - s.x) <= h && Math.abs(y - s.y) <= h ? 0 : Infinity;
         break;
       }
       case 'text': {

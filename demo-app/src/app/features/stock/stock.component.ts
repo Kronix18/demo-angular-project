@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/icons/icon.component';
 import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -7,7 +8,7 @@ import { CandlestickChartComponent } from './candlestick-chart/candlestick-chart
 @Component({
   selector: 'app-stock',
   standalone: true,
-  imports: [CommonModule, RouterLink, CandlestickChartComponent],
+  imports: [CommonModule, RouterLink, CandlestickChartComponent, IconComponent],
   templateUrl: './stock.component.html',
   styleUrl: './stock.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { IconComponent } from '../../shared/icons/icon.component';
 
 export type PanelTab = 'objects' | 'data' | 'watchlist' | 'alerts';
 export interface PanelIndicator { index: number; label: string; color: string; hidden: boolean; }
@@ -14,6 +15,7 @@ export interface PanelAlert { id: string; symbol: string; price: number; trigger
 @Component({
   selector: 'app-chart-side-panel',
   standalone: true,
+  imports: [IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="tabs" role="tablist">
@@ -28,19 +30,19 @@ export interface PanelAlert { id: string; symbol: string; price: number; trigger
           @for (i of indicators(); track i.index) {
             <div class="row" data-obj-indicator [class.hidden]="i.hidden" (dblclick)="indicatorSettings.emit(i.index)">
               <span class="chip" [style.background]="i.color"></span><span class="label">{{ i.label }}</span>
-              <button type="button" class="ctl" data-obj-eye [attr.aria-label]="(i.hidden ? 'Show ' : 'Hide ') + i.label" (click)="indicatorToggle.emit(i.index)">{{ i.hidden ? '◌' : '◉' }}</button>
-              <button type="button" class="ctl" data-obj-settings [attr.aria-label]="'Settings for ' + i.label" (click)="indicatorSettings.emit(i.index)">⚙</button>
-              <button type="button" class="ctl" data-obj-delete [attr.aria-label]="'Remove ' + i.label" (click)="indicatorRemove.emit(i.index)">×</button>
+              <button type="button" class="ctl" data-obj-eye [attr.aria-label]="(i.hidden ? 'Show ' : 'Hide ') + i.label" (click)="indicatorToggle.emit(i.index)"><app-icon [name]="i.hidden ? 'eyeoff' : 'eye'" [size]="14" /></button>
+              <button type="button" class="ctl" data-obj-settings [attr.aria-label]="'Settings for ' + i.label" (click)="indicatorSettings.emit(i.index)"><app-icon name="gear" [size]="14" /></button>
+              <button type="button" class="ctl" data-obj-delete [attr.aria-label]="'Remove ' + i.label" (click)="indicatorRemove.emit(i.index)"><app-icon name="close" [size]="14" /></button>
             </div>
           } @empty { <p class="empty">No indicators</p> }
           <h3>Drawings</h3>
           @for (d of drawings(); track d.id) {
             <div class="row" data-obj-drawing [class.selected]="d.id === selectedId()" [class.hidden]="d.hidden" (click)="drawingSelect.emit(d.id)">
               <span class="label">{{ d.label }}</span>
-              <button type="button" class="ctl" data-obj-front title="Bring to front" aria-label="Bring to front" (click)="$event.stopPropagation(); drawingOrder.emit({ id: d.id, how: 'front' })">⇧</button>
-              <button type="button" class="ctl" data-obj-eye [attr.aria-label]="d.hidden ? 'Show drawing' : 'Hide drawing'" (click)="$event.stopPropagation(); drawingToggleHidden.emit(d.id)">{{ d.hidden ? '◌' : '◉' }}</button>
-              <button type="button" class="ctl" data-obj-lock [attr.aria-pressed]="d.locked" aria-label="Lock drawing" (click)="$event.stopPropagation(); drawingToggleLocked.emit(d.id)">🔒</button>
-              <button type="button" class="ctl" data-obj-delete aria-label="Delete drawing" (click)="$event.stopPropagation(); drawingRemove.emit(d.id)">×</button>
+              <button type="button" class="ctl" data-obj-front title="Bring to front" aria-label="Bring to front" (click)="$event.stopPropagation(); drawingOrder.emit({ id: d.id, how: 'front' })"><app-icon name="bring" [size]="14" /></button>
+              <button type="button" class="ctl" data-obj-eye [attr.aria-label]="d.hidden ? 'Show drawing' : 'Hide drawing'" (click)="$event.stopPropagation(); drawingToggleHidden.emit(d.id)"><app-icon [name]="d.hidden ? 'eyeoff' : 'eye'" [size]="14" /></button>
+              <button type="button" class="ctl" data-obj-lock [attr.aria-pressed]="d.locked" aria-label="Lock drawing" (click)="$event.stopPropagation(); drawingToggleLocked.emit(d.id)"><app-icon name="lock" [size]="14" /></button>
+              <button type="button" class="ctl" data-obj-delete aria-label="Delete drawing" (click)="$event.stopPropagation(); drawingRemove.emit(d.id)"><app-icon name="close" [size]="14" /></button>
             </div>
           } @empty { <p class="empty">No drawings on this symbol</p> }
         }
@@ -59,7 +61,7 @@ export interface PanelAlert { id: string; symbol: string; price: number; trigger
               <span class="label">{{ w.symbol.toUpperCase() }}</span>
               <span class="value">{{ w.last === undefined ? '–' : w.last.toFixed(2) }}</span>
               <span class="value" [class.up]="(w.pct ?? 0) >= 0" [class.down]="(w.pct ?? 0) < 0">{{ w.pct === undefined ? '' : (w.pct >= 0 ? '+' : '') + w.pct.toFixed(2) + '%' }}</span>
-              <button type="button" class="ctl" data-watch-remove [attr.aria-label]="'Remove ' + w.symbol" (click)="$event.stopPropagation(); watchRemove.emit(w.symbol)">×</button>
+              <button type="button" class="ctl" data-watch-remove [attr.aria-label]="'Remove ' + w.symbol" (click)="$event.stopPropagation(); watchRemove.emit(w.symbol)"><app-icon name="close" [size]="14" /></button>
             </div>
           }
           <div class="add">
@@ -72,7 +74,7 @@ export interface PanelAlert { id: string; symbol: string; price: number; trigger
             <div class="row" data-alert-row [class.triggered]="a.triggered">
               <span class="label">{{ a.symbol.toUpperCase() }} crosses {{ a.price.toFixed(2) }}</span>
               @if (a.triggered) { <span class="value">triggered</span> }
-              <button type="button" class="ctl" data-alert-remove aria-label="Remove alert" (click)="alertRemove.emit(a.id)">×</button>
+              <button type="button" class="ctl" data-alert-remove aria-label="Remove alert" (click)="alertRemove.emit(a.id)"><app-icon name="close" [size]="14" /></button>
             </div>
           } @empty { <p class="empty">No alerts. Add one at a price, or right-click the chart.</p> }
           <div class="add">
@@ -101,7 +103,7 @@ export interface PanelAlert { id: string; symbol: string; price: number; trigger
       .value { font-variant-numeric: tabular-nums; color: var(--c-text-muted); }
       .up { color: var(--c-up); } .down { color: var(--c-down); }
       .chip { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-      .ctl { width: 18px; height: 18px; padding: 0; border: none; background: transparent; color: var(--c-text-muted); cursor: pointer; opacity: 0.6; }
+      .ctl { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: none; background: transparent; color: var(--c-text-muted); cursor: pointer; opacity: 0.6; }
       .row:hover .ctl { opacity: 1; }
       .ctl:hover, .ctl[aria-pressed='true'] { color: var(--c-primary); opacity: 1; }
       .empty { margin: 4px; color: var(--c-text-muted); }

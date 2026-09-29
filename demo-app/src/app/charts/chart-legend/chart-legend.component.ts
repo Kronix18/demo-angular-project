@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { IconComponent } from '../../shared/icons/icon.component';
 
 export interface LegendRow {
   key: string;
@@ -38,6 +39,7 @@ export interface LegendGroup {
 @Component({
   selector: 'app-chart-legend',
   standalone: true,
+  imports: [IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @for (g of groups(); track g.key) {
@@ -57,8 +59,8 @@ export interface LegendGroup {
               </span>
             }
             <button type="button" class="ctl" data-price-eye [attr.aria-pressed]="!h.hidden" [attr.aria-label]="h.hidden ? 'Show symbol' : 'Hide symbol'"
-              [title]="h.hidden ? 'Show' : 'Hide'" (click)="seriesToggle.emit('price')">{{ h.hidden ? '◌' : '◉' }}</button>
-            <button type="button" class="ctl" data-price-settings aria-label="Symbol settings" title="Settings" (click)="seriesSettings.emit('price')">⚙</button>
+              [title]="h.hidden ? 'Show' : 'Hide'" (click)="seriesToggle.emit('price')"><app-icon [name]="h.hidden ? 'eyeoff' : 'eye'" [size]="14" /></button>
+            <button type="button" class="ctl" data-price-settings aria-label="Symbol settings" title="Settings" (click)="seriesSettings.emit('price')"><app-icon name="gear" [size]="14" /></button>
           </div>
         }
         @for (r of g.rows; track r.key) {
@@ -69,18 +71,18 @@ export interface LegendGroup {
               <span class="value">{{ r.value }}</span>
               <button type="button" class="ctl" data-eye [attr.aria-pressed]="!r.hidden"
                 [attr.aria-label]="(r.hidden ? 'Show ' : 'Hide ') + r.label"
-                [title]="r.hidden ? 'Show' : 'Hide'" (click)="toggle.emit(r.index!)">{{ r.hidden ? '◌' : '◉' }}</button>
+                [title]="r.hidden ? 'Show' : 'Hide'" (click)="toggle.emit(r.index!)"><app-icon [name]="r.hidden ? 'eyeoff' : 'eye'" [size]="14" /></button>
               <button type="button" class="ctl" data-settings [attr.aria-label]="'Settings for ' + r.label"
-                title="Settings" (click)="settings.emit(r.index!)">⚙</button>
+                title="Settings" (click)="settings.emit(r.index!)"><app-icon name="gear" [size]="14" /></button>
               <button type="button" class="ctl" data-remove [attr.aria-label]="'Remove ' + r.label"
-                title="Remove" (click)="remove.emit(r.index!)">×</button>
+                title="Remove" (click)="remove.emit(r.index!)"><app-icon name="close" [size]="14" /></button>
             </div>
           } @else if (r.compare) {
             <div class="row" data-compare-row>
               <span class="chip" data-chip [style.background]="r.color"></span>
               <span class="label">{{ r.label }}</span>
               <span class="value">{{ r.value }}</span>
-              <button type="button" class="ctl" data-compare-remove [attr.aria-label]="'Remove ' + r.label" title="Remove" (click)="compareRemove.emit(r.compare!)">×</button>
+              <button type="button" class="ctl" data-compare-remove [attr.aria-label]="'Remove ' + r.label" title="Remove" (click)="compareRemove.emit(r.compare!)"><app-icon name="close" [size]="14" /></button>
             </div>
           } @else if (r.builtin) {
             <div class="row" data-volume-row [class.hidden]="r.hidden">
@@ -88,8 +90,8 @@ export interface LegendGroup {
               <span class="label">{{ r.label }}</span>
               <span class="value">{{ r.value }}</span>
               <button type="button" class="ctl" data-volume-eye [attr.aria-pressed]="!r.hidden" [attr.aria-label]="r.hidden ? 'Show volume' : 'Hide volume'"
-                [title]="r.hidden ? 'Show' : 'Hide'" (click)="seriesToggle.emit('volume')">{{ r.hidden ? '◌' : '◉' }}</button>
-              <button type="button" class="ctl" data-volume-settings aria-label="Volume settings" title="Settings" (click)="seriesSettings.emit('volume')">⚙</button>
+                [title]="r.hidden ? 'Show' : 'Hide'" (click)="seriesToggle.emit('volume')"><app-icon [name]="r.hidden ? 'eyeoff' : 'eye'" [size]="14" /></button>
+              <button type="button" class="ctl" data-volume-settings aria-label="Volume settings" title="Settings" (click)="seriesSettings.emit('volume')"><app-icon name="gear" [size]="14" /></button>
             </div>
           } @else {
             <div class="row plain">
@@ -125,6 +127,7 @@ export interface LegendGroup {
       .value { font-variant-numeric: tabular-nums; }
       .ctl {
         width: 16px; height: 16px; padding: 0; border: none; background: transparent;
+        display: inline-flex; align-items: center; justify-content: center;
         color: var(--c-text-muted); cursor: pointer; font-size: 0.8rem; line-height: 1; opacity: 0;
       }
       .row:hover .ctl, .ctl:focus-visible { opacity: 1; }

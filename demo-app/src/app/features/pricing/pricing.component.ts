@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/icons/icon.component';
 import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -7,7 +8,7 @@ import { SubscriptionPlan, SubscriptionTier } from '../../core/subscriptions/sub
 @Component({
   selector: 'app-pricing',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, IconComponent],
   templateUrl: './pricing.component.html',
   styleUrl: './pricing.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -75,7 +76,7 @@ export class PricingComponent implements OnInit {
 
   formatFeatureValue(value: number | boolean): string {
     if (typeof value === 'boolean') {
-      return value ? '✓' : '✗';
+      return value ? 'yes' : 'no';
     }
     if (value === -1) {
       return 'Unlimited';

@@ -31,6 +31,7 @@ Requests (with reference screenshots of TradingView):
 | 11.15 | Price alerts, bar replay, toasts | DONE |
 | 11.16 | Compare symbols | DONE |
 | 11.17 | Saved layouts, indicator templates | DONE |
+| 11.18 | Drawn (SVG) icons everywhere instead of emoji / symbol characters | DONE |
 
 ## 11.1 results
 - Legend header is now `SYMBOL · 1D  O H L C  V  change` for the hovered bar (latest when idle); indicator rows sit under it (overlays) or in their own pane (oscillators). Each row: chip, live value, ⚙ settings, eye, ✕; double-click opens settings.
@@ -151,3 +152,12 @@ Other changes
 - The loading skeleton / error card, side panel, replay bar and toasts are their own components (viewer stylesheet still under the 4 kB budget).
 - Honest limits: session only changes which close the countdown targets (the demo data has no intraday bars); alerts and replay are the only place price "moves" because the files are static; compare uses daily closes aligned by date.
 - Tests: about 65 new unit specs (registry/shapes, controller, store, panel, services, dialogs, viewer) and the e2e `platform.spec.ts`. Screenshots: `docs/screenshots/11.14-side-panel.png`, `11.15-replay.png`, `11.9-more-tools.png`.
+
+## Round 5 — drawn icons (11.18)
+
+Every icon in the app is now a **drawing** (SVG line art on a 24×24 grid, like TradingView's toolbar), not an emoji or a symbol character.
+- `shared/icons/icons.ts` is the single registry (about 190 icons, composed from small helpers for anchor dots, arrow heads, dashes, stars and the cog so they stay consistent): one per drawing tool (all 100+, so the sidebar and the flyouts show what the tool draws), the cursors, the toolbar (undo / redo, settings, camera, fullscreen, layouts, replay, compare, panel, calendar, fit, lock, invert, percent, zoom ±, play / pause / step), legend and panel controls (eye, eye-off, gear, close, bring to front), the theme toggle and the screener's sort arrows, and the pricing table's included / not included marks.
+- `<app-icon name="…" [size]>` renders it (strokes follow the text colour, so hover / pressed / dark mode just work; solid icons such as the stamps are filled).
+- **The canvas uses the same path data**: the icon stamps on the chart (arrow, check, star, flag, heart, thumb, fire, rocket, warning, bulb, bell, dollar) and the bell of price alerts are painted with `Path2D` (`drawIcon`), so they no longer depend on the OS emoji font and follow the drawing colour.
+- The emoji picker became a **stamp picker** (28 drawn stamps in the Icons flyout); the `emoji` tool is now `stamp`.
+- Guards: `icons.spec` (every tool / cursor / toolbar button has an icon, paths are plain path data, no two tools share the same drawing, every stamp exists) and `icons-guard.spec` (no emoji, arrow, dingbat or geometric-shape character anywhere in the app sources) plus an e2e check that no chart button shows a symbol character.

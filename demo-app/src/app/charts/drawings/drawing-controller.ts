@@ -31,8 +31,8 @@ interface Deps {
   /** a freshly created text label wants its text edited */
   editText?: (id: string) => void;
   committed?: (d: Drawing) => void;
-  /** the emoji the emoji tool stamps */
-  emoji?: () => string;
+  /** the icon (name in the icon registry) the stamp tool places */
+  stamp?: () => string;
 }
 
 type Drag =
@@ -202,7 +202,7 @@ export class DrawingController {
       const d: Drawing = {
         id: this.newId(), type: tool as DrawingType, a: pt, ...view,
         ...(def?.text ? { text: def.defaultText ?? '' } : {}),
-        ...(tool === 'emoji' ? { text: this.deps.emoji?.() ?? '⭐' } : {}),
+        ...(tool === 'stamp' ? { text: this.deps.stamp?.() ?? 'iconstar' } : {}),
       };
       this.commit(d);
       if (def?.text) this.deps.editText?.(d.id);

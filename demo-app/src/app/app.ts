@@ -1,3 +1,4 @@
+import { IconComponent } from './shared/icons/icon.component';
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd, ActivatedRoute } from '@angular/router';
@@ -10,7 +11,7 @@ import { filter, startWith, takeUntil } from 'rxjs/operators';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -20,7 +21,7 @@ export class App implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private chartState = inject(ChartStateService);
   readonly theme = inject(ThemeService);
-  readonly themeIcon: Record<string, string> = { system: '◐', light: '☀', dark: '☾' };
+  readonly themeIcon: Record<string, string> = { system: 'contrast', light: 'sun', dark: 'moon' };
   private destroy$ = new Subject<void>();
 
   isAuthenticated = false;

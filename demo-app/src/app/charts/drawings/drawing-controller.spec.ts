@@ -447,7 +447,7 @@ describe('DrawingController (10.3)', () => {
     });
   });
 
-  describe('per-drawing lock / hide, anchored text, emoji, table (11.12)', () => {
+  describe('per-drawing lock / hide, anchored text, stamp, table (11.12)', () => {
     const click = (x: number, y: number) => { ctl.pointerDown(x, y); ctl.pointerUp(x, y); };
     const hl = (extra: object = {}) => store.add('msft', { id: 'h', type: 'hline', a: { t: bars[5].timestamp, p: 30 }, ...extra } as any);
 
@@ -496,11 +496,11 @@ describe('DrawingController (10.3)', () => {
       expect(moved.y).toBeCloseTo(0.5 + 20 / 200, 5);
     });
 
-    it('emoji tool stamps the current emoji; table starts with placeholder text to edit', () => {
-      const c2 = new DrawingController({ chart: () => chart, bars: () => bars, store, symbol: () => 'msft', tool: () => tool, changed: () => changes++, emoji: () => '🦄', editText: (id) => edits.push(id) });
-      tool = 'emoji';
+    it('stamp tool places the current stamp; table starts with placeholder text to edit', () => {
+      const c2 = new DrawingController({ chart: () => chart, bars: () => bars, store, symbol: () => 'msft', tool: () => tool, changed: () => changes++, stamp: () => 'iconrocket', editText: (id) => edits.push(id) });
+      tool = 'stamp';
       c2.pointerDown(100, 100); c2.pointerUp(100, 100);
-      expect(store.list('msft')[0]).toMatchObject({ type: 'emoji', text: '🦄' });
+      expect(store.list('msft')[0]).toMatchObject({ type: 'stamp', text: 'iconrocket' });
       expect(edits).toEqual([]);
       tool = 'table';
       c2.pointerDown(200, 100); c2.pointerUp(200, 100);

@@ -39,15 +39,15 @@
           </li>
           <li [class.included]="plan.features.advancedFilters">
             <span class="feature-label">Advanced Filters:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.advancedFilters) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.advancedFilters) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.advancedFilters) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.advancedFilters) }} }</span>
           </li>
           <li [class.included]="plan.features.exportData">
             <span class="feature-label">Export Data:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.exportData) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.exportData) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.exportData) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.exportData) }} }</span>
           </li>
           <li [class.included]="plan.features.advancedCharts">
             <span class="feature-label">Advanced Charts:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.advancedCharts) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.advancedCharts) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.advancedCharts) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.advancedCharts) }} }</span>
           </li>
           <li>
             <span class="feature-label">Historical Data:</span>
@@ -55,7 +55,7 @@
           </li>
           <li [class.included]="plan.features.technicalIndicators">
             <span class="feature-label">Technical Indicators:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.technicalIndicators) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.technicalIndicators) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.technicalIndicators) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.technicalIndicators) }} }</span>
           </li>
           <li>
             <span class="feature-label">Watchlists:</span>
@@ -65,23 +65,23 @@
           </li>
           <li [class.included]="plan.features.priceAlerts">
             <span class="feature-label">Price Alerts:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.priceAlerts) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.priceAlerts) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.priceAlerts) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.priceAlerts) }} }</span>
           </li>
           <li [class.included]="plan.features.apiAccess">
             <span class="feature-label">API Access:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.apiAccess) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.apiAccess) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.apiAccess) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.apiAccess) }} }</span>
           </li>
           <li [class.included]="!plan.features.adsEnabled">
             <span class="feature-label">Ad-Free:</span>
-            <span class="feature-value">{{ formatFeatureValue(!plan.features.adsEnabled) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(!plan.features.adsEnabled) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(!plan.features.adsEnabled) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(!plan.features.adsEnabled) }} }</span>
           </li>
           <li [class.included]="plan.features.prioritySupport">
             <span class="feature-label">Priority Support:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.prioritySupport) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.prioritySupport) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.prioritySupport) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.prioritySupport) }} }</span>
           </li>
           <li [class.included]="plan.features.realTimeData">
             <span class="feature-label">Real-time Data:</span>
-            <span class="feature-value">{{ formatFeatureValue(plan.features.realTimeData) }}</span>
+            <span class="feature-value">@if (formatFeatureValue(plan.features.realTimeData) === 'yes') { <app-icon name="iconcheck" [size]="16" /><span class="sr">Included</span> } @else if (formatFeatureValue(plan.features.realTimeData) === 'no') { <app-icon name="iconcross" [size]="14" /><span class="sr">Not included</span> } @else { {{ formatFeatureValue(plan.features.realTimeData) }} }</span>
           </li>
         </ul>
       </div>

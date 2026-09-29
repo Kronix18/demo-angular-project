@@ -1,5 +1,6 @@
 import { Chart } from 'chart.js';
 import { cssVar } from './chart-theme';
+import { drawIcon } from '../shared/icons/canvas-icon';
 
 export interface LastPriceInfo { y: number; text: string; up: boolean; clamped: boolean; countdown?: string; }
 
@@ -59,7 +60,8 @@ export const lastPricePlugin = {
         ctx.fillStyle = cssVar('--c-text');
         ctx.font = '11px sans-serif';
         ctx.textBaseline = 'middle';
-        ctx.fillText(`🔔 ${l.text}`, chartArea.right + 4, l.y);
+        drawIcon(ctx, 'iconbell', chartArea.right + 11, l.y, 11, cssVar(l.triggered ? '--c-text-muted' : '--c-primary'), 1.4);
+        ctx.fillText(l.text, chartArea.right + 20, l.y);
         ctx.restore();
       }
     }

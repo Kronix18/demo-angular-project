@@ -29,19 +29,19 @@
           <button 
             [class.active]="chartType === 'candlestick'" 
             (click)="changeChartType('candlestick')"
-            title="Candlestick">🕯️</button>
+            title="Candlestick" aria-label="Candlestick"><app-icon name="candles" [size]="18" /></button>
           <button 
             [class.active]="chartType === 'ohlc'" 
             (click)="changeChartType('ohlc')"
-            title="OHLC">📊</button>
+            title="OHLC" aria-label="OHLC bars"><app-icon name="ohlcbars" [size]="18" /></button>
           <button 
             [class.active]="chartType === 'bar'" 
             (click)="changeChartType('bar')"
-            title="Bar Chart">📊</button>
+            title="Bar Chart" aria-label="Bar chart"><app-icon name="columns" [size]="18" /></button>
           <button 
             [class.active]="chartType === 'line'" 
             (click)="changeChartType('line')"
-            title="Line Chart">📈</button>
+            title="Line Chart" aria-label="Line chart"><app-icon name="linechart" [size]="18" /></button>
         </div>
       </div>
 
@@ -64,7 +64,7 @@
         <button 
           class="reset-zoom-btn"
           (click)="resetZoom()"
-          title="Reset Zoom">🔍 Reset</button>
+          title="Reset Zoom"><app-icon name="reset" [size]="16" /> Reset</button>
       </div>
     </div>
   </div>

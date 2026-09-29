@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/icons/icon.component';
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, HostListener, inject, input, output } from '@angular/core';
 
 /**
@@ -8,13 +9,14 @@ import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, HostList
 @Component({
   selector: 'app-modal',
   standalone: true,
+  imports: [IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="backdrop" data-backdrop (click)="closed.emit()">
       <div class="dialog" role="dialog" aria-modal="true" [attr.aria-label]="title()" (click)="$event.stopPropagation()">
         <header>
           <h2>{{ title() }}</h2>
-          <button type="button" class="x" data-modal-close aria-label="Close" (click)="closed.emit()">×</button>
+          <button type="button" class="x" data-modal-close aria-label="Close" (click)="closed.emit()"><app-icon name="close" [size]="18" /></button>
         </header>
         <div class="body"><ng-content /></div>
       </div>
@@ -33,7 +35,7 @@ import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, HostList
       }
       header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--c-border); }
       h2 { margin: 0; font-size: 1.05rem; font-weight: 600; }
-      .x { border: none; background: transparent; color: var(--c-text-muted); font-size: 1.4rem; line-height: 1; cursor: pointer; }
+      .x { display: inline-flex; align-items: center; border: none; background: transparent; color: var(--c-text-muted); font-size: 1.4rem; line-height: 1; cursor: pointer; }
       .x:hover { color: var(--c-text); }
       .body { padding: 1rem; overflow: auto; }
     `,

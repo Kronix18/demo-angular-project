@@ -1112,7 +1112,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
-  describe('per-drawing controls and emoji (11.12)', () => {
+  describe('per-drawing controls and stamps (11.12)', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const ctl = () => (component as any).drawings;
     let store: any;
@@ -1161,17 +1161,18 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       expect(q('[data-draw-style]')).toBeNull(); // hidden -> deselected
     });
 
-    it('the icons flyout has an emoji picker; picking one arms the emoji tool and the click stamps it', async () => {
+    it('the icons flyout has a picker of drawn stamps; picking one arms the stamp tool and the click places it', async () => {
       const remock = await ready();
       (q('[data-flyout="icons"]') as HTMLButtonElement).click();
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelectorAll('[data-emoji]').length).toBeGreaterThan(30);
-      (Array.from(fixture.nativeElement.querySelectorAll('[data-emoji]')) as HTMLElement[]).find((b) => b.dataset['emoji'] === '🚀')!.click();
+      expect(fixture.nativeElement.querySelectorAll('[data-stamp]').length).toBeGreaterThan(20);
+      expect(fixture.nativeElement.querySelectorAll('[data-stamp] svg').length).toBeGreaterThan(20); // drawn, not text
+      (q('[data-stamp="iconrocket"]') as HTMLButtonElement).click();
       fixture.detectChanges();
-      expect(component.tool()).toBe('emoji');
+      expect(component.tool()).toBe('stamp');
       remock();
       ctl().pointerDown(100, 100); ctl().pointerUp(100, 100);
-      expect(store.list('msft')[0]).toMatchObject({ type: 'emoji', text: '🚀' });
+      expect(store.list('msft')[0]).toMatchObject({ type: 'stamp', text: 'iconrocket' });
     });
   });
 

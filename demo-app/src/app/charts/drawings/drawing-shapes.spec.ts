@@ -153,12 +153,15 @@ describe('drawing shapes (11.7)', () => {
     expect(c.ry).toBeCloseTo(30, 6);
   });
 
-  it('text-like tools: text, note, callout show their text; price label shows the price; icons are glyphs', () => {
+  it('text-like tools: text, note, callout show their text; price label shows the price; icon stamps are drawn icons', () => {
     expect(texts(shapesFor(drawing('text', [at(10, 100)], { text: 'hello' }), env))).toContain('hello');
     expect(texts(shapesFor(drawing('note', [at(10, 100)], { text: 'n' }), env))).toContain('n');
     expect(texts(shapesFor(drawing('callout', [at(10, 100), at(20, 120)], { text: 'c' }), env))).toContain('c');
     expect(texts(shapesFor(drawing('pricelabel', [at(10, 123.4)]), env))).toContain('123.40');
-    expect(texts(shapesFor(drawing('iconstar', [at(10, 100)]), env))).toEqual(['★']);
+    expect(shapesFor(drawing('iconstar', [at(10, 100)]), env)).toEqual([{ k: 'icon', x: 100, y: 200, name: 'iconstar', size: 22 }]);
+    expect(shapesFor(drawing('iconup', [at(10, 100)]), env)[0]).toMatchObject({ k: 'icon', role: 'up' });
+    expect(distanceToShapes(shapesFor(drawing('iconstar', [at(10, 100)]), env), 105, 205, env)).toBe(0);
+    expect(distanceToShapes(shapesFor(drawing('iconstar', [at(10, 100)]), env), 140, 205, env)).toBe(Infinity);
   });
 
   it('hit testing: segment, ray, filled areas, text boxes', () => {
@@ -283,8 +286,9 @@ describe('drawing shapes (11.7)', () => {
       expect(empty.length).toBeGreaterThan(0); // an empty table still shows one cell
     });
 
-    it('emoji stamps draw the chosen glyph', () => {
-      expect(texts(shapesFor(drawing('emoji', [at(10, 100)], { text: '🦄' }), env))).toEqual(['🦄']);
+    it('stamps draw the chosen icon', () => {
+      expect(shapesFor(drawing('stamp', [at(10, 100)], { text: 'trophy' }), env)).toEqual([{ k: 'icon', x: 100, y: 200, name: 'trophy', size: 26 }]);
+      expect(shapesFor(drawing('stamp', [at(10, 100)]), env)[0]).toMatchObject({ name: 'iconstar' }); // default
     });
 
     it('ghost feed repeats the bars between a and b starting at b', () => {

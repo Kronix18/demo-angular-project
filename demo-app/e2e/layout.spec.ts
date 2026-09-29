@@ -54,6 +54,24 @@ test.describe('chart page layout (5.4)', () => {
     await page.screenshot({ path: 'docs/screenshots/11.8-sidebar-column.png' });
   });
 
+  test('every button on the chart page carries a drawn (SVG) icon; no picture / symbol characters are shown', async ({ page }) => {
+    await openChart(page);
+    await page.click('[data-panel]');
+    await page.click('[data-flyout="icons"]');
+    const r = await page.evaluate(() => {
+      const symbol = /[\u2190-\u21FF\u2300-\u2BFF\uFF0B\u00D7\u2715]|\p{Extended_Pictographic}/u;
+      const btns = Array.from(document.querySelectorAll('.draw-tools button, .chart-tools button, .scale-bar button, .chart-legend button, [data-obj-eye]'));
+      return {
+        symbols: (document.querySelector('.chart-page') as HTMLElement).innerText.split('\n').filter((l) => symbol.test(l)),
+        withoutSvg: btns.filter((b) => !b.querySelector('svg') && !['auto', 'log', 'Replay', 'Compare'].some((t) => (b as HTMLElement).innerText.includes(t)) && !b.classList.contains('clock')).map((b) => (b as HTMLElement).outerHTML.slice(0, 80)),
+        n: btns.length,
+      };
+    });
+    expect(r.symbols).toEqual([]);
+    expect(r.withoutSvg).toEqual([]);
+    expect(r.n).toBeGreaterThan(15);
+  });
+
   test('compact navbar on the chart page; other pages keep navbar + footer', async ({ page }) => {
     await openChart(page);
     const nav = await page.locator('nav.navbar').boundingBox();

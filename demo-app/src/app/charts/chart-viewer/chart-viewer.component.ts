@@ -22,6 +22,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
 import { ChartStatusComponent } from '../chart-status/chart-status.component';
+import { IconComponent } from '../../shared/icons/icon.component';
 import { ReplayBarComponent, ReplayState } from '../replay/replay-bar.component';
 import { ChartToastsComponent, Toast } from '../replay/chart-toasts.component';
 import { ChartSidePanelComponent, PanelTab } from '../side-panel/chart-side-panel.component';
@@ -287,7 +288,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, LayoutsDialogComponent, ChartStatusComponent, ChartSidePanelComponent, ReplayBarComponent, ChartToastsComponent, DrawingSidebarComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, LayoutsDialogComponent, ChartStatusComponent, ChartSidePanelComponent, ReplayBarComponent, ChartToastsComponent, IconComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -303,16 +304,16 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
               </optgroup>
             }
           </select>
-          <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">📷</button>
-          <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">⛶</button>
-          <button type="button" class="tool-btn" data-layouts title="Layouts: save / load chart setups" aria-label="Layouts" (click)="layoutsOpen.set(true)">▤{{ layouts.current() ? ' ' + layouts.current() : '' }}</button>
-          <button type="button" class="tool-btn" data-replay [attr.aria-pressed]="!!replay()" title="Bar replay" aria-label="Bar replay" (click)="toggleReplay()">⏵ Replay</button>
-          <button type="button" class="tool-btn" data-compare title="Compare or add symbol" aria-label="Compare symbol" (click)="openSearch('', 'compare')">＋ Compare</button>
-          <button type="button" class="tool-btn" data-panel [attr.aria-pressed]="panelOpen()" title="Object tree, data window, watchlist, alerts" aria-label="Side panel" (click)="togglePanel()">☰</button>
-          <button type="button" class="tool-btn" data-chart-settings title="Chart settings" aria-label="Chart settings" (click)="settingsOpen.set(true)">⚙</button>
-          <button type="button" class="tool-btn" data-undo title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!drawingStore.canUndo(currentSymbol)" (click)="undo()">↶</button>
-          <button type="button" class="tool-btn" data-redo title="Redo (Ctrl+Y)" aria-label="Redo" [disabled]="!drawingStore.canRedo(currentSymbol)" (click)="redo()">↷</button>
-          <button type="button" class="reset-zoom-btn" title="Reset zoom" aria-label="Reset zoom" (click)="resetZoom()">↺</button>
+          <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()"><app-icon name="camera" [size]="18" /></button>
+          <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()"><app-icon name="fullscreen" [size]="18" /></button>
+          <button type="button" class="tool-btn" data-layouts title="Layouts: save / load chart setups" aria-label="Layouts" (click)="layoutsOpen.set(true)"><app-icon name="layouts" [size]="18" />@if (layouts.current()) { <span class="lbl">{{ layouts.current() }}</span> }</button>
+          <button type="button" class="tool-btn" data-replay [attr.aria-pressed]="!!replay()" title="Bar replay" aria-label="Bar replay" (click)="toggleReplay()"><app-icon name="replay" [size]="18" /><span class="lbl">Replay</span></button>
+          <button type="button" class="tool-btn" data-compare title="Compare or add symbol" aria-label="Compare symbol" (click)="openSearch('', 'compare')"><app-icon name="plus" [size]="18" /><span class="lbl">Compare</span></button>
+          <button type="button" class="tool-btn" data-panel [attr.aria-pressed]="panelOpen()" title="Object tree, data window, watchlist, alerts" aria-label="Side panel" (click)="togglePanel()"><app-icon name="panel" [size]="18" /></button>
+          <button type="button" class="tool-btn" data-chart-settings title="Chart settings" aria-label="Chart settings" (click)="settingsOpen.set(true)"><app-icon name="gear" [size]="18" /></button>
+          <button type="button" class="tool-btn" data-undo title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!drawingStore.canUndo(currentSymbol)" (click)="undo()"><app-icon name="undo" [size]="18" /></button>
+          <button type="button" class="tool-btn" data-redo title="Redo (Ctrl+Y)" aria-label="Redo" [disabled]="!drawingStore.canRedo(currentSymbol)" (click)="redo()"><app-icon name="redo" [size]="18" /></button>
+          <button type="button" class="reset-zoom-btn" title="Reset zoom" aria-label="Reset zoom" (click)="resetZoom()"><app-icon name="reset" [size]="18" /></button>
         </div>
       </header>
 
@@ -347,7 +348,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         [locked]="drawingStore.locked()" [hidden]="drawingStore.hidden()" (pick)="setTool($event)" (magnetToggle)="toggleMagnet()"
         (keepToggle)="keepDrawing.set(!keepDrawing())" (lockToggle)="drawingStore.toggleLocked()"
         (hideToggle)="drawingStore.toggleHidden(); redraw()" (clear)="clearDrawings()" (removeIndicators)="chartState.clearIndicators()"
-        (removeAll)="clearDrawings(); chartState.clearIndicators()" (emojiPick)="pickEmoji($event)" />
+        (removeAll)="clearDrawings(); chartState.clearIndicators()" (stampPick)="pickStamp($event)" />
       <div class="chart-col">
       <div class="chart-panel" data-pane="panel">
         <canvas #chartCanvas [attr.hidden]="error ? '' : null" [class.drawing]="!isSelectTool(tool())" (dblclick)="onDblClick($event)"
@@ -361,13 +362,13 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
             <select data-draw-dash aria-label="Line style" (change)="setDrawStyle(sd.id, { dash: $any($event.target).value })">
               @for (d of dashes; track d) { <option [value]="d" [selected]="(sd.style?.dash ?? 'solid') === d">{{ d }}</option> }
             </select>
-            <button type="button" data-draw-lock [attr.aria-pressed]="!!sd.locked" aria-label="Lock this drawing" title="Lock this drawing" (click)="setDrawFlag(sd.id, 'locked', !sd.locked)">🔒</button>
-            <button type="button" data-draw-hide aria-label="Hide this drawing" title="Hide this drawing" (click)="setDrawFlag(sd.id, 'hidden', true)">👁</button>
+            <button type="button" data-draw-lock [attr.aria-pressed]="!!sd.locked" aria-label="Lock this drawing" title="Lock this drawing" (click)="setDrawFlag(sd.id, 'locked', !sd.locked)"><app-icon name="lock" [size]="16" /></button>
+            <button type="button" data-draw-hide aria-label="Hide this drawing" title="Hide this drawing" (click)="setDrawFlag(sd.id, 'hidden', true)"><app-icon name="eyeoff" [size]="16" /></button>
             <select data-draw-order aria-label="Order" title="Bring to front / send to back" (change)="reorder(sd.id, $any($event.target).value); $any($event.target).value = ''">
               <option value="">Order…</option><option value="front">Bring to front</option><option value="forward">Bring forward</option><option value="backward">Send backward</option><option value="back">Send to back</option>
             </select>
-            <button type="button" data-draw-clone aria-label="Clone drawing (Ctrl+D)" title="Clone (Ctrl+D)" [disabled]="drawingStore.locked()" (click)="cloneSelected()">⧉</button>
-            <button type="button" data-draw-delete aria-label="Delete drawing" title="Delete drawing" [disabled]="drawingStore.locked()" (click)="deleteSelected()">🗑</button>
+            <button type="button" data-draw-clone aria-label="Clone drawing (Ctrl+D)" title="Clone (Ctrl+D)" [disabled]="drawingStore.locked()" (click)="cloneSelected()"><app-icon name="clone" [size]="16" /></button>
+            <button type="button" data-draw-delete aria-label="Delete drawing" title="Delete drawing" [disabled]="drawingStore.locked()" (click)="deleteSelected()"><app-icon name="trash" [size]="16" /></button>
           </div>
         }
         @if (ctxMenu(); as m) {
@@ -391,13 +392,13 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       </div>
       <div class="scale-bar" role="group" aria-label="Price scale">
       <button type="button" class="clock" data-clock title="Chart time (click to change the time zone)" (click)="settingsOpen.set(true)">{{ clockText() }}</button>
-      <button type="button" data-goto title="Go to date (Alt+G)" aria-label="Go to date" (click)="gotoOpen.set(true)">📅</button>
-      <button type="button" data-fit title="Fit all data" aria-label="Fit all data" (click)="fitAll()">⤢</button>
-      <button type="button" data-lock-scale [attr.aria-pressed]="scaleLocked()" title="Lock the price scale (no auto-fit, no vertical drag)" aria-label="Lock price scale" (click)="toggleLockScale()">🔒</button>
-      <button type="button" data-zoom-out title="Zoom out" aria-label="Zoom out" (click)="zoomBy(1 / 1.25)">−</button>
-      <button type="button" data-zoom-in title="Zoom in" aria-label="Zoom in" (click)="zoomBy(1.25)">+</button>
-      <button type="button" data-invert [attr.aria-pressed]="invertOn" title="Invert the price scale" (click)="chartState.toggleInvertScale()">⇅</button>
-      <button type="button" data-percent [attr.aria-pressed]="percentOn" title="Percentage scale: % change from the first visible bar" (click)="chartState.togglePercentScale()">%</button>
+      <button type="button" data-goto title="Go to date (Alt+G)" aria-label="Go to date" (click)="gotoOpen.set(true)"><app-icon name="calendar" [size]="16" /></button>
+      <button type="button" data-fit title="Fit all data" aria-label="Fit all data" (click)="fitAll()"><app-icon name="fit" [size]="16" /></button>
+      <button type="button" data-lock-scale [attr.aria-pressed]="scaleLocked()" title="Lock the price scale (no auto-fit, no vertical drag)" aria-label="Lock price scale" (click)="toggleLockScale()"><app-icon name="lock" [size]="16" /></button>
+      <button type="button" data-zoom-out title="Zoom out" aria-label="Zoom out" (click)="zoomBy(1 / 1.25)"><app-icon name="zoomout" [size]="16" /></button>
+      <button type="button" data-zoom-in title="Zoom in" aria-label="Zoom in" (click)="zoomBy(1.25)"><app-icon name="zoomin" [size]="16" /></button>
+      <button type="button" data-invert [attr.aria-pressed]="invertOn" title="Invert the price scale" (click)="chartState.toggleInvertScale()"><app-icon name="invert" [size]="16" /></button>
+      <button type="button" data-percent [attr.aria-pressed]="percentOn" title="Percentage scale: % change from the first visible bar" (click)="chartState.togglePercentScale()"><app-icon name="percent" [size]="16" /></button>
       <button type="button" data-auto [attr.aria-pressed]="autoScale()" title="Auto-fit the price scale to the visible bars (drag the chart vertically to switch it off)" (click)="setAuto()">auto</button>
       <button type="button" data-log [attr.aria-pressed]="logOn" title="Logarithmic price scale (volume too)" (click)="toggleLog()">log</button>
       </div>
@@ -458,6 +459,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       .scale-bar { display: flex; flex: none; justify-content: flex-end; gap: 2px; padding: 1px 8px; background: var(--c-surface); border-top: 1px solid var(--c-pane-border); }
       .scale-bar .clock { margin-right: auto; font-variant-numeric: tabular-nums; }
       .scale-bar button {
+        display: inline-flex; align-items: center;
         padding: 1px 6px; border: none; border-radius: var(--border-radius-sm); background: transparent;
         color: var(--c-text-muted); cursor: pointer; font-size: 0.75rem;
       }
@@ -471,9 +473,11 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
         padding: 3px 6px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--border-radius);
       }
       .draw-style input[type='color'] { width: 26px; height: 22px; padding: 0; border: none; background: none; cursor: pointer; }
-      .draw-style select, .draw-style button { font-size: 0.75rem; padding: 1px 4px; background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); }
+      .draw-style select, .draw-style button { display: inline-flex; align-items: center; font-size: 0.75rem; padding: 1px 4px; background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); border-radius: var(--border-radius-sm); }
       .text-edit { position: absolute; z-index: 6; width: 160px; padding: 2px 4px; font-size: 0.8rem; background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-primary); border-radius: var(--border-radius-sm); }
       .chart-tools { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
+      .tool-btn, .reset-zoom-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.4rem; }
+      .lbl { font-size: 0.8125rem; }
       .chart-tools select, .tool-btn {
         padding: 0.25rem 0.5rem;
         border: 1px solid var(--c-border);
@@ -585,7 +589,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     magnet: () => this.magnetOn,
     zoomTo: (r) => this.zoomToRegion(r),
     editText: (id) => this.openTextEditor(id),
-    emoji: () => this.emoji(),
+    stamp: () => this.stampName(),
     committed: () => { if (!this.keepDrawing()) { this.tool.set(this.cursorMode); this.drawings.syncPan(); this.applyCursorStyle(); } },
   });
 
@@ -608,8 +612,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
 
   redraw(): void { this.chart?.draw(); }
 
-  readonly emoji = signal('🙂');
-  pickEmoji(e: string): void { this.emoji.set(e); this.setTool('emoji'); }
+  readonly stampName = signal('iconstar');
+  pickStamp(n: string): void { this.stampName.set(n); this.setTool('stamp'); }
   setDrawFlag(id: string, flag: 'locked' | 'hidden', on: boolean): void { this.drawings.setFlag(id, flag, on); }
   reorder(id: string, how: string): void {
     if (['front', 'back', 'forward', 'backward'].includes(how)) { this.drawingStore.move(this.currentSymbol, id, how as 'front'); this.chart?.draw(); }
