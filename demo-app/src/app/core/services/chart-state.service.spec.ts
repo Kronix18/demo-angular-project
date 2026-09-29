@@ -215,9 +215,11 @@ describe('ChartStateService (task 4.1)', () => {
 
   it('view settings (11.11): everything on by default, replace + sanitise + persist', () => {
     const svc = TestBed.inject(ChartStateService);
-    expect(svc.snapshot().view).toEqual({ gridH: true, gridV: true, crosshair: true, lastPrice: true, ohlc: true });
+    expect(svc.snapshot().view).toEqual({ gridH: true, gridV: true, crosshair: true, lastPrice: true, ohlc: true, countdown: false, timezone: 'exchange', session: 'regular' });
     svc.setViewSettings({ gridH: false, crosshair: false, ohlc: 'no' as any, junk: 1 } as any);
-    expect(svc.snapshot().view).toEqual({ gridH: false, gridV: true, crosshair: false, lastPrice: true, ohlc: true });
+    expect(svc.snapshot().view).toEqual({ gridH: false, gridV: true, crosshair: false, lastPrice: true, ohlc: true, countdown: false, timezone: 'exchange', session: 'regular' });
+    svc.setViewSettings({ ...svc.snapshot().view, timezone: 'mars' as any, session: 'extended', countdown: true });
+    expect(svc.snapshot().view).toMatchObject({ timezone: 'exchange', session: 'extended', countdown: true }); // an unknown timezone falls back
     expect(JSON.parse(sessionStorage.getItem('chart-state')!).view.gridH).toBe(false);
     const again = new ChartStateService();
     expect(again.snapshot().view.crosshair).toBe(false);

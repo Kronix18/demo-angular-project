@@ -1002,13 +1002,15 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       await loaded();
       (q('[data-flyout="cursors"]') as HTMLButtonElement).click();
       fixture.detectChanges();
-      expect(qa('[data-flyout-tool]').map((b) => b.dataset['flyoutTool'])).toEqual(['cursor', 'dot', 'pointer', 'eraser']);
+      expect(qa('[data-flyout-tool]').map((b) => b.dataset['flyoutTool'])).toEqual(['cursor', 'dot', 'pointer', 'demo', 'eraser']);
       (q('[data-flyout-tool="dot"]') as HTMLButtonElement).click();
       fixture.detectChanges();
       expect(component.tool()).toBe('dot');
       expect(chartOf().$cursorStyle).toBe('dot');
       component.setTool('pointer');
       expect(chartOf().$cursorStyle).toBe('pointer');
+      component.setTool('demo');
+      expect(chartOf().$cursorStyle).toBe('demo');
       component.setTool('trend');
       expect(chartOf().$cursorStyle).toBe('cross');
     });
@@ -1189,7 +1191,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       (q('[data-ok]') as HTMLButtonElement).click();
       await fixture.whenStable();
       fixture.detectChanges();
-      expect(st.snapshot().view).toEqual({ gridH: false, gridV: false, crosshair: false, lastPrice: false, ohlc: false });
+      expect(st.snapshot().view).toMatchObject({ gridH: false, gridV: false, crosshair: false, lastPrice: false, ohlc: false });
       const c = chartOf();
       expect(c.options.scales.x.grid.display).toBe(false);
       expect(c.options.scales.y.grid.display).toBe(false);
@@ -1239,6 +1241,74 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       const scrollTo = vi.spyOn(component, 'scrollToLatest');
       key('End');
       expect(scrollTo).toHaveBeenCalled();
+    });
+  });
+
+  describe('go to date, lock scale, fit, clock (11.13)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    const fresh = () => { sessionStorage.clear(); localStorage.clear(); const st = TestBed.inject(ChartStateService); st.reset(); return st; };
+    const chartOf = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
+
+    it('go to date opens a dialog; picking a date centres the view on that bar', async () => {
+      fresh();
+      await loaded();
+      (q('[data-goto]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-goto-date-dialog')).toBeTruthy();
+      const zoomScale = vi.spyOn(chartOf(), 'zoomScale');
+      const bars = (component as any).bars as { timestamp: number }[];
+      const iso = new Date(bars[1].timestamp).toISOString().slice(0, 10);
+      const input = q('[data-goto-input]') as HTMLInputElement;
+      input.value = iso; input.dispatchEvent(new Event('input'));
+      (q('[data-ok]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('app-goto-date-dialog')).toBeNull();
+      expect(zoomScale).toHaveBeenCalled();
+      const [axis, range] = zoomScale.mock.calls[0] as any[];
+      expect(axis).toBe('x');
+      expect((range.min + range.max) / 2).toBeCloseTo(1, 0);
+    });
+
+    it('Alt+G opens go to date too', async () => {
+      fresh();
+      await loaded();
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', altKey: true, bubbles: true }));
+      fixture.detectChanges();
+      expect(q('app-goto-date-dialog')).toBeTruthy();
+    });
+
+    it('lock scale freezes the price range: auto, vertical drags and the auto button are inert while locked', async () => {
+      fresh();
+      await loaded();
+      expect(component.autoScale()).toBe(true);
+      (q('[data-lock-scale]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(component.autoScale()).toBe(false);
+      expect(q('[data-lock-scale]')!.getAttribute('aria-pressed')).toBe('true');
+      component.setAuto();
+      expect(component.autoScale()).toBe(false);
+      (q('[data-lock-scale]') as HTMLButtonElement).click();
+      component.setAuto();
+      expect(component.autoScale()).toBe(true);
+    });
+
+    it('fit all data zooms the x axis to every bar', async () => {
+      fresh();
+      await loaded();
+      const zoomScale = vi.spyOn(chartOf(), 'zoomScale');
+      (q('[data-fit]') as HTMLButtonElement).click();
+      const bars = (component as any).bars as unknown[];
+      expect((zoomScale.mock.calls[0] as any[])[1]).toMatchObject({ min: 0, max: bars.length - 1 });
+    });
+
+    it('the clock shows the time in the chosen timezone', async () => {
+      const st = fresh();
+      await loaded();
+      expect(q('[data-clock]')!.textContent).toMatch(/^\d\d:\d\d:\d\d UTC-[45]$/); // exchange time (New York)
+      st.setViewSettings({ ...st.snapshot().view, timezone: 'utc' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(q('[data-clock]')!.textContent).toMatch(/^\d\d:\d\d:\d\d UTC$/);
     });
   });
 

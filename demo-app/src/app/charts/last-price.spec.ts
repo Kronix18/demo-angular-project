@@ -30,4 +30,11 @@ describe('last price line (11.11)', () => {
     expect(lastPriceInfo(chart([]) as any)).toBeNull();
     expect(lastPriceInfo({ chartArea: null } as any)).toBeNull();
   });
+
+  it('carries the bar countdown when the chart has one', () => {
+    const c: any = chart([100, 110]);
+    expect(lastPriceInfo(c)!.countdown).toBeUndefined();
+    c.$countdown = () => '05:00:00';
+    expect(lastPriceInfo(c)!.countdown).toBe('05:00:00');
+  });
 });
