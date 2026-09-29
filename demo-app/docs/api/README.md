@@ -134,11 +134,11 @@ explain instead of failing. Anonymous access is allowed only for what the market
 GET /api/meta
 {
   "api_version": 2,
-  "data_as_of": { "prices": "2026-09-22", "technicals": "2026-09-22", "ratings": "2026-09-22",
+  "data_as_of": { "prices": "2026-09-22", "technicals": "2026-09-22", "rs": "2026-09-22", "eps": "2026-09-15", "smr": "2026-09-15",
                   "fundamentals": "2026-09-19", "institutional": "2026-06-30", "market": "2026-09-22" },
-  "next_refresh_after": "2026-09-23T02:00:00Z",
-  "model_versions": { "rs": ["RS_LEGACY_V1","RS_MULTIWINDOW_V1"], "eps": ["EPS_V1"], "composite": ["COMPOSITE_V1"] },
-  "datasets": ["prices","technicals","ratings","fundamentals","institutional","patterns","market","events"]
+  "next_refresh_after": "2026-09-23T02:00:00Z",   // may be null: the daily import is manual today
+  "model_versions": { "technicals": "TECHNICAL_DAILY_V1", "rs": ["RS_3M_V1","RS_6M_V1","RS_12M_V1","RS_ER3_V1"], "eps": "EPS_V5_3", "smr": "SMR_V4" },
+  "datasets": ["security_master","prices","splits","technicals","rs_ratings","eps_rating","smr_rating","filings"]   // later: weekly, index_prices, fundamentals, composite, patterns, market, institutional, events
 }
 ```
 

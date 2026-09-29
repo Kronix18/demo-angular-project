@@ -1,7 +1,6 @@
 # 04 — Fundamentals and SEC filings
 
-Backing: `sec_filing` (**DB**, 197 970 rows); `xbrl_facts_raw`, `financial_quarters`, `financial_years`, `fundamental_metrics` (**PLAN**;
-EPS building blocks exist as **CODE**).
+Backing: `sec_filing` (**DB**, 197 970 rows); `external_quarter_financials` (**DB**, yfinance quarters for foreign issuers and names with missing/stale SEC revenue); SEC-derived point-in-time inputs (`PROFITABILITY_V1`, EPS inputs, REIT FFO) exist inside the EPS/SMR pipelines but **which of them are queryable tables is UNKNOWN**; `financial_quarters`, `financial_years`, `fundamental_metrics` (**PLAN** as served datasets).
 
 ## 1. Filings (can ship first, only needs the DB)
 
@@ -52,6 +51,10 @@ filing changed the number (point-in-time: `as_of` returns the value known then).
 Requires only the datasets behind the requested `types`; unknown/unavailable types are simply absent (never an error).
 
 ## 4. Backend requirements
+- Every quarterly row carries `source`: `sec` \| `yfinance` \| `alpha_vantage` and `eps_basis`: `gaap` \| `adjusted` (the ratings are built on **adjusted** EPS, IBD-style; the UI shows both when both exist).
+- Banks/interest-income filers: `revenue` = interest and dividend income + non-interest income (the pipelines already do this); utilities use their own revenue concept. State the rule in `meta.revenue_basis`.
+- Foreign 20-F/6-K filers often have annual data only → sparse quarters are normal, not an error.
+- CIK lineage (reorganisations such as XOM) must be followed so history is continuous.
 - Normalised concept map (Revenue, NetIncome, EPS diluted…), currency USD only for now; ADR / 20-F filers flagged.
 - 10-K/A and 10-Q/A handled (`is_amendment`, `is_restated`).
 - `filing_date`/`accepted_at` stored so point-in-time (`as_of`) is exact.

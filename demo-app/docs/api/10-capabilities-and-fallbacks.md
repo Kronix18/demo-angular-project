@@ -15,7 +15,7 @@ upgrade CTA (entitlement false), or "not available yet" (dataset off).
 | Data | Preferred | Fallback | Parity |
 |---|---|---|---|
 | OHLCV | `/api/chart/{symbol}/ohlcv` | static `*.us.txt` | identical `Bar[]` |
-| SMA/EMA/ATR/volume-avg with stored period | `/technicals` | client calc | ≤ 1e-6 rel. vs Python golden fixtures |
+| SMA 10/50/200, EMA 21, ATR 14, avg volume 20/50 (stored in `technical_daily`) | `/technicals` | client calc | ≤ 1e-6 rel. vs Python golden fixtures |
 | Any other period / RSI / MACD / BB / … | client calc | – | – |
 | RS line | `/rs-line` | none (needs index + universe) | – |
 | Patterns, pivots, stops, sell markers | `/patterns`, `/trade-levels`, `/sell-signals` | none | – |

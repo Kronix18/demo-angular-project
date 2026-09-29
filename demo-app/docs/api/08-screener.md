@@ -9,7 +9,7 @@ The front end builds the filter UI **from this response**; adding a field on the
 ```json
 { "data": [ { "key": "eps_rating", "label": "EPS Rating", "group": "ratings", "type": "int", "min": 1, "max": 99, "unit": null,
               "operators": ["gte","lte","between","eq"], "sortable": true, "default_column": true,
-              "min_tier": "plus", "description": "…", "dataset": "ratings" },
+              "min_tier": "plus", "description": "…", "dataset": "eps_rating" },
             { "key": "sector_key", "label": "Sector", "group": "classification", "type": "enum", "options_ref": "/api/universe/facets#sectors",
               "operators": ["in","not_in"], "min_tier": "free", "dataset": "security_master" },
             { "key": "smr_rating", "type": "grade", "options": ["A","B","C","D","E"], "operators": ["in","gte_grade","lte_grade"] } ],
@@ -23,10 +23,10 @@ returned with `available:false` (greyed "coming soon" in the UI) — never omitt
 | Group | Keys | Status |
 |---|---|---|
 | classification | `sector_key`, `industry_key`, `industry_group`, `exchange`, `security_type`, `is_etf`, `is_adr`, `is_spac`, `sic` | DB |
-| price_volume | `price`, `change_pct`, `volume`, `dollar_volume_avg_50`, `market_cap`, `shares_outstanding`, `float_shares`, `ipo_date`, `age_years` | DB / prices |
-| technicals | `above_ema_21`, `above_sma_50`, `above_sma_200`, `ema_21_gt_sma_50`, `sma_50_gt_sma_200`, `pct_from_high_52w`, `pct_from_ath`, `pct_from_low_52w`, `atr_14_pct`, `rel_volume`, `ud_volume_ratio`, `vol_avg_50`, `rs_new_high` | CODE |
+| price_volume | `price`, `change_pct`, `volume`, `market_cap`, `shares_outstanding`, `float_shares`, `ipo_date`, `age_years` | DB / prices |
+| technicals | `pct_from_52w_high`, `pct_from_52w_low`, `pct_from_sma_50`, `pct_from_sma_200`, `new_52w_high`, `new_ath`, `atr_pct`, `relative_volume_50`, `up_down_volume_ratio_50`, `avg_volume_50`, `avg_dollar_volume_50`; derived booleans `above_ema_21`, `above_sma_50`, `above_sma_200` (price vs the stored MAs); later `rs_new_high` | **DB** (`technical_daily`) |
 | fundamentals | `eps_yoy_pct`, `eps_3q_avg_yoy_pct`, `eps_acceleration`, `sales_yoy_pct`, `sales_3q_avg_yoy_pct`, `sales_acceleration`, `eps_cagr_3y_pct`, `eps_cagr_5y_pct`, `roe_pct`, `gross_margin_pct`, `operating_margin_pct`, `net_margin_pct`, `margin_trend_pct` | PLAN |
-| ratings | `composite_rating`, `eps_rating`, `rs_rating`, `rs_3m_rating`, `rs_6m_rating`, `rs_exp_3m`, `smr_rating`, `accdist_rating`, `sponsorship_rating`, `group_rs_rating`, `group_rank`, `earnings_stability` | PLAN |
+| ratings | `rs_rating`, `rs_3m_rating`, `rs_6m_rating`, `rs_exp_3m` (**DB, daily**); `eps_rating`, `smr_rating` (**DB, 19 stored dates → screener `as_of` limited to those**); `composite_rating`, `accdist_rating`, `sponsorship_rating`, `group_rs_rating`, `group_rank`, `earnings_stability` (PLAN) | mixed |
 | canslim | `canslim_score`, `c_score`, `a_score`, `n_score`, `s_score`, `l_score`, `i_score`, `m_score` | PLAN |
 | patterns | `pattern_type`, `base_stage`, `base_quality_score`, `distance_to_pivot_pct`, `in_buy_zone`, `breakout_today`, `breakout_days_ago`, `failed_breakout`, `breakout_quality_score`, `early_entry_available` | PLAN |
 | institutional | `fund_count`, `fund_count_change_q`, `institutional_ownership_pct`, `consecutive_quarters_increase` | PLAN |

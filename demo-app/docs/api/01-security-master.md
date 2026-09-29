@@ -1,6 +1,6 @@
 # 01 — Security master
 
-Backing: `security_master` (**DB**), `security_symbol_history`, `security_name_history`, `corporate_actions` (**DB, empty**).
+Backing: `security_master` (**DB**), `splits`, `dividends` (**DB**), `corporate_actions` (**DB**), `security_symbol_history`, `security_name_history` (**DB, empty**).
 Conventions: see `README.md`.
 
 ## Object: `Security`
@@ -72,14 +72,13 @@ until that table is populated the current symbol is used and `meta.symbol_resolu
 ```
 `effective_from` inclusive, `effective_to` exclusive, `null` = current (as the backend defines it).
 
-### `GET /api/securities/{security_id}/corporate-actions?from=&to=&type=`  (**PLAN**)
+### `GET /api/securities/{security_id}/corporate-actions?from=&to=&type=`  (**DB** for split/dividend)
 Feeds chart markers (split "S", dividend "D") and the adjusted-price toggle.
 ```json
-{ "data": [ { "effective_date": "2024-06-10", "action_type": "split", "details": { "ratio_from": 1, "ratio_to": 10 }, "source": "…" },
+{ "data": [ { "effective_date": "2024-06-10", "action_type": "split", "details": { "factor": 10.0 }, "source": "…" },
             { "effective_date": "2026-08-14", "action_type": "dividend", "details": { "amount": 0.83, "currency": "USD" }, "source": "…" } ] }
 ```
-`action_type`: `split | reverse_split | dividend | special_dividend | spinoff | merger | delisting | symbol_change | name_change`
-(the backend's `corporate_actions` table is shared with a later task — front end only relies on `split`, `dividend`, `delisting`).
+`action_type` (backend CHECK domain): `split | dividend | merger | delisting | ticker_change | name_change`. Split `details`: `{"factor": 4.0}` (4.0 = 4:1, 0.5 = 1:2 reverse; the API may add `ratio_from/ratio_to`); dividend `details`: `{"amount": 0.83, "currency": "USD"}`. Sourced from `splits` / `dividends` (PK `security_id, ex_date`) and mirrored in `corporate_actions`; only **approved** splits are exposed (detected ones wait in `split_review_queue`).
 
 ### `GET /api/universe/facets`  (**DB**, cheap)
 Drives screener dropdowns and the industry tree. Counts respect the eligibility gate unless `scope=all`.

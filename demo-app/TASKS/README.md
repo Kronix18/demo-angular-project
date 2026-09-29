@@ -106,6 +106,7 @@ No backend dataset needed: everything is built and verified against contract fix
 | 12.8 | phase-12-api-foundation/12.8-metaservice-api-meta-with-dataset-signals.md | NOT STARTED | MetaService (`/api/meta`) with dataset signals — needs: `meta` |
 | 12.9 | phase-12-api-foundation/12.9-symbolcapabilities-api-chart-symbol-meta.md | NOT STARTED | SymbolCapabilities (`/api/chart/{symbol}/meta`) — needs: `prices` |
 | 12.10 | phase-12-api-foundation/12.10-appifdataset-appiffeature-structural-directives.md | NOT STARTED | `*appIfDataset` / `*appIfFeature` structural directives — needs: none |
+| 12.12 | phase-12-api-foundation/12.12-freshness-indicator.md | NOT STARTED | Freshness indicator — needs: `meta` |
 | 12.11 | phase-12-api-foundation/12.11-data-info-popover-as-of-model-versions.md | NOT STARTED | "Data info" popover (as_of, model versions) — needs: `meta` |
 
 ### Phase 13 — Prices from the backend
@@ -115,13 +116,14 @@ Replaces the static `*.us.txt` files with `/api/chart/...` when the backend can 
 |---|---|---|---|
 | 13.1 | phase-13-prices-from-backend/13.1-ohlcvapiclient-params-columnar-decode.md | NOT STARTED | OhlcvApiClient (params, columnar decode) — needs: `prices` |
 | 13.2 | phase-13-prices-from-backend/13.2-backend-first-data-source-with-static-fallback.md | NOT STARTED | Backend-first data source with static fallback — needs: `prices` |
-| 13.3 | phase-13-prices-from-backend/13.3-adjusted-price-toggle.md | NOT STARTED | Adjusted-price toggle — needs: `prices` + `adj_factor` |
+| 13.3 | phase-13-prices-from-backend/13.3-split-adjusted-price-toggle.md | NOT STARTED | Split-adjusted price toggle — needs: `prices` + `splits` (DB) |
+| 13.11 | phase-13-prices-from-backend/13.11-volume-policy-unadjusted-volume-notice.md | NOT STARTED | Volume policy: unadjusted volume notice — needs: `prices` |
 | 13.4 | phase-13-prices-from-backend/13.4-server-weekly-monthly-bars.md | NOT STARTED | Server weekly/monthly bars — needs: `prices` (weekly) |
 | 13.5 | phase-13-prices-from-backend/13.5-tier-truncation-notice.md | NOT STARTED | Tier truncation notice — needs: `prices` |
 | 13.6 | phase-13-prices-from-backend/13.6-batch-ohlcv-for-compare-overlay.md | NOT STARTED | Batch OHLCV for compare overlay — needs: `prices` (batch) |
 | 13.7 | phase-13-prices-from-backend/13.7-latest-quotes-for-header-and-watchlist.md | NOT STARTED | Latest quotes for header and watchlist — needs: `prices` (quotes) |
 | 13.8 | phase-13-prices-from-backend/13.8-index-benchmark-data.md | NOT STARTED | Index benchmark data — needs: `index_prices` |
-| 13.9 | phase-13-prices-from-backend/13.9-corporate-action-markers-split-dividend.md | NOT STARTED | Corporate-action markers (split/dividend) — needs: `corporate_actions` |
+| 13.9 | phase-13-prices-from-backend/13.9-corporate-action-markers-split-dividend.md | NOT STARTED | Corporate-action markers (split/dividend) — needs: `splits`, `dividends` (DB) |
 | 13.10 | phase-13-prices-from-backend/13.10-range-clamp-by-first-last-bar-and-delisting.md | NOT STARTED | Range clamp by first/last bar and delisting — needs: `prices` |
 
 ### Phase 14 — Server-side technicals and RS line
@@ -133,12 +135,13 @@ Uses the backend `technical_daily` series instead of calculating in the browser,
 | 14.2 | phase-14-server-technicals/14.2-technicalsapiclient-columnar.md | NOT STARTED | TechnicalsApiClient (columnar) — needs: `technicals` |
 | 14.3 | phase-14-server-technicals/14.3-indicatorsource-abstraction-server-vs-client.md | NOT STARTED | IndicatorSource abstraction (server vs client) — needs: `technicals` |
 | 14.4 | phase-14-server-technicals/14.4-use-server-sma-ema.md | NOT STARTED | Use server SMA/EMA — needs: `technicals` |
-| 14.5 | phase-14-server-technicals/14.5-use-server-atr-and-volume-averages.md | NOT STARTED | Use server ATR and volume averages — needs: `technicals` |
+| 14.5 | phase-14-server-technicals/14.5-use-server-atr14-and-volume-averages.md | NOT STARTED | Use server ATR14 and volume averages — needs: `technicals` |
 | 14.6 | phase-14-server-technicals/14.6-price-location-overlays.md | NOT STARTED | Price-location overlays — needs: `technicals` |
 | 14.7 | phase-14-server-technicals/14.7-ma-relation-badges.md | NOT STARTED | MA-relation badges — needs: `technicals` |
-| 14.8 | phase-14-server-technicals/14.8-weekly-10w-40w-ma-from-server.md | NOT STARTED | Weekly 10w/40w MA from server — needs: `technicals` (weekly) |
-| 14.9 | phase-14-server-technicals/14.9-rs-line-pane-from-rs-line.md | NOT STARTED | RS-line pane from `/rs-line` — needs: `relative_strength_history`, `index_prices` |
+| 14.8 | phase-14-server-technicals/14.8-weekly-10w-40w-ma-deferred-to-server.md | NOT STARTED | Weekly 10w/40w MA (deferred to server) — needs: `technical_weekly` (PLAN, low priority) |
+| 14.9 | phase-14-server-technicals/14.9-rs-line-pane-from-rs-line.md | NOT STARTED | RS-line pane from `/rs-line` — needs: `index_prices` (PLAN) — RS *ratings* exist, the RS *line* does not |
 | 14.10 | phase-14-server-technicals/14.10-rs-line-new-high-marker.md | NOT STARTED | RS-line new-high marker — needs: `relative_strength_history` |
+| 14.12 | phase-14-server-technicals/14.12-raw-vs-adjusted-basis-check.md | NOT STARTED | Raw vs adjusted basis check — needs: `technicals` |
 | 14.11 | phase-14-server-technicals/14.11-drop-redundant-client-compute.md | NOT STARTED | Drop redundant client compute — needs: `technicals` |
 
 ### Phase 15 — Screener v2
@@ -166,9 +169,12 @@ IBD-style ratings shown everywhere, plus the per-stock checkup page (plan §46).
 
 | # | File | Status | Backend dataset needed / summary |
 |---|---|---|---|
-| 16.1 | phase-16-ratings-checkup/16.1-ratingsapiclient-and-types.md | NOT STARTED | RatingsApiClient and types — needs: `ratings` |
+| 16.1 | phase-16-ratings-checkup/16.1-ratingsapiclient-and-types.md | NOT STARTED | RatingsApiClient and types — needs: `rs_ratings` (daily), `eps_rating`, `smr_rating` (19 dates) |
+| 16.12 | phase-16-ratings-checkup/16.12-model-rating-labelling-and-unrated-states.md | NOT STARTED | "Model rating" labelling and unrated states — needs: `ratings` |
+| 16.13 | phase-16-ratings-checkup/16.13-sparse-ratings-history-step-sparkline.md | NOT STARTED | Sparse ratings history (step sparkline) — needs: `eps_rating`, `smr_rating` (19 dates) |
+| 16.14 | phase-16-ratings-checkup/16.14-valid-date-pickers-from-ratings-dates.md | NOT STARTED | Valid-date pickers from `/ratings/dates` — needs: `ratings` (dates) |
 | 16.2 | phase-16-ratings-checkup/16.2-rating-badge-component.md | NOT STARTED | Rating badge component — needs: none |
-| 16.3 | phase-16-ratings-checkup/16.3-stock-header-ratings-strip.md | NOT STARTED | Stock header ratings strip — needs: `ratings` |
+| 16.3 | phase-16-ratings-checkup/16.3-stock-header-ratings-strip.md | NOT STARTED | Stock header ratings strip — needs: `rs_ratings`, `eps_rating`, `smr_rating` |
 | 16.4 | phase-16-ratings-checkup/16.4-ratings-history-sparkline.md | NOT STARTED | Ratings history sparkline — needs: `ratings` (history) |
 | 16.5 | phase-16-ratings-checkup/16.5-chart-legend-ratings.md | NOT STARTED | Chart legend ratings — needs: `ratings` |
 | 16.6 | phase-16-ratings-checkup/16.6-screener-ratings-columns.md | NOT STARTED | Screener ratings columns — needs: `ratings` |
