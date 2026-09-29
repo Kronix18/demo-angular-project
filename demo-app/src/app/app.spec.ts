@@ -150,4 +150,38 @@ describe('App — navbar composition', () => {
     }
     expect(inlineStyled.length).toBe(0);
   });
+
+  describe('navigation (6.1)', () => {
+    const hrefOf = (label: string) => anchorWithText('.nav-links a', label)?.getAttribute('href');
+    const activeLabels = () =>
+      Array.from(navbar.querySelectorAll('.nav-links a.active')).map((a) => (a.textContent ?? '').trim());
+
+    it('Charts link exists in both auth states, pointing at the default symbol', async () => {
+      await createFixture();
+      expect(hrefOf('Charts')).toBe('/charts/msft');
+      TestBed.resetTestingModule();
+      seedLoggedIn();
+      await createFixture();
+      expect(hrefOf('Charts')).toBe('/charts/msft');
+    });
+
+    it('the link for the current route gets the active class', async () => {
+      await createFixture();
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/pricing');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(activeLabels()).toEqual(['Pricing']);
+    });
+
+    it('chart routes flag the shell fullscreen (compact navbar, no footer)', async () => {
+      await createFixture();
+      const container = fixture.nativeElement.querySelector('.app-container') as HTMLElement;
+      expect(container.classList.contains('fullscreen')).toBe(false);
+      expect(fixture.nativeElement.querySelector('footer')).toBeTruthy();
+      const route = routes.find((r) => r.path === 'charts/:symbol');
+      expect(route?.data?.['fullscreen']).toBe(true);
+    });
+  });
 });

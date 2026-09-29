@@ -308,6 +308,74 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(errEl).toBeTruthy();
   });
 
+  describe('error & loading states (6.3)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+
+    it('shows a skeleton (not stale content) while loading, gone afterwards', async () => {
+      fixture.detectChanges();
+      expect(q('.skeleton')).toBeTruthy();
+      httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(q('.skeleton')).toBeNull();
+    });
+
+    it('unknown symbol: names the symbol, lists available symbols, offers Retry; no chart instance', async () => {
+      stubCanvas();
+      httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+      await fixture.whenStable();
+      component.loadChartData('aapl', '1d');
+      httpMock.expectOne('test-data/aapl.us.txt').flush('nope', { status: 404, statusText: 'Not Found' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const card = q('.error-card');
+      expect(card).toBeTruthy();
+      expect(card!.textContent).toContain('AAPL');
+      for (const sym of ['msft', 'qqq', 'nvda']) expect(card!.textContent).toContain(sym);
+      expect(q('[data-retry]')).toBeTruthy();
+      expect(Chart.getChart(component.chartCanvas!.nativeElement)).toBeUndefined();
+      expect(q('canvas')!.hasAttribute('hidden')).toBe(true);
+    });
+
+    it('Retry re-invokes the load for the failed symbol', async () => {
+      stubCanvas();
+      httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+      await fixture.whenStable();
+      component.loadChartData('aapl', '1d');
+      httpMock.expectOne('test-data/aapl.us.txt').flush('x', { status: 404, statusText: 'Not Found' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      (q('[data-retry]') as HTMLButtonElement).click();
+      const retried = httpMock.expectOne('test-data/aapl.us.txt');
+      retried.flush('x', { status: 404, statusText: 'Not Found' });
+    });
+
+    it('clicking an available symbol in the error card switches the chart to it', async () => {
+      stubCanvas();
+      httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+      await fixture.whenStable();
+      component.loadChartData('aapl', '1d');
+      httpMock.expectOne('test-data/aapl.us.txt').flush('x', { status: 404, statusText: 'Not Found' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const st = TestBed.inject(ChartStateService);
+      const btn = Array.from(fixture.nativeElement.querySelectorAll('[data-symbol]')).find(
+        (b) => (b as HTMLElement).dataset['symbol'] === 'qqq') as HTMLButtonElement;
+      btn.click();
+      expect(st.snapshot().symbol).toBe('qqq');
+      httpMock.expectOne('test-data/qqq.us.txt').flush(MSFT_ROWS);
+    });
+
+    it('known symbol with an empty file says "No data" (not "unknown symbol")', async () => {
+      stubCanvas();
+      httpMock.expectOne('test-data/msft.us.txt').flush('<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>');
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(q('.error-card')!.textContent).toMatch(/no data/i);
+      expect(q('.error-card')!.textContent).not.toMatch(/unknown symbol/i);
+    });
+  });
+
   describe('indicators on the chart (5.2)', () => {
     const rows = (n: number) => {
       const out = ['<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>'];
