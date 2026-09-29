@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef, signal, computed } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef, signal, computed, effect } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService, AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
@@ -22,6 +22,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { cssVar, resolveColor } from '../chart-theme';
 import { DrawingController, Tool, ZoomRegion } from '../drawings/drawing-controller';
 import { ChartStatusComponent } from '../chart-status/chart-status.component';
+import { ChartSidePanelComponent, PanelTab } from '../side-panel/chart-side-panel.component';
+import { WatchlistService } from '../../core/services/watchlist.service';
+import { AlertService } from '../../core/services/alert.service';
+import { toolDef } from '../drawings/drawing-tools';
 import { GotoDateDialogComponent } from '../dialogs/goto-date-dialog.component';
 import { barCountdown, formatClock } from '../market-time';
 import { ChartSettingsDialogComponent } from '../dialogs/chart-settings-dialog.component';
@@ -263,7 +267,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
-  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, ChartStatusComponent, DrawingSidebarComponent],
+  imports: [CommonModule, ChartToolbarComponent, ChartLegendComponent, IndicatorsDialogComponent, IndicatorSettingsDialogComponent, SymbolSearchDialogComponent, SymbolSettingsDialogComponent, ChartSettingsDialogComponent, GotoDateDialogComponent, ChartStatusComponent, ChartSidePanelComponent, DrawingSidebarComponent],
   template: `
     <div class="chart-page">
       <header class="chart-header">
@@ -281,6 +285,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           </select>
           <button type="button" class="tool-btn" data-screenshot title="Save chart as PNG" aria-label="Save chart as PNG" (click)="screenshot()">Snapshot</button>
           <button type="button" class="tool-btn" data-fullscreen title="Toggle fullscreen" aria-label="Toggle fullscreen" (click)="toggleFullscreen()">Fullscreen</button>
+          <button type="button" class="tool-btn" data-panel [attr.aria-pressed]="panelOpen()" title="Object tree, data window, watchlist, alerts" aria-label="Side panel" (click)="togglePanel()">☰</button>
           <button type="button" class="tool-btn" data-chart-settings title="Chart settings" aria-label="Chart settings" (click)="settingsOpen.set(true)">⚙</button>
           <button type="button" class="tool-btn" data-undo title="Undo (Ctrl+Z)" aria-label="Undo" [disabled]="!drawingStore.canUndo(currentSymbol)" (click)="undo()">↶</button>
           <button type="button" class="tool-btn" data-redo title="Redo (Ctrl+Y)" aria-label="Redo" [disabled]="!drawingStore.canRedo(currentSymbol)" (click)="redo()">↷</button>
@@ -340,6 +345,7 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
           <div class="ctx-menu" data-ctx-menu role="menu" [style.left.px]="m.x" [style.top.px]="m.y">
             <button type="button" role="menuitem" data-ctx="reset" (click)="ctxDo('reset')">Reset chart view</button>
             <button type="button" role="menuitem" data-ctx="hline" (click)="ctxDo('hline')">Add horizontal line at {{ m.price.toFixed(2) }}</button>
+            <button type="button" role="menuitem" data-ctx="alert" (click)="ctxDo('alert')">Add alert at {{ m.price.toFixed(2) }}</button>
             <button type="button" role="menuitem" data-ctx="clear" (click)="ctxDo('clear')">Remove drawings</button>
             <button type="button" role="menuitem" data-ctx="settings" (click)="ctxDo('settings')">Settings…</button>
           </div>
@@ -366,6 +372,15 @@ interface LegendSeries { index: number; label: string; color: string; hidden: bo
       <button type="button" data-log [attr.aria-pressed]="logOn" title="Logarithmic price scale (volume too)" (click)="toggleLog()">log</button>
       </div>
       </div>
+      @if (panelOpen()) {
+        <app-chart-side-panel [tab]="panelTab()" [indicators]="panelIndicators()" [drawings]="panelDrawings()" [selectedId]="selectedId()"
+          [data]="panelData()" [watch]="panelWatch()" [current]="currentSymbol" [alerts]="panelAlerts()"
+          (tabChange)="setPanelTab($event)" (indicatorToggle)="toggleIndicator($event)" (indicatorRemove)="removeIndicator($event)" (indicatorSettings)="openSettings($event)"
+          (drawingSelect)="selectDrawing($event)" (drawingToggleHidden)="toggleDrawingFlag($event, 'hidden')" (drawingToggleLocked)="toggleDrawingFlag($event, 'locked')"
+          (drawingRemove)="removeDrawing($event)" (drawingOrder)="reorder($event.id, $event.how)"
+          (watchPick)="chartState.setSymbol($event)" (watchAdd)="watchlist.add($event)" (watchRemove)="watchlist.remove($event)"
+          (alertAdd)="addAlert($event)" (alertRemove)="alerts.remove($event)" />
+      }
       </div>
     </div>
   `,
@@ -808,6 +823,51 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   readonly seriesDialog = signal<'price' | 'volume' | null>(null);
   readonly settingsOpen = signal(false);
   readonly gotoOpen = signal(false);
+
+  // ---- side panel (11.14) ---------------------------------------------------------
+  protected readonly watchlist = inject(WatchlistService);
+  protected readonly alerts = inject(AlertService);
+  private readonly savedPanel = ((): { open: boolean; tab: PanelTab } => {
+    try { const p = JSON.parse(localStorage.getItem('chart-panel') ?? '{}'); return { open: p.open === true, tab: ['objects', 'data', 'watchlist', 'alerts'].includes(p.tab) ? p.tab : 'objects' }; } catch { return { open: false, tab: 'objects' }; }
+  })();
+  readonly panelOpen = signal(this.savedPanel.open);
+  readonly panelTab = signal<PanelTab>(this.savedPanel.tab);
+  private savePanel(): void { try { localStorage.setItem('chart-panel', JSON.stringify({ open: this.panelOpen(), tab: this.panelTab() })); } catch { /* per-session only */ } }
+  togglePanel(): void { this.panelOpen.update((v) => !v); this.savePanel(); }
+  setPanelTab(t: PanelTab): void { this.panelTab.set(t); this.savePanel(); }
+
+  readonly panelIndicators = computed(() => (this.legendSource()?.series ?? []).map((s) => ({ index: s.index, label: s.label, color: s.color, hidden: s.hidden })));
+  readonly panelDrawings = computed(() => {
+    this.drawingStore.revision();
+    this.legendSource(); // a symbol switch rebuilds the chart
+    return this.drawingStore.list(this.currentSymbol).map((d) => ({ id: d.id, label: toolDef(d.type)?.label ?? d.type, hidden: !!d.hidden, locked: !!d.locked }));
+  });
+  readonly panelData = computed(() => {
+    const src = this.legendSource();
+    const bars = this.bars;
+    if (!src || !bars.length) return { date: '', rows: [] };
+    const i = Math.min(Math.max(0, this.hoverIndex() ?? bars.length - 1), bars.length - 1);
+    const b = bars[i];
+    const prev = i > 0 ? bars[i - 1] : null;
+    const f = (v: number) => v.toFixed(2);
+    const rows = [
+      { label: 'Open', value: f(b.open) }, { label: 'High', value: f(b.high) }, { label: 'Low', value: f(b.low) }, { label: 'Close', value: f(b.close) },
+      { label: 'Volume', value: compactVolume(b.volume) },
+      { label: 'Change', value: prev ? `${b.close - prev.close >= 0 ? '+' : ''}${f(b.close - prev.close)} (${f(((b.close - prev.close) / prev.close) * 100)}%)` : '–' },
+      ...src.series.map((s) => { const v = s.values[Math.min(i, s.values.length - 1)]; return { label: s.label, value: typeof v === 'number' ? f(v) : '–', color: s.color }; }),
+    ];
+    return { date: this.formatBarDate(b.timestamp), rows };
+  });
+  readonly panelWatch = computed(() => this.watchlist.list().map((symbol) => ({ symbol, ...(this.watchlist.quotes()[symbol] ?? {}) })));
+  readonly panelAlerts = computed(() => this.alerts.list());
+
+  toggleDrawingFlag(id: string, flag: 'locked' | 'hidden'): void {
+    const d = this.drawingStore.list(this.currentSymbol).find((x) => x.id === id);
+    if (d) this.drawings.setFlag(id, flag, !d[flag]);
+  }
+  selectDrawing(id: string): void { this.drawings.select(id); }
+  removeDrawing(id: string): void { this.drawingStore.remove(this.currentSymbol, id); this.drawings.select(null); this.redraw(); }
+  addAlert(price: number): void { this.alerts.add(this.currentSymbol, price); this.chart?.draw(); }
   readonly scaleLocked = signal(false);
   readonly clockText = signal('');
   private clockTimer: ReturnType<typeof setInterval> | null = null;
@@ -853,11 +913,12 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     this.ctxMenu.set({ x, y, price: Number.isFinite(price) ? price : 0, t: this.bars.length ? timeForIndex(this.bars, idx) : 0 });
   }
 
-  ctxDo(what: 'reset' | 'hline' | 'clear' | 'settings'): void {
+  ctxDo(what: 'reset' | 'hline' | 'alert' | 'clear' | 'settings'): void {
     const m = this.ctxMenu();
     this.ctxMenu.set(null);
     if (what === 'reset') { this.resetZoom(); this.setAuto(); }
     else if (what === 'hline' && m) { this.drawingStore.add(this.currentSymbol, { id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, type: 'hline', a: { t: m.t, p: m.price } }); this.redraw(); }
+    else if (what === 'alert' && m) this.addAlert(m.price);
     else if (what === 'clear') this.clearDrawings();
     else this.settingsOpen.set(true);
   }
@@ -955,6 +1016,9 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     this.router = router;
     this.cdr = cdr;
     this.chartState = chartState;
+    // quotes are only fetched while the watchlist is on screen
+    effect(() => { if (this.panelOpen() && this.panelTab() === 'watchlist') for (const s of this.watchlist.list()) this.watchlist.loadQuote(s); });
+    effect(() => { this.alerts.list(); this.chart?.draw(); });
   }
 
   ngOnInit(): void {
@@ -1329,6 +1393,7 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     (this.chart as any).$percentBase = () => this.percentBase();
     (this.chart as any).$percentOn = this.percentOn;
     (this.chart as any).$lastBars = () => this.bars;
+    (this.chart as any).$alerts = () => this.alerts.forSymbol(this.currentSymbol);
     (this.chart as any).$countdown = () => { const v = this.chartState.snapshot().view; return v.countdown ? barCountdown(new Date(), this.currentInterval, v.session) : undefined; };
     (this.chart as any).$crosshairOn = view.crosshair;
     (this.chart as any).$lastPriceOn = view.lastPrice;

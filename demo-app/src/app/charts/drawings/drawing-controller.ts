@@ -131,6 +131,12 @@ export class DrawingController {
     return null;
   }
 
+  /** Selects a drawing (the object tree); `null` clears the selection. */
+  select(id: string | null): void {
+    this.selectedId = id && this.find(id) ? id : null;
+    this.deps.changed();
+  }
+
   /** Per-drawing lock / hide. Hiding also deselects. */
   setFlag(id: string, flag: 'locked' | 'hidden', on: boolean): void {
     const d = this.find(id);

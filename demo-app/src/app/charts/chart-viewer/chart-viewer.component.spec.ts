@@ -95,6 +95,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
   }
 
   afterEach(() => {
+    localStorage.clear(); // panel, lock / hide, watchlist and alert state persist there
     // Destroy the fixture FIRST (runs ngOnDestroy, tears down the chart),
     // then flush any request the http testing controller still holds, then
     // verify — order matters, verify() fails on open requests.
@@ -1336,7 +1337,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       return st;
     };
     const openPanel = async (tab: string) => {
-      (q('[data-panel]') as HTMLButtonElement).click();
+      if (!q('app-chart-side-panel')) (q('[data-panel]') as HTMLButtonElement).click();
       fixture.detectChanges();
       (q(`[data-tab="${tab}"]`) as HTMLButtonElement).click();
       fixture.detectChanges();
@@ -1414,6 +1415,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       fixture.detectChanges();
       expect(alerts.forSymbol('msft').map((a: any) => a.price)).toEqual([480]);
       expect(chartOf().$alerts().map((a: any) => a.price)).toEqual([480]);
+      chartOf().scales.y.getValueForPixel = () => 490; // the stub canvas has no real scale
       component.chartCanvas!.nativeElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 120 }));
       fixture.detectChanges();
       (q('[data-ctx="alert"]') as HTMLButtonElement).click();
