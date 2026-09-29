@@ -22,6 +22,10 @@ export interface CatalogItem {
   buildParams(period: number): Record<string, unknown>;
 }
 
+/** Allowed period range for period-based indicators (validated inline in the panel). */
+export const PERIOD_MIN = 2;
+export const PERIOD_MAX = 500;
+
 export const INDICATOR_CATALOG: CatalogItem[] = [
   {
     type: 'sma', label: 'SMA', kind: 'overlay', definitionId: 'moving_average', defaultPeriod: 20, usesPeriod: true,
@@ -30,6 +34,14 @@ export const INDICATOR_CATALOG: CatalogItem[] = [
   {
     type: 'ema', label: 'EMA', kind: 'overlay', definitionId: 'moving_average', defaultPeriod: 21, usesPeriod: true,
     buildParams: (p) => ({ method: 'EMA', source: 'close', length: p }),
+  },
+  {
+    type: 'wma', label: 'WMA', kind: 'overlay', definitionId: 'moving_average', defaultPeriod: 10, usesPeriod: true,
+    buildParams: (p) => ({ method: 'WMA', source: 'close', length: p }),
+  },
+  {
+    type: 'rma', label: 'RMA', kind: 'overlay', definitionId: 'moving_average', defaultPeriod: 14, usesPeriod: true,
+    buildParams: (p) => ({ method: 'RMA', source: 'close', length: p }),
   },
   {
     type: 'rsi', label: 'RSI', kind: 'pane', definitionId: 'rsi', defaultPeriod: 14, usesPeriod: true,

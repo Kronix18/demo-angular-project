@@ -103,7 +103,11 @@ export class ChartStateService {
         symbol: typeof parsed.symbol === 'string' ? parsed.symbol : DEFAULTS.symbol,
         interval: typeof parsed.interval === 'string' ? parsed.interval : DEFAULTS.interval,
         range: typeof parsed.range === 'string' ? parsed.range : DEFAULTS.range,
-        indicators: Array.isArray(parsed.indicators) ? parsed.indicators : [],
+        indicators: Array.isArray(parsed.indicators)
+          ? parsed.indicators.filter(
+              (i: any) => i && typeof i.type === 'string' && typeof i.period === 'number' && Number.isFinite(i.period)
+            )
+          : [],
       };
     } catch {
       return { ...DEFAULTS, indicators: [] };

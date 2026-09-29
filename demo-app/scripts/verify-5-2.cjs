@@ -39,7 +39,17 @@ fs.mkdirSync(OUT, { recursive: true });
   check('baseline: no indicator rows', (await page.$$('[data-indicator-row]')).length === 0);
   check('baseline: no oscillator panes', (await paneIds()).length === 0);
 
+  // 5.3 validation: inline errors, no dialogs
+  let dialogs = 0; page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+  await page.selectOption('select[name="indicatorType"]', 'sma');
+  await page.fill('input[name="indicatorPeriod"]', '1'); await page.click('[data-add]'); await page.waitForTimeout(150);
+  const badMsg = await page.textContent('[data-error]').catch(() => null);
+  check('5.3 invalid period shows inline error, nothing added', /2.*500/.test(badMsg || '') && (await page.$$('[data-indicator-row]')).length === 0, badMsg);
   await addInd('sma', 20);
+  await page.click('[data-add]'); await page.waitForTimeout(150);
+  const dupMsg = await page.textContent('[data-error]').catch(() => null);
+  check('5.3 duplicate add shows inline error', /already/i.test(dupMsg || '') && (await page.$$('[data-indicator-row]')).length === 1, dupMsg);
+  check('5.3 no alert dialogs', dialogs === 0);
   const labels = await datasetLabels();
   check('SMA 20 dataset on price chart', labels.includes('SMA 20'), JSON.stringify(labels));
   await page.screenshot({ path: path.join(OUT, '5.2-sma-overlay.png') });

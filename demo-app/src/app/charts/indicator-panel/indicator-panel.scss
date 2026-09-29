@@ -42,3 +42,5 @@ button:hover { border-color: var(--c-primary, #2563eb); color: var(--c-primary, 
 .kind { opacity: 0.6; font-size: 0.75rem; }
 .remove-btn { border: none; background: none; padding: 0 0.25rem; font-size: 1rem; line-height: 1; }
 .empty { opacity: 0.6; }
+input.invalid { border-color: var(--auth-error-color, #dc3545); }
+.error { color: var(--auth-error-color, #dc3545); }
