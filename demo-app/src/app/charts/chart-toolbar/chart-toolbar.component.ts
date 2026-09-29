@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
@@ -159,6 +159,8 @@ export class ChartToolbarComponent {
   // Only symbols with demo data (0.3 spec) — drives the datalist.
   symbols = [...AVAILABLE_SYMBOLS];
 
+  private cdr = inject(ChangeDetectorRef);
+
   constructor(private store: ChartStateService) {
     // Initialize form values FROM the store (rehydration: refresh keeps the
     // user's symbol/interval — single source of truth).
@@ -172,6 +174,7 @@ export class ChartToolbarComponent {
       this.symbol = s.symbol;
       this.interval = s.interval;
       this.range = s.range;
+      this.cdr.markForCheck(); // zoneless: store writes from elsewhere must schedule a render
     });
   }
 

@@ -67,4 +67,24 @@ test.describe('chart page layout (5.4)', () => {
     expect(perf.p90).toBeLessThan(60);
     expect(errors).toEqual([]);
   });
+
+  test('cold load of the FULL history (ALL, 4 indicators) is interactive in < 3s; interval switch does not refetch', async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('chart-state', JSON.stringify({
+      symbol: 'msft', interval: '1d', range: 'ALL',
+      indicators: [{ type: 'sma', period: 20 }, { type: 'ema', period: 50 }, { type: 'rsi', period: 14 }, { type: 'atr', period: 14 }],
+    })));
+    let fileRequests = 0;
+    page.on('request', (r) => { if (r.url().includes('/test-data/')) fileRequests++; });
+    const t0 = Date.now();
+    await page.goto('/charts/msft');
+    await page.waitForFunction(() => (window as any).__charts?.chart && !document.querySelector('.loading-overlay'));
+    const loadMs = Date.now() - t0;
+    console.log(`[perf] cold ALL load with 4 indicators: ${loadMs} ms (dev server, unoptimised build)`);
+    expect(loadMs).toBeLessThan(3000);
+    const bars = await page.evaluate(() => (window as any).__charts.chart.scales.x.max + 1);
+    expect(bars).toBeGreaterThan(9000); // really the full ~40y history
+    await page.selectOption('#interval', '1w');
+    await page.waitForFunction((n) => (window as any).__charts.chart.scales.x.max + 1 < n / 3, bars);
+    expect(fileRequests).toBe(1);
+  });
 });

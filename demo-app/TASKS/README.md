@@ -69,7 +69,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 6.1 | phase-6-integration/6.1-routing-navigation.md | DONE (browser-verified, `scripts/verify-6-1-6-3.cjs`) | active-route styling, Charts link reopens last symbol, chart routes are fullscreen |
 | 6.2 | phase-6-integration/6.2-design-token-compliance.md | DONE for shell + chart (browser-verified, `verify-6-2.cjs` 9/9); feature pages grandfathered by a ratchet | theme.scss, guard spec, opt-in dark theme |
 | 6.3 | phase-6-integration/6.3-error-loading-states.md | DONE (browser-verified 13/13) | skeleton, error card (unknown symbol / no data / failed) + symbol picker + Retry |
-| 6.4 | phase-6-integration/6.4-performance.md | NOT STARTED | MSFT has ~40y of daily bars |
+| 6.4 | phase-6-integration/6.4-performance.md | DONE (measured; via LOD windowing, not LTTB) | cold ALL (10k bars, 4 indicators) 672 ms; pan ~17 ms/frame; e2e-enforced budgets |
 | 7.1 | phase-7-testing/7.1-coverage-gate.md | DONE | `npm run test:coverage`: 97.8% stmts / 89.3% branches over core+charts+app.ts, gate at 80% |
 | 7.2 | phase-7-testing/7.2-e2e-playwright.md | DONE | `npm run e2e`: 19 Playwright tests (auth, chart, indicators, layout x4 sizes, states, theme) |
 | 7.3 | phase-7-testing/7.3-manual-matrix.md | NOT STARTED | |

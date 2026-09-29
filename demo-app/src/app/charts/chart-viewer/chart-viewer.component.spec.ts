@@ -379,12 +379,13 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       }
       const st = TestBed.inject(ChartStateService);
       st.setRange('ALL');
-      st.setInterval('1w');
-      // the initial load and the interval-change reload are both in flight
-      const reqs = httpMock.match('test-data/msft.us.txt');
-      expect(reqs.length).toBe(2);
-      reqs.forEach((r) => r.flush(rows.join('\r\n')));
+      httpMock.expectOne('test-data/msft.us.txt').flush(rows.join('\r\n'));
       await fixture.whenStable();
+      const daily = (Chart.getChart(component.chartCanvas!.nativeElement) as any).data.datasets[0].data.length;
+      st.setInterval('1w'); // re-aggregates from the cached file: NO second request
+      expect(httpMock.match('test-data/msft.us.txt').length).toBe(0);
+      await fixture.whenStable();
+      expect(daily).toBeGreaterThan(30);
       const chart: any = Chart.getChart(component.chartCanvas!.nativeElement);
       const pts = chart.data.datasets[0].data;
       expect(pts.length).toBeGreaterThan(5);

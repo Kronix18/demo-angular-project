@@ -356,11 +356,14 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         if (symbolChanged) {
           this.router.navigate(['/charts', s.symbol], { replaceUrl: true });
         }
-        if (symbolChanged || intervalChanged) {
+        if (symbolChanged) {
           this.loadChartData(s.symbol, s.interval);
         } else if (this.allData.length) {
-          // an indicator-only change keeps the user's current pan/zoom view
-          this.createChart(this.allData, rangeChanged ? undefined : this.currentView());
+          // The file holds daily bars; weekly is aggregated client-side, so an
+          // interval/range/indicator change re-renders from cache (no refetch).
+          // Only indicator-only changes keep the user's current pan/zoom view.
+          const reframe = rangeChanged || intervalChanged;
+          this.createChart(this.allData, reframe ? undefined : this.currentView());
         }
       });
   }
