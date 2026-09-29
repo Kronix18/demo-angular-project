@@ -72,7 +72,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 6.4 | phase-6-integration/6.4-performance.md | DONE (measured; via LOD windowing, not LTTB) | cold ALL (10k bars, 4 indicators) 672 ms; pan ~17 ms/frame; e2e-enforced budgets |
 | 7.1 | phase-7-testing/7.1-coverage-gate.md | DONE | `npm run test:coverage`: 97.8% stmts / 89.3% branches over core+charts+app.ts, gate at 80% |
 | 7.2 | phase-7-testing/7.2-e2e-playwright.md | DONE | `npm run e2e`: 19 Playwright tests (auth, chart, indicators, layout x4 sizes, states, theme) |
-| 7.3 | phase-7-testing/7.3-manual-matrix.md | NOT STARTED | |
+| 7.3 | phase-7-testing/7.3-manual-matrix.md | DONE (29 PASS, 2 NOT RUN: Firefox/WebKit not installed) | [docs/MANUAL-MATRIX.md](../docs/MANUAL-MATRIX.md) |
 | 8.1 | phase-8-cleanup-docs/8.1-dead-file-removal.md | DONE | 20 dead files removed; build + 14 spec files + browser scripts green |
 | 8.2 | phase-8-cleanup-docs/8.2-readme-architecture.md | DONE | README rewritten, docs/ARCHITECTURE.md added, links checked, cold `npm ci && npm run build` verified |
 | 8.3 | phase-8-cleanup-docs/8.3-production-build.md | DONE (browser-verified) | production build clean (no warnings), `npm run e2e:prod` smoke on the static bundle |
