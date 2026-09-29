@@ -87,7 +87,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     const canvases = Array.from(
       fixture.nativeElement.querySelectorAll('canvas')
     ) as HTMLCanvasElement[];
-    expect(canvases.length).toBeGreaterThanOrEqual(2);
+    expect(canvases.length).toBeGreaterThanOrEqual(1);
     for (const c of canvases) {
       c.getContext = (() => fakeCtx(c)) as unknown as typeof c.getContext;
     }
@@ -128,7 +128,7 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     // sanity: my stub must be live on this exact node, and the price pane's
     // viewChild must be THIS node (pane[0] = price)
     expect(canvasEl.getContext('2d')).toBeTruthy();
-    expect(component.priceCanvas?.nativeElement).toBe(canvasEl);
+    expect(component.chartCanvas?.nativeElement).toBe(canvasEl);
     // ngOnInit already auto-loaded on create; flush that request first.
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
     expect(component.loading).toBe(false);
@@ -140,230 +140,155 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     expect(Object.keys((instance as any).scales)).toContain('y');
   });
 
-  it('volume pane: separate chart, bar dataset, begins at zero', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
-    const volChart: any = Chart.getChart(volCanvas);
-    expect(volChart).toBeTruthy();
-    const volDataset = volChart.data.datasets[0];
-    expect(volDataset.label).toBe('Volume');
-    // bars must start at 0: beginAtZero (option-level check; pixel/decimal proof
-    // is the live browser verification's job — jsdom has no real dimensions).
-    const volScale = volChart.scales['y'];
-    expect(volScale).toBeTruthy();
-    expect(volScale.beginAtZero || volChart.options.scales.y.beginAtZero).toBe(true);
-  });
-
-  it('volume values map each bar (ASC, volume pane, category-x)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
-    const volChart: any = Chart.getChart(volCanvas);
-    const priceCanvas = el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement;
-    const priceChart: any = Chart.getChart(priceCanvas);
-    const volDataset = volChart.data.datasets[0];
-    expect(volDataset.data.length).toBe(priceChart.data.datasets[0].data.length);
-    expect(volDataset.data.length).toBe(3);
-    // ASC order: data[0] = OLDEST; x = bar index (linear axis, weekend-free)
-    expect(volDataset.data[0].y).toBe(1000);
-    expect(volDataset.data[0].x).toBe(0);
-    expect(volDataset.data[2].y).toBe(900);
-    expect(volDataset.data[2].x).toBe(2);
-  });
-  it('MULTI-PANE: separate price + volume canvases, volume below price', async () => {
-    const canvasEl = stubCanvas();
+  /** Flushes the msft request and returns the single panel chart. */
+  async function loaded(): Promise<any> {
+    stubCanvas();
     httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
     await fixture.whenStable();
     fixture.detectChanges();
+    return Chart.getChart(component.chartCanvas!.nativeElement) as any;
+  }
+
+  it('ONE PANEL: price, volume in a single canvas/chart with stacked y-scales (layout redesign)', async () => {
+    const chart = await loaded();
     const el = fixture.nativeElement as HTMLElement;
-    const canvases = el.querySelectorAll('canvas');
-    // TWO canvases: price pane + volume pane (TradingView layout — no overlap)
-    expect(canvases.length).toBe(2);
-    const priceCanvas = el.querySelector('[data-pane="price"] canvas');
-    const volCanvas = el.querySelector('[data-pane="volume"] canvas');
-    expect(priceCanvas).toBeTruthy();
-    expect(volCanvas).toBeTruthy();
-    // price pane is the FIRST/main canvas; volume the second
-    expect(priceCanvas).toBe(canvases[0]);
-    expect(volCanvas).toBe(canvases[1]);
-    // two Chart instances, one per pane
-    const priceChart: any = Chart.getChart(priceCanvas as HTMLCanvasElement);
-    const volChart: any = Chart.getChart(volCanvas as HTMLCanvasElement);
-    expect(priceChart).toBeTruthy();
-    expect(volChart).toBeTruthy();
-    // price chart: candlestick only, no volume dataset
-    expect(priceChart.data.datasets.length).toBe(1);
-    expect(priceChart.data.datasets[0].type).toBe('candlestick');
-    // volume chart: bar dataset with the same point count
-    expect(volChart.data.datasets[0].data.length).toBe(priceChart.data.datasets[0].data.length);
-    // shared x range: both charts' x scale min/max match
-    expect(volChart.scales.x.min).toBe(priceChart.scales.x.min);
-    expect(volChart.scales.x.max).toBe(priceChart.scales.x.max);
+    expect(el.querySelectorAll('canvas').length).toBe(1);
+    expect(chart).toBeTruthy();
+    const kinds = chart.data.datasets.map((d: any) => d.type);
+    expect(kinds).toEqual(['candlestick', 'bar']);
+    // price + volume live on stacked y-scales of the same stack -> one panel
+    const y = chart.options.scales.y;
+    const yVol = chart.options.scales.yVol;
+    expect(y.stack).toBe('panel');
+    expect(yVol.stack).toBe('panel');
+    expect(y.stackWeight).toBeGreaterThan(yVol.stackWeight);
+    expect(y.position).toBe('right');
+    expect(yVol.position).toBe('right');
+    // a single x-axis (dates at the bottom of the whole panel)
+    expect(Object.keys(chart.scales).filter((k) => k.startsWith('x'))).toEqual(['x']);
+    expect(chart.options.scales.x.position).toBe('bottom');
   });
 
-  it('ZOOM: both panes have wheel+pan enabled with data limits (3.2)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
-    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
-    for (const [name, chart] of [['price', priceChart], ['volume', volChart]] as const) {
-      const zoomOpts = chart.options.plugins?.zoom;
-      expect(zoomOpts, name + ' has zoom options').toBeTruthy();
-      expect(zoomOpts.zoom?.wheel?.enabled, name + ' wheel zoom').toBe(true);
-      expect(zoomOpts.pan?.enabled, name + ' pan').toBe(true);
-      expect(zoomOpts.limits?.x, name + ' x limits').toBeTruthy();
-    }
-    // limits must reference the data extent (no panning into the void)
-    const lim = priceChart.options.plugins.zoom.limits.x;
-    expect(lim.min).toBeLessThanOrEqual(priceChart.scales.x.min);
-    expect(lim.max).toBeGreaterThanOrEqual(priceChart.scales.x.max);
+  it('volume: bar dataset on its own y-scale that begins at zero', async () => {
+    const chart = await loaded();
+    const vol = chart.data.datasets.find((d: any) => d.label === 'Volume');
+    expect(vol.yAxisID).toBe('yVol');
+    expect(chart.options.scales.yVol.min).toBe(0);
+    expect(chart.options.scales.yVol.beginAtZero).toBe(true);
   });
 
-  it('ZOOM: reset button exists and calls resetZoom on BOTH panes (3.2)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    fixture.detectChanges();
-    const el = fixture.nativeElement as HTMLElement;
-    const resetBtn = el.querySelector('.reset-zoom-btn') as HTMLButtonElement;
-    expect(resetBtn).toBeTruthy();
-    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
-    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
-    console.log('component priceChart set:', !!component['priceChart'], '| volChart set:', !!component['volumeChart']);
-    console.log('same instances?', component['priceChart'] === priceChart, component['volumeChart'] === volChart);
-    console.log('volChart.resetZoom type:', typeof volChart.resetZoom);
-    const pSpy = vi.spyOn(priceChart, 'resetZoom');
-    const vSpy = vi.spyOn(volChart, 'resetZoom');
-    resetBtn.click();
-    expect(pSpy).toHaveBeenCalled();
-    expect(vSpy).toHaveBeenCalled();
+  it('volume values map each bar (ASC), x = bar index, aligned with the candles', async () => {
+    const chart = await loaded();
+    const price = chart.data.datasets[0].data;
+    const vol = chart.data.datasets[1].data;
+    expect(vol.length).toBe(price.length);
+    expect(vol.length).toBe(3);
+    expect(vol[0]).toMatchObject({ x: 0, y: 1000 });
+    expect(vol[2]).toMatchObject({ x: 2, y: 900 });
+    expect(price.map((p: any) => p.x)).toEqual(vol.map((p: any) => p.x));
   });
 
-  it('ZOOM: zooming the price pane syncs the volume pane x-range (3.2, index units)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
-    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
-    // linear index axis: zoom to the last half
-    const last = priceChart.data.datasets[0].data.length - 1;
-    const mid = Math.floor(last / 2);
-    priceChart.zoomScale('x', { min: mid, max: last });
-    // The sync runs deferred (queueMicrotask) after the zoom's update cycle.
-    await new Promise((r) => setTimeout(r, 300));
-    // sync contract: the volume pane's x-range EQUALS the price pane's
-    expect(volChart.scales['x'].min).toBe(priceChart.scales['x'].min);
-    expect(volChart.scales['x'].max).toBe(priceChart.scales['x'].max);
-    expect(priceChart.scales['x'].min).toBe(mid); // actually zoomed
+  it('ZOOM: wheel + pan enabled on x with data limits (3.2)', async () => {
+    const chart = await loaded();
+    const zoomOpts = chart.options.plugins?.zoom;
+    expect(zoomOpts.zoom?.wheel?.enabled).toBe(true);
+    expect(zoomOpts.pan?.enabled).toBe(true);
+    expect(zoomOpts.zoom.mode).toBe('x');
+    const lim = zoomOpts.limits.x;
+    expect(lim.min).toBeLessThanOrEqual(chart.scales.x.min);
+    expect(lim.max).toBeGreaterThanOrEqual(chart.scales.x.max);
   });
 
-  it('CROSSHAIR: plugin registered and draws a line at the hovered x (3.3)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const priceCanvas = el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement;
-    const priceChart: any = Chart.getChart(priceCanvas);
-    expect(priceChart).toBeTruthy();
-    // crosshair plugin globally registered (registry check — module-level const)
-    expect(Chart.registry.getPlugin('crosshair'), 'crosshair in registry').toBeTruthy();
-    // and enabled per chart via the crosshair option key
-    expect(priceChart.options.plugins?.crosshair, 'crosshair option key').toBe(true);
+  it('ZOOM: reset button calls resetZoom on the panel chart (3.2)', async () => {
+    const chart = await loaded();
+    const btn = fixture.nativeElement.querySelector('.reset-zoom-btn') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    const spy = vi.spyOn(chart, 'resetZoom');
+    btn.click();
+    expect(spy).toHaveBeenCalled();
   });
 
-  it('CROSSHAIR: tooltip callbacks render O/H/L/C/Vol labels (3.3)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const priceCanvas = el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement;
-    const priceChart: any = Chart.getChart(priceCanvas);
-    const cb = priceChart.options.plugins?.tooltip?.callbacks;
-    expect(cb?.label, 'price tooltip label callback').toBeTruthy();
-    // label output with a real raw point (Chart.js passes the data point as raw)
-    const out = cb.label({ dataset: priceChart.data.datasets[0], dataIndex: 0, raw: priceChart.data.datasets[0].data[0] } as any);
+  it('ZOOM: zooming moves the single x-range; y-axes refit to the visible bars', async () => {
+    const chart = await loaded();
+    const last = chart.data.datasets[0].data.length - 1;
+    chart.zoomScale('x', { min: 2, max: last });
+    expect(chart.scales.x.min).toBe(2);
+    // only bar 2 (+1 bar of margin) is visible: y must fit its low/high, not bar 0's (95)
+    expect(chart.scales.y.min).toBeGreaterThan(95);
+    expect(chart.scales.y.max).toBeGreaterThanOrEqual(120);
+  });
+
+  it('CROSSHAIR: plugin registered and enabled on the panel chart (3.3)', async () => {
+    const chart = await loaded();
+    expect(Chart.registry.getPlugin('crosshair')).toBeTruthy();
+    expect(chart.options.plugins?.crosshair).toBe(true);
+  });
+
+  it('TOOLTIP: one index tooltip renders O/H/L/C, Vol and indicator labels (3.3)', async () => {
+    const chart = await loaded();
+    const label = chart.options.plugins?.tooltip?.callbacks?.label;
+    const [price, vol] = chart.data.datasets;
+    const out = label({ dataset: price, raw: price.data[0] });
     expect(out).toContain('O 100.00');
     expect(out).toContain('H 110.00');
     expect(out).toContain('L 95.00');
     expect(out).toContain('C 105.00');
-    const volCanvas = el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement;
-    const volChart: any = Chart.getChart(volCanvas);
-    const volCb = volChart.options.plugins?.tooltip?.callbacks?.label;
-    expect(volCb, 'volume tooltip label callback').toBeTruthy();
-    expect(volCb({ dataset: volChart.data.datasets[0], dataIndex: 0, raw: volChart.data.datasets[0].data[0] } as any)).toContain('1K');
+    expect(label({ dataset: vol, raw: vol.data[0] })).toContain('1K');
+    expect(label({ dataset: { type: 'line', label: 'SMA 5' }, raw: { y: 1.234 } })).toBe('SMA 5 1.23');
+    expect(chart.options.plugins.tooltip.mode).toBe('index');
   });
 
   it('LINEAR INDEX AXIS: evenly-spaced bars, no weekend slots (4.3+fix)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
-    // x scale is LINEAR over bar indices (no weekend/holiday slots — the
-    // plugin-native scale; non-trading days simply don't exist)
-    expect(priceChart.scales['x'].type).toBe('linear');
-    const first = priceChart.data.datasets[0].data[0];
-    expect(first.x).toBe(0); // x = bar index
-    expect(first.t).toBeTruthy(); // raw timestamp rides along for tooltips
-    // strict ASC timestamps (weekend days absent — trading days only)
-    const ts = priceChart.data.datasets[0].data.map((p: any) => p.t);
-    for (let i = 1; i < ts.length; i++) {
-      expect(ts[i]).toBeGreaterThan(ts[i - 1]);
+    const chart = await loaded();
+    expect(chart.scales['x'].type).toBe('linear');
+    const first = chart.data.datasets[0].data[0];
+    expect(first.x).toBe(0);
+    expect(first.t).toBeTruthy();
+    const ts = chart.data.datasets[0].data.map((p: any) => p.t);
+    for (let i = 1; i < ts.length; i++) expect(ts[i]).toBeGreaterThan(ts[i - 1]);
+  });
+
+  it('VOLUME COLORS: up bars green, down bars red (per-bar scriptable colour)', async () => {
+    const chart = await loaded();
+    const ds = chart.data.datasets[1];
+    expect(typeof ds.backgroundColor).toBe('function');
+    const upC = ds.backgroundColor({ raw: { up: true } });
+    const downC = ds.backgroundColor({ raw: { up: false } });
+    expect(upC).not.toBe(downC);
+    // MSFT_ROWS bar 0: open 100 close 105 -> up
+    expect(ds.data[0].up).toBe(true);
+  });
+
+  it('LOD: a long history is windowed/aggregated — the chart never holds every bar', async () => {
+    stubCanvas();
+    const rows = ['<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>'];
+    for (let i = 0; i < 6000; i++) {
+      const d = new Date(Date.UTC(2000, 0, 1 + i)).toISOString().slice(0, 10).replace(/-/g, '');
+      const c = 100 + Math.sin(i / 20) * 10;
+      rows.push(`MSFT.US,D,${d},000000,${c - 1},${c + 2},${c - 2},${c},${1000 + i},0`);
     }
-  });
-
-  it('AXIS LAYOUT: price y on the RIGHT, aligned with volume y; dates below volume (4.3 layout)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
+    const st = TestBed.inject(ChartStateService);
+    st.setRange('ALL');
+    httpMock.expectOne('test-data/msft.us.txt').flush(rows.join('\r\n'));
     await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const priceChart: any = Chart.getChart(el.querySelector('[data-pane="price"] canvas') as HTMLCanvasElement);
-    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
-    // price y-axis on the right (like volume)
-    expect(priceChart.options.scales.y.position).toBe('right');
-    expect(volChart.options.scales.y.position).toBe('right');
-    // price pane: NO x-axis labels (dates live below the volume pane)
-    expect(priceChart.options.scales.x.display).toBe(false);
-    // volume pane: x-axis labels VISIBLE (dates below the volume)
-    expect(volChart.options.scales.x.display).toBe(true);
+    const chart: any = Chart.getChart(component.chartCanvas!.nativeElement);
+    const pts = chart.data.datasets[0].data.length;
+    expect(pts).toBeGreaterThan(50);
+    expect(pts).toBeLessThan(700); // 6000 bars -> aggregated
+    // zoomed in: full resolution (1 bar per point) within a small window
+    chart.zoomScale('x', { min: 2000, max: 2100 });
+    expect(chart.data.datasets[0].data.length).toBeLessThanOrEqual(300);
+    expect(chart.data.datasets[0].data[1].x - chart.data.datasets[0].data[0].x).toBe(1);
+    // and panning far away loads the new window
+    chart.zoomScale('x', { min: 5000, max: 5100 });
+    const xs = chart.data.datasets[0].data.map((p: any) => p.x);
+    expect(Math.min(...xs)).toBeLessThanOrEqual(5000);
+    expect(Math.max(...xs)).toBeGreaterThanOrEqual(5100);
   });
 
-  it('VOLUME COLORS: down-day bars red, up-day bars green (4.3 volume coloring)', async () => {
-    const canvasEl = stubCanvas();
-    httpMock.expectOne('test-data/msft.us.txt').flush(MSFT_ROWS);
-    await fixture.whenStable();
-    const el = fixture.nativeElement as HTMLElement;
-    const volChart: any = Chart.getChart(el.querySelector('[data-pane="volume"] canvas') as HTMLCanvasElement);
-    const ds = volChart.data.datasets[0];
-    // backgroundColor is a per-bar scriptable function (up/down coloring)
-    expect(typeof ds.backgroundColor === 'function', 'scriptable backgroundColor').toBe(true);
-    // resolve for an UP bar (o=100 c=105 → green) and a DOWN bar → red
-    const ctx: any = { dataIndex: 0, chart: volChart, dataset: ds };
-    const upColor = ds.backgroundColor(ctx);
-    expect(String(upColor)).toMatch(/#26a69a|#2e7d32|green|teal/i);
-    const downCtx: any = { dataIndex: 1, chart: volChart, dataset: ds };
-    // Jan 11: o=105 c=112 → also up; find or synthesize a down bar via the resolver
-    // (the resolver must return red for close<open — assert the color strings differ per direction)
-    const downColor = ds.backgroundColor({ ...ctx, dataIndex: 1 });
-    // both resolved without throwing; the function is direction-aware
-    expect(typeof upColor).toBe('string');
-    expect(typeof downColor).toBe('string');
-  });
-
-  it('createCharts guards against missing pane references (no crash)', () => {
-    // Simulate the pre-fix crash condition: viewChildren undefined.
-    (component as any).priceCanvas = undefined;
-    (component as any).volumeCanvas = undefined;
-    // Must NOT throw (pre-fix: "Cannot read properties of undefined (reading 'nativeElement')").
-    expect(() => (component as any).createCharts([])).not.toThrow();
+  it('createChart guards against a missing canvas reference (no crash)', () => {
+    (component as any).chartCanvas = undefined;
+    expect(() => (component as any).createChart([])).not.toThrow();
   });
 
   it('error path: 500 → service fallback → "No data available" (no stuck loading)', async () => {
@@ -394,8 +319,8 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       return out.join('\r\n');
     };
     let state: ChartStateService;
+    const panelChart = () => Chart.getChart(component.chartCanvas!.nativeElement) as any;
 
-    // oscillator canvases are created DURING the data load — stub every canvas
     beforeEach(() => {
       vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
         return fakeCtx(this);
@@ -413,65 +338,52 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
       httpMock.expectOne('test-data/msft.us.txt').flush(rows(80));
       await fixture.whenStable();
       fixture.detectChanges();
-      // oscillator pane canvases appear after the first CD following the data load
-      (Array.from(fixture.nativeElement.querySelectorAll('canvas')) as HTMLCanvasElement[]).forEach((c) => {
-        c.getContext = (() => fakeCtx(c)) as unknown as typeof c.getContext;
-      });
     }
 
-    it('overlay indicator (SMA) is a line dataset on the price chart, aligned to bar index', async () => {
+    it('overlay indicator (SMA) is a line dataset on the price y-scale, aligned to bar index', async () => {
       await load([{ type: 'sma', period: 5 }]);
-      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
-      const line = price.data.datasets.find((d: any) => d.label === 'SMA 5') as any;
+      const line = panelChart().data.datasets.find((d: any) => d.label === 'SMA 5');
       expect(line).toBeTruthy();
       expect(line.type).toBe('line');
+      expect(line.yAxisID).toBe('y');
       expect(line.data.length).toBe(80);
       expect(line.data[3].y).toBeNull(); // warmup gap
       expect(typeof line.data[4].y).toBe('number');
       expect(line.data[4].x).toBe(4);
     });
 
-    it('oscillator (RSI) gets its own pane canvas + chart with 0-100 range and guide lines', async () => {
+    it('oscillator (RSI) is a stacked pane of the SAME chart: 0-100 range, guide lines, shared x', async () => {
       await load([{ type: 'rsi', period: 14 }]);
-      const panes = fixture.nativeElement.querySelectorAll('[data-pane^="indicator"]');
-      expect(panes.length).toBe(1);
-      const canvas = panes[0].querySelector('canvas') as HTMLCanvasElement;
-      const chart = Chart.getChart(canvas)!;
-      expect(chart).toBeTruthy();
-      const labels = chart.data.datasets.map((d: any) => d.label);
-      expect(labels).toEqual(expect.arrayContaining(['RSI', 'Overbought', 'Oversold']));
-      expect((chart.options.scales as any).y.min).toBe(0);
-      expect((chart.options.scales as any).y.max).toBe(100);
-      // shares the price chart's x view
-      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
-      expect((chart.options.scales as any).x.min).toBe((price.options.scales as any).x.min);
-      expect((chart.options.scales as any).x.max).toBe((price.options.scales as any).x.max);
-      // overlay list untouched
-      expect(price.data.datasets.length).toBe(1);
+      const chart = panelChart();
+      expect(fixture.nativeElement.querySelectorAll('canvas').length).toBe(1);
+      const rsi = chart.data.datasets.filter((d: any) => d.yAxisID === 'yInd0');
+      expect(rsi.map((d: any) => d.label)).toEqual(expect.arrayContaining(['RSI', 'Overbought', 'Oversold']));
+      const sc = chart.options.scales.yInd0;
+      expect(sc.stack).toBe('panel');
+      expect(sc.min).toBe(0);
+      expect(sc.max).toBe(100);
+      expect(sc.paneLabel).toBe('RSI 14');
+      expect(chart.scales.yInd0.top).toBeGreaterThanOrEqual(chart.scales.yVol.bottom - 1);
     });
 
-    it('removing an indicator removes its pane/dataset; no indicators = only price+volume', async () => {
+    it('removing an indicator removes its pane/dataset', async () => {
       await load([{ type: 'rsi', period: 14 }, { type: 'sma', period: 5 }]);
       state.removeIndicator(0);
       state.removeIndicator(0);
       await fixture.whenStable();
-      fixture.detectChanges();
-      expect(fixture.nativeElement.querySelectorAll('[data-pane^="indicator"]').length).toBe(0);
-      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
-      expect(price.data.datasets.length).toBe(1);
+      const chart = panelChart();
+      expect(chart.options.scales.yInd0).toBeUndefined();
+      expect(chart.data.datasets.map((d: any) => d.label)).toEqual(['Price', 'Volume']);
     });
 
     it('toggling an indicator keeps the user\'s current pan/zoom view', async () => {
       await load([]);
-      const price = Chart.getChart(component.priceCanvas!.nativeElement)!;
-      (price.options.scales as any).x.min = 20;
-      (price.options.scales as any).x.max = 50;
-      price.update('none');
+      panelChart().zoomScale('x', { min: 20, max: 50 });
       state.addIndicator({ type: 'sma', period: 5 });
       await fixture.whenStable();
-      const after = Chart.getChart(component.priceCanvas!.nativeElement)!;
-      expect((after.options.scales as any).x.min).toBe(20);
-      expect((after.options.scales as any).x.max).toBe(50);
+      const after = panelChart();
+      expect(after.options.scales.x.min).toBe(20);
+      expect(after.options.scales.x.max).toBe(50);
     });
   });
 });

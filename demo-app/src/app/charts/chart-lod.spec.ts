@@ -49,10 +49,10 @@ describe('chart LOD helpers (level-of-detail windowing)', () => {
     expect(bucketWindow([], 0, 10, 2)).toEqual([]);
   });
 
-  it('loadWindow: visible span plus one span of buffer each side, clamped', () => {
-    expect(loadWindow(100, 150, 1000)).toEqual({ from: 50, to: 200 });
-    expect(loadWindow(0, 40, 1000)).toEqual({ from: 0, to: 80 });
-    expect(loadWindow(980, 999, 1000)).toEqual({ from: 961, to: 999 });
+  it('loadWindow: visible span plus half a span of buffer each side, clamped', () => {
+    expect(loadWindow(100, 150, 1000)).toEqual({ from: 75, to: 175 });
+    expect(loadWindow(0, 40, 1000)).toEqual({ from: 0, to: 60 });
+    expect(loadWindow(980, 999, 1000)).toEqual({ from: 970, to: 999 });
   });
 
   it('fitRange pads the data extent; flat data still gets a non-zero range', () => {

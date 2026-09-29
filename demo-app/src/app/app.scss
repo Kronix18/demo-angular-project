@@ -5,8 +5,31 @@
      (flex:1) → chart-container (flex:1) → panes (flex 3/1) all grow to fill.
      min-height left the container at content size (253px dead gap below the
      volume pane — measured live). */
-  height: 100vh;
+  min-height: 100vh;
   background: #f8f9fa;
+
+  /* Chart pages: the shell is EXACTLY the viewport — compact navbar, no footer,
+     no padding; the routed component fills the rest and nothing scrolls. */
+  &.fullscreen {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+
+    .navbar { padding: 4px 12px; box-shadow: none; }
+    .navbar-content { max-width: none; gap: 16px; }
+    .logo { font-size: 16px; }
+    .nav-links { gap: 14px; font-size: 13px; }
+    .nav-link { padding-bottom: 0; }
+    .nav-actions { gap: 8px; }
+    .logout-btn, .login-link, .register-link, .account-link { padding: 2px 10px; font-size: 13px; }
+    .main-content {
+      max-width: none;
+      padding: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+  }
 }
 
 .navbar {

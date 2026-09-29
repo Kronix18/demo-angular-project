@@ -65,30 +65,36 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
   `,
   styles: [
     `
+      /* Compact single-row toolbar (chart page is full-viewport): inline
+         controls, labels kept for a11y but visually hidden. */
+      :host { display: block; }
       .toolbar {
         display: flex;
-        gap: 1rem;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
         align-items: center;
-        padding: 1rem;
-        background-color: var(--c-surface, #ffffff);
-        border-radius: var(--border-radius, 8px);
-        box-shadow: var(--shadow-elevation-low, 0 1px 4px rgba(0, 0, 0, 0.12));
       }
 
       .toolbar-group {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        align-items: center;
         gap: 0.25rem;
       }
 
-      /* 4.3: range preset buttons — TradingView-style bottom-bar row */
-      .range-group {
-        flex-direction: row;
-        gap: 0.25rem;
-        align-items: flex-end;
+      label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
       }
+
+      /* 4.3: range preset buttons — TradingView-style row */
+      .range-group { gap: 0.125rem; }
       .range-btn {
-        padding: 0.375rem 0.625rem;
+        padding: 0.1875rem 0.5rem;
         border: 1px solid transparent;
         border-radius: var(--border-radius-sm, 4px);
         background: transparent;
@@ -106,21 +112,16 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
         color: #fff;
       }
 
-      label {
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: var(--c-text, #1f2937);
-      }
-
       input,
       select {
-        padding: 0.5rem;
+        padding: 0.1875rem 0.5rem;
         border: 1px solid var(--c-border, #d1d5db);
         border-radius: var(--border-radius-sm, 4px);
         background-color: var(--c-surface, #ffffff);
         color: var(--c-text, #1f2937);
-        font-size: 0.875rem;
+        font-size: 0.8125rem;
       }
+      input#symbol { width: 6.5rem; }
 
       input:focus,
       select:focus {
@@ -129,18 +130,18 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
         box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
       }
 
-      button {
-        padding: 0.5rem 1rem;
+      button:not(.range-btn) {
+        padding: 0.1875rem 0.75rem;
         background-color: var(--c-primary, #2563eb);
         color: #fff;
         border: none;
         border-radius: var(--border-radius-sm, 4px);
         cursor: pointer;
-        font-size: 0.875rem;
+        font-size: 0.8125rem;
         font-weight: 500;
       }
 
-      button:hover {
+      button:not(.range-btn):hover {
         background-color: var(--c-primary-dark, #1d4ed8);
       }
     `,

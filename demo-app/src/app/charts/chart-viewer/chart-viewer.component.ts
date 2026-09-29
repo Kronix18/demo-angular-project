@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ViewChild, ViewChildren, QueryList, ElementRef, ChangeDetectorRef, inject, DestroyRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef, inject, DestroyRef } from '@angular/core';
 import { Chart } from 'chart.js';
 import { CommonModule } from '@angular/common';
 import { ChartDataService } from '../../core/services/chart-data.service';
@@ -11,8 +11,8 @@ import { IndicatorPanel } from '../indicator-panel/indicator-panel';
 import { IndicatorCalculationService } from '../../core/services/indicator-calculation.service';
 import { ResolvedIndicator, resolveEntry } from '../../core/indicators/indicator-catalog';
 import { OutputSpec } from '../../core/indicators/indicator-definitions';
-import { map, distinctUntilChanged } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { LodPoint, bucketWindow, chooseBucket, fitRange, loadWindow } from '../chart-lod';
 // 2.2 (task file): chart-setup MUST be imported before chartjs-chart-financial
 // anywhere — it registers registerables + adapter + zoom + the financial
 // controllers/elements (side-effect import alone is unreliable: ESM/CJS
@@ -20,58 +20,83 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import '../chart-setup';
 import 'chartjs-chart-financial';
 
+/** Theme colour from a CSS custom property (token rule), with a fallback. */
+function cssVar(name: string, fallback: string): string {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
- * 3.3 Crosshair plugin (module-level const): draws a 1px vertical line at the
- * active tooltip's x-position — the TradingView crosshair behavior (port of the
- * Python viewer's crosshair.py UX contract).
- * CROSS-PANE (Kevin: "dashed line going through both, on whichever you hover"):
- * the hovered pane's tooltip drives a SHARED hover-index (window.__charts.hoverX);
- * BOTH charts draw the line at that index — one continuous line through price
- * AND volume panes. Color read from the CSS custom property at runtime.
+ * Crosshair (3.3): a dashed vertical line through the WHOLE panel (price,
+ * volume and indicator panes are ONE chart now, so a single line spans them
+ * all). Snaps to the hovered bar via the tooltip's active element.
  */
 const crosshairPlugin = {
   id: 'crosshair',
-  // capture the hover x on EVERY pane (the shared line is driven by whichever
-  // pane is hovered); cleared on mouse-out
-  beforeEvent(chart: Chart, event: any): void {
-    if (!(window as any).__charts) (window as any).__charts = {};
-    if (event?.event?.type === 'mousemove') {
-      const x = event.event.x;
-      if (typeof x === 'number' && isFinite(x)) {
-        (window as any).__charts.hoverX = x;
-      }
-    } else if (event?.event?.type === 'mouseout') {
-      (window as any).__charts.hoverX = null;
-    }
+  afterEvent(chart: any, args: any): void {
+    const e = args.event;
+    if (e?.type === 'mousemove' && typeof e.x === 'number') chart.$crosshairX = e.x;
+    else if (e?.type === 'mouseout') chart.$crosshairX = null;
   },
-  afterDatasetsDraw(chart: Chart): void {
-    // shared hover index (set by whichever pane the user is hovering); fall
-    // back to this chart's own tooltip active elements
-    const shared = (window as any).__charts?.hoverX;
-    let x = shared;
-    if (x == null) {
-      const active = chart.tooltip?.getActiveElements?.() ?? [];
-      x = active.length ? active[0].element?.x : null;
-    }
-    if (typeof x !== 'number' || !isFinite(x)) return;
+  afterDatasetsDraw(chart: any): void {
+    const active = chart.tooltip?.getActiveElements?.() ?? [];
+    const x = active.length ? active[0].element?.x : chart.$crosshairX;
     const { ctx, chartArea } = chart;
-    if (!ctx || !chartArea) return;
-    let color = '#758696';
-    try {
-      const v = getComputedStyle(chart.canvas).getPropertyValue('--c-crosshair').trim();
-      if (v) color = v;
-    } catch { /* jsdom/non-DOM: fallback */ }
+    if (typeof x !== 'number' || !isFinite(x) || !ctx || !chartArea) return;
+    if (x < chartArea.left || x > chartArea.right) return;
     ctx.save();
     ctx.beginPath();
     ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1;
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = cssVar('--c-crosshair', '#758696');
     ctx.moveTo(x, chartArea.top);
     ctx.lineTo(x, chartArea.bottom);
     ctx.stroke();
     ctx.restore();
   },
 };
+Chart.register(crosshairPlugin);
+
+/**
+ * Pane decoration: a thin separator above every stacked pane except the first,
+ * and each pane's label (`scales[id].paneLabel`) in its top-left corner. The
+ * panes share ONE canvas, x-axis and grid, so they read as a single panel.
+ */
+const paneDecorPlugin = {
+  id: 'paneDecor',
+  afterDraw(chart: any): void {
+    const { ctx, chartArea } = chart;
+    if (!ctx || !chartArea) return;
+    const border = cssVar('--c-pane-border', '#d1d5db');
+    const text = cssVar('--c-text-muted', '#6b7280');
+    const ids = Object.keys(chart.scales).filter((k) => k.startsWith('y'));
+    ctx.save();
+    ctx.font = '12px sans-serif';
+    ctx.textBaseline = 'top';
+    ids.forEach((id, idx) => {
+      const scale = chart.scales[id];
+      if (idx > 0) {
+        ctx.beginPath();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = border;
+        ctx.moveTo(chartArea.left, Math.round(scale.top) + 0.5);
+        ctx.lineTo(chartArea.right, Math.round(scale.top) + 0.5);
+        ctx.stroke();
+      }
+      const label = scale.options?.paneLabel;
+      if (label) {
+        ctx.fillStyle = text;
+        ctx.fillText(label, chartArea.left + 8, scale.top + 6);
+      }
+    });
+    ctx.restore();
+  },
+};
+Chart.register(paneDecorPlugin);
 
 /** Compact volume formatting (Kevin): 1,000,000 → 1M, 100,000 → 100K,
  *  1,000,000,000 → 1B, 1,500 → 1.5K, 1,000 → 1K (no trailing .0). */
@@ -84,166 +109,104 @@ function compactVolume(v: number): string {
   return String(v);
 }
 
-/** Tooltip label callbacks (3.3): O/H/L/C for the price pane, Vol for the volume
- *  pane — TradingView-style readouts. */
-const priceTooltipCallbacks = {
-  title(items: any[]): string {
-    // category axis: the bar's raw timestamp rides on the data point (t)
-    const raw = items?.[0]?.raw;
-    if (typeof raw?.t === 'number') {
-      return new Date(raw.t).toLocaleString('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric',
-      });
-    }
-    return String(items?.[0]?.label ?? '');
-  },
-  label(item: any): string {
-    // indicator overlays (line datasets) share the price pane's index tooltip
-    if (item?.dataset?.type === 'line') {
-      const y = item?.raw?.y;
-      return `${item.dataset.label} ${typeof y === 'number' ? y.toFixed(2) : '-'}`;
-    }
-    const raw = item?.raw ?? {};
-    const fmt = (v: unknown) => typeof v === 'number' ? v.toFixed(2) : String(v ?? '-');
+/** One index-mode tooltip for the whole panel: O/H/L/C, Vol and every indicator
+ *  value at the hovered bar (TradingView-style readouts). */
+const tooltipLabel = (item: any): string => {
+  const ds = item?.dataset ?? {};
+  const raw = item?.raw ?? {};
+  if (ds.type === 'candlestick') {
+    const fmt = (v: unknown) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? '-'));
     return `O ${fmt(raw.o)}  H ${fmt(raw.h)}  L ${fmt(raw.l)}  C ${fmt(raw.c)}`;
-  },
-};
-const volumeTooltipCallbacks = {
-  label(item: any): string {
-    const v = item?.raw?.y;
-    return `Vol ${typeof v === 'number' ? compactVolume(v) : String(v ?? '-')}`;
-  },
+  }
+  if (ds.type === 'bar') {
+    return `Vol ${typeof raw.y === 'number' ? compactVolume(raw.y) : String(raw.y ?? '-')}`;
+  }
+  return `${ds.label} ${typeof raw.y === 'number' ? raw.y.toFixed(2) : '-'}`;
 };
 
-// 3.3: register the crosshair plugin globally (after its definition — no TDZ).
-// The `crosshair: true` option key on each chart enables it per chart.
-Chart.register(crosshairPlugin);
-
-// Y-axis width alignment (Kevin: "volume sticks out further left than the
-// price"): the panes' y-axes have different label widths (price "520" vs
-// volume "200,000,000") → different plot-area widths → bars/candles at the
-// same index sit at different x pixels.
-const FIXED_AXIS_WIDTH = 90;
-const alignWidthsPlugin = {
-  id: 'alignWidths',
-  // FIXED y-axis width (TradingView does the same): the scale-level afterFit
-  // recipe — the only hook that reliably sticks (post-fit assignments and
-  // sibling-update loops from plugin hooks broke the chart into the -32768
-  // sentinel state — measured live). Both panes get a deterministic 90px
-  // y-axis so the plot areas align horizontally.
-  afterFit(chart: Chart): void {
-    const inst = chart as any;
-    if (inst.scales?.y) inst.scales.y.width = FIXED_AXIS_WIDTH;
-  },
+const Y_WIDTH = 72; // fixed y-axis width: every pane's axis is the same size
+const PRICE_WEIGHT = 6;
+const VOLUME_WEIGHT = 1.5;
+const PANE_WEIGHT = 2;
+const DASHES: Record<OutputSpec['defaultLineStyle'], number[]> = {
+  solid: [], dash: [6, 4], dot: [2, 3], dash_dot: [6, 3, 2, 3],
 };
-Chart.register(alignWidthsPlugin);
+
+type Computed = { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> };
+
+/** Builds the data array of one dataset from the current LOD points. */
+type DataBuilder = (pts: LodPoint[]) => any[];
 
 /**
- * Multi-pane chart viewer (3.1 REVISED per Kevin / Ruling 7): TradingView-style
- * TRUE panes — price candles in their own pane (~75% height) and volume bars in
- * a separate bottom pane (~25%, own y-scale, never overlapping the candles).
- * Two Chart instances share the x-range (identical time-scale min/max), so
- * zoom/pan (3.2) can sync both panes by updating the same range.
+ * Chart viewer: price candles, volume and indicator panes in ONE Chart.js
+ * instance with vertically STACKED y-scales (`stack` + `stackWeight`), so they
+ * share a single canvas, x-axis, grid, zoom state and crosshair — one panel.
+ *
+ * Performance: the chart only ever holds a window of the data around the
+ * visible range, aggregated to <= ~500 points (see chart-lod.ts); the window
+ * and the y-axis fits are recomputed (rAF-throttled) as the user pans/zooms.
  */
 @Component({
   selector: 'app-chart-viewer',
   standalone: true,
   imports: [CommonModule, ChartToolbarComponent, IndicatorPanel],
   template: `
-    <div class="chart-container" [class.has-panes]="oscPanes.length > 0">
-      <app-chart-toolbar>
-      </app-chart-toolbar>
-      <app-indicator-panel />
-
-      @if (loading) {
-        <div class="loading-overlay">Loading chart...</div>
-      }
-
-      <!-- Price pane (candles only) -->
-      <div class="pane price-pane" data-pane="price">
-        <canvas #priceCanvas></canvas>
-      </div>
-
-      <!-- Volume pane (separate scale — TradingView layout, no overlap) -->
-      <div class="pane volume-pane" data-pane="volume">
-        <canvas #volumeCanvas></canvas>
-      </div>
-
-      <!-- Oscillator panes (5.2): one pane per pane-kind indicator, below volume -->
-      @for (p of oscPanes; track p.key) {
-        <div class="pane indicator-pane" [attr.data-pane]="'indicator-' + p.key">
-          <span class="pane-label">{{ p.label }}</span>
-          <canvas #paneCanvas></canvas>
-        </div>
-      }
-
-      @if (error) {
-        <div class="error-message">
-          <p>Error loading chart: {{ error }}</p>
-        </div>
-      }
-
-      <div class="chart-actions">
+    <div class="chart-page">
+      <header class="chart-header">
+        <app-chart-toolbar />
+        <app-indicator-panel />
         <button type="button" class="reset-zoom-btn" (click)="resetZoom()">Reset zoom</button>
+      </header>
+
+      <div class="chart-panel" data-pane="panel">
+        <canvas #chartCanvas></canvas>
+        @if (loading) {
+          <div class="loading-overlay">Loading chart...</div>
+        }
+        @if (error) {
+          <div class="error-message">
+            <p>Error loading chart: {{ error }}</p>
+          </div>
+        }
       </div>
     </div>
   `,
   styles: [
     `
-      .chart-container {
-        position: relative;
-        /* Definite viewport height: the parent flex chain (app-container →
-           main-content → here) never resolves a definite height (measured:
-           container stuck at content size 460px, dead gap below). calc()
-           makes the height definite regardless of the parent chain: viewport
-           minus navbar (70) + paddings (64) + toolbar (~89) + footer (~65). */
-        height: calc(100vh - 288px);
-        min-height: 480px;
+      /* Fill whatever the shell gives us — the page itself never scrolls. */
+      :host {
         display: flex;
         flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;
       }
-      .pane {
+      .chart-page {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      .chart-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem 0.75rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--c-surface, #fff);
+        border-bottom: 1px solid var(--c-pane-border, #d1d5db);
+      }
+      .chart-panel {
         position: relative;
-        width: 100%;
-      }
-      .price-pane {
-        /* Viewport-relative fill: the app-container/main-content flex chain
-           doesn't propagate a definite height (app.scss is served stale —
-           changes verified in the file but not in the served CSS), so the
-           panes size themselves: price ~62vh (toolbar+padding above, volume
-           below), volume ~21vh. No overlap, no dead gap — measured live. */
-        flex: 3 1 0;
-        height: 62vh;
-        min-height: 280px;
-      }
-      .volume-pane {
-        flex: 1 1 0;
-        height: 21vh;
-        min-height: 90px;
-        /* no visible separation: the dashed crosshair runs continuously through
-           both panes (Kevin) — no border divider */
-      }
-      /* 5.2: with oscillator panes the container grows (page scrolls) instead of
-         squeezing price/volume — every pane keeps a definite height. */
-      .chart-container.has-panes { height: auto; }
-      .has-panes .price-pane, .has-panes .volume-pane { flex: none; }
-      .indicator-pane {
-        flex: none;
-        height: 22vh;
-        min-height: 140px;
-      }
-      .pane-label {
-        position: absolute;
-        top: 4px;
-        left: 8px;
-        z-index: 2;
-        font-size: 0.75rem;
-        color: var(--c-text-muted, #6b7280);
-        pointer-events: none;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        background: var(--c-surface, #fff);
       }
       canvas {
-        width: 100% !important;
-        height: 100% !important;
+        position: absolute;
+        inset: 0;
+        display: block;
       }
       .loading-overlay {
         position: absolute;
@@ -255,17 +218,18 @@ Chart.register(alignWidthsPlugin);
         z-index: 5;
       }
       .error-message {
-        padding: 1rem;
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         color: var(--auth-error-color, #dc3545);
         text-align: center;
-      }
-      .chart-actions {
-        display: flex;
-        justify-content: flex-end;
-        padding: 0.5rem 0;
+        z-index: 6;
       }
       .reset-zoom-btn {
-        padding: 0.375rem 0.875rem;
+        margin-left: auto;
+        padding: 0.25rem 0.625rem;
         border: 1px solid var(--c-border, #d1d5db);
         border-radius: var(--border-radius-sm, 4px);
         background: var(--c-surface, #fff);
@@ -281,14 +245,8 @@ Chart.register(alignWidthsPlugin);
   ],
 })
 export class ChartViewerComponent implements OnInit, OnDestroy {
-  @ViewChild('priceCanvas') priceCanvas?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('volumeCanvas') volumeCanvas?: ElementRef<HTMLCanvasElement>;
-  @ViewChildren('paneCanvas') paneCanvases?: QueryList<ElementRef<HTMLCanvasElement>>;
-  private priceChart: Chart | null = null;
-  private volumeChart: Chart | null = null;
-  private indicatorCharts: Chart[] = [];
-  /** Oscillator panes currently rendered (5.2) — drives the @for above. */
-  oscPanes: { key: string; label: string; resolved: ResolvedIndicator }[] = [];
+  @ViewChild('chartCanvas') chartCanvas?: ElementRef<HTMLCanvasElement>;
+  private chart: Chart | null = null;
   loading = true;
   error: string | null = null;
   currentSymbol: string = '';
@@ -298,13 +256,20 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
   private chartDataService: ChartDataService;
   private route: ActivatedRoute;
   private router: Router;
-  // ZONELESS app (no zone.js polyfill): async callbacks (HTTP subscribe) do
-  // NOT trigger change detection — markForCheck() after state updates makes
-  // the @if(loading)/@if(error) blocks re-render (2.2 fix, verified live).
+  // ZONELESS app: async callbacks don't trigger change detection — markForCheck()
+  // after state updates makes the @if(loading)/@if(error) blocks re-render.
   private cdr: ChangeDetectorRef;
   private chartState: ChartStateService;
   private indicatorCalc = inject(IndicatorCalculationService);
   private destroyRef = inject(DestroyRef);
+
+  /** All bars fetched for the current symbol (one fetch per symbol, 4.3). */
+  private allData: OHLCV[] = [];
+  /** Bars the chart indexes into (weekly-aggregated when interval = 1w). */
+  private bars: OHLCV[] = [];
+  /** Per-dataset data builders + the window currently loaded into the chart. */
+  private builders: DataBuilder[] = [];
+  private loaded: { from: number; to: number; bucket: number } | null = null;
 
   constructor(
     chartDataService: ChartDataService,
@@ -329,8 +294,8 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         this.chartState.setSymbol(symbol);
       }
     });
-    // Derive loads from state: symbol changes refetch (new data file);
-    // interval/range changes re-render from the cached data (4.3: one fetch).
+    // Symbol/interval changes refetch/reaggregate; range/indicator changes
+    // re-render from the cached data (4.3: one fetch per symbol).
     this.chartState.state$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((s) => {
@@ -347,281 +312,60 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
         if (symbolChanged || intervalChanged) {
           this.loadChartData(s.symbol, s.interval);
         } else if (this.allData.length) {
-          // range/indicator change: re-render from cached data. An
-          // indicator-only change keeps the user's current pan/zoom view.
-          this.createCharts(this.allData, rangeChanged ? undefined : this.currentView());
+          // an indicator-only change keeps the user's current pan/zoom view
+          this.createChart(this.allData, rangeChanged ? undefined : this.currentView());
         }
       });
   }
 
-  /** All bars fetched for the current symbol (one fetch per symbol, 4.3). */
-  private allData: OHLCV[] = [];
-
-  // Public since 2.2: the toolbar/state refactor (2.3/4.x) and specs drive
-  // reloads through it.
+  // Public since 2.2: specs drive reloads through it.
   loadChartData(symbol: string, interval: string): void {
     this.loading = true;
     this.error = null;
-    // 4.3 PAN FIX (Kevin: "when you pan the chart, the bars before don't load"):
-    // fetch the FULL file (no cap chop — msft holds ~10k bars) and let the
-    // range preset FRAME THE VIEW only. Bars outside the preset stay in the
-    // chart (off-screen); pan/zoom reveals them — TradingView behavior.
+    // 4.3 PAN FIX: fetch the FULL file; the range preset only FRAMES the view.
     this.chartDataService.getOHLCV(symbol, interval, 100000).subscribe({
       next: (data) => {
         this.allData = data;
         if (data && data.length > 0) {
-          this.createCharts(data);
+          this.createChart(data);
         } else {
           this.error = 'No data available';
         }
         this.loading = false;
-        this.cdr.markForCheck(); // zoneless: schedule CD after async state change
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Failed to load chart data:', err);
         this.error = 'Failed to load chart data';
         this.loading = false;
-        this.cdr.markForCheck(); // zoneless: schedule CD after async state change
+        this.cdr.markForCheck();
       },
     });
   }
 
-  /** X extent shared by both panes — identical min/max keeps them aligned. */
-  private sharedXExtent(data: OHLCV[]): { min: number; max: number } {
-    const timestamps = data.map((d) => d.timestamp);
-    const min = Math.min(...timestamps);
-    const max = Math.max(...timestamps);
-    // pad each side by ~1 bar so edge candles/bars aren't clipped
-    const pad = data.length > 1 ? (max - min) / (data.length - 1) : 86400000;
-    return { min: min - pad, max: max + pad };
-  }
-
-  /** Per-bar date label for the category axis (no weekend slots — one label
-   *  per TRADING day). */
   private formatBarDate(ts: number): string {
-    return new Date(ts).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: '2-digit',
-    });
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
   }
 
-  /** The price chart's current x view (bar-index units), if a chart exists. */
+  /** The chart's current x view (bar-index units), if a chart exists. */
   private currentView(): { min: number; max: number } | undefined {
-    const x = this.priceChart?.scales?.['x'] as any;
-    return x && typeof x.min === 'number' && typeof x.max === 'number'
-      ? { min: x.min, max: x.max }
-      : undefined;
+    const x = this.chart?.scales?.['x'] as any;
+    return x && typeof x.min === 'number' && typeof x.max === 'number' ? { min: x.min, max: x.max } : undefined;
   }
 
-  private allCharts(): Chart[] {
-    return [this.priceChart, this.volumeChart, ...this.indicatorCharts].filter((c): c is Chart => !!c);
-  }
-
-  private destroyCharts(): void {
-    for (const c of this.indicatorCharts) c.destroy();
-    this.indicatorCharts = [];
-    if (this.priceChart) {
-      this.priceChart.destroy();
-      this.priceChart = null;
+  private destroyChart(): void {
+    if (this.chart) {
+      this.chart.destroy();
+      this.chart = null;
     }
-    if (this.volumeChart) {
-      this.volumeChart.destroy();
-      this.volumeChart = null;
-    }
-  }
-
-  private createCharts(data: OHLCV[], preserveView?: { min: number; max: number }): void {
-    // Belt-and-braces guard: never crash on missing canvas references.
-    const priceEl = this.priceCanvas?.nativeElement;
-    const volEl = this.volumeCanvas?.nativeElement;
-    if (!priceEl || !volEl) {
-      console.warn('createCharts: panes not ready; skipping chart creation');
-      return;
-    }
-
-    this.destroyCharts();
-
-    // 4.3 PAN FIX: chart datasets carry ALL bars (nothing chopped — pan/zoom
-    // reveals bars outside the preset); the range preset only FRAMES the VIEW:
-    // the x-scale min/max = the preset window (computed from the slice bounds).
-    const rangeSlice = filterByRange(data, this.currentRange as any, this.currentInterval);
-    if (!rangeSlice.length) {
-      this.error = 'No data in range';
-      return;
-    }
-
-    // FULL data on the charts (weekly-aggregated only when interval=1w — the
-    // aggregation applies to the whole file so pan-left shows weekly bars).
-    const chartBars =
-      this.currentInterval === '1w' ? aggregateWeeklyWFri(data) : data;
-
-    // X-AXIS ARCHITECTURE (root-caused live): chartjs-plugin-zoom's pan writes
-    // numeric min/max into category-scale options, which breaks
-    // chartjs-chart-financial's controller (element x = -32768, y collapses
-    // 0..1, candles vanish after pan). The proven combo: LINEAR x-scale with
-    // x = bar INDEX — the plugin handles linear scales natively, the
-    // financial controller gets numeric x, and weekend/holiday gaps vanish
-    // (indices skip non-trading days). Date labels via ticks.callback.
-    const dateForIndex = (i: number) => {
-      const b = chartBars[Math.min(Math.max(0, i), chartBars.length - 1)];
-      return b ? this.formatBarDate(b.timestamp) : '';
-    };
-
-    const priceData = chartBars.map((d, i) => ({
-      x: i, o: d.open, h: d.high, l: d.low, c: d.close,
-      t: d.timestamp, // raw timestamp for the tooltip title
-    }));
-    const volumeData = chartBars.map((d, i) => ({
-      x: i, y: d.volume,
-    }));
-
-    // VIEW extent = the preset window as INDEX range (the slice's bounds, ±1
-    // bar pad) — the view zooms to frame the preset; pan/zoom reveals the rest.
-    // MATCH BY TIMESTAMP (not object reference): the weekly path re-aggregates
-    // into NEW bar objects, so indexOf fails (-1) and the view collapses to
-    // min=0/max=-2 (measured live: weekly 6M showed nothing). Timestamps are
-    // unique per bar in both paths.
-    const sliceStartTs = rangeSlice[0].timestamp;
-    const sliceEndTs = rangeSlice[rangeSlice.length - 1].timestamp;
-    let sliceStart = chartBars.findIndex((b) => b.timestamp >= sliceStartTs);
-    if (sliceStart < 0) sliceStart = 0;
-    let sliceEnd = sliceStart;
-    for (let i = sliceStart; i < chartBars.length; i++) {
-      if (chartBars[i].timestamp <= sliceEndTs) sliceEnd = i; else break;
-    }
-    const viewMin = preserveView ? preserveView.min : Math.max(0, sliceStart - 1);
-    const viewMax = preserveView ? preserveView.max : Math.min(chartBars.length - 1, sliceEnd + 1);
-    const fullMin = 0;
-    const fullMax = chartBars.length - 1;
-
-    const xScale = {
-      type: 'linear' as const,
-      min: viewMin,
-      max: viewMax,
-      ticks: {
-        maxRotation: 0, autoSkip: true, maxTicksLimit: 10,
-        // The callback's SECOND arg is the TICK index (0..9 with maxTicksLimit),
-        // NOT the bar index — mapping it directly showed 1986 dates under 2026
-        // candles (measured live). The FIRST arg is the VALUE = the bar index
-        // on this linear scale — use it for the date lookup.
-        callback: (value: any) => dateForIndex(value),
-      },
-    };
-
-    // 3.2: zoom/pan on the x-axis only, clamped to the data extent (no panning
-    // into the void; min 10 visible bars per the Python range_controller port).
-    // BOTH callback variants hooked: onZoom/onPan fire on API-triggered changes
-    // (zoomScale/pan calls — tests, chart-type switch); onZoomComplete/
-    // onPanComplete fire after real user gestures (wheel/drag/pinch). The
-    // gesture variants fire INSIDE the update cycle, so syncXRange defers.
-    const zoomOptions = (extent: { min: number; max: number }) => ({
-      zoom: {
-        wheel: { enabled: true, speed: 0.1 },
-        pinch: { enabled: true },
-        mode: 'x' as const,
-        onZoom: ({ chart }: any) => this.syncXRange(chart),
-        onZoomComplete: ({ chart }: any) => this.syncXRange(chart),
-      },
-      pan: {
-        enabled: true,
-        mode: 'x' as const,
-        onPan: ({ chart }: any) => this.syncXRange(chart),
-        onPanComplete: ({ chart }: any) => this.syncXRange(chart),
-      },
-      limits: {
-        x: {
-          min: extent.min,
-          max: extent.max,
-          minRange: 10, // ~10 visible bars (index units)
-        },
-      },
-    });
-
-    // 5.2 indicators: resolve state entries, compute on the SAME bars (indices
-    // line up with the candle x = bar index), split overlay vs oscillator pane.
-    const computed = this.computeIndicators(chartBars);
-    const overlayDatasets = this.buildOverlayDatasets(computed.overlays);
-    this.syncOscPanes(computed.panes);
-
-    // PRICE pane: candlestick only (volume lives in its own pane now).
-    // 4.3 layout: price y-axis on the RIGHT (aligned with volume y); NO x labels
-    // (the dates render below the VOLUME pane).
-    // FIXED y-axis width (Kevin: "volume sticks out further left"): both panes'
-    // y-axes forced to the same width so the plot areas align horizontally.
-    // The SCALE-level afterFit is the recipe that reliably sticks (post-fit
-    // assignments + sibling-update plugin hooks broke the chart — measured).
-    const fixedAxisAfterFit = (scale: any) => { scale.width = FIXED_AXIS_WIDTH; };
-    this.priceChart = new Chart(priceEl, {
-      type: 'candlestick',
-      data: { datasets: [{ type: 'candlestick', label: 'Price', data: priceData }, ...overlayDatasets] } as any,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false }, // TradingView hides the legend; 10.2 adds rows
-          tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: priceTooltipCallbacks },
-          zoom: zoomOptions({ min: fullMin, max: fullMax }),
-          crosshair: true, // enables the crosshair plugin (3.3)
-        },
-        scales: {
-          x: { ...xScale, display: false }, // dates below the volume pane
-          y: { type: 'linear', position: 'right' as const, afterFit: fixedAxisAfterFit },
-        },
-      } as any,
-    });
-
-    // VOLUME pane: bars on their own scale — starts at 0, never overlaps price.
-    // 4.3 volume coloring: up days green, down days red (close vs open).
-    const upColor = '#26a69a';
-    const downColor = '#ef5350';
-    this.volumeChart = new Chart(volEl, {
-      type: 'bar',
-      data: { datasets: [{
-        label: 'Volume',
-        data: volumeData,
-        backgroundColor: (ctx: any) => {
-          const idx = ctx.dataIndex;
-          const bar = chartBars[idx];
-          if (!bar) return upColor;
-          return bar.close >= bar.open ? upColor : downColor;
-        },
-      }] } as any,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: true, mode: 'index', intersect: false, callbacks: volumeTooltipCallbacks },
-          zoom: zoomOptions({ min: fullMin, max: fullMax }),
-          crosshair: true, // enables the crosshair plugin (3.3)
-        },
-        scales: {
-          x: { ...xScale, display: true }, // 4.3 layout: dates BELOW the volume pane
-          y: { type: 'linear', position: 'right' as const, beginAtZero: true, grid: { drawOnChartArea: false }, afterFit: fixedAxisAfterFit,
-               ticks: { callback: (v: any) => compactVolume(Number(v)) } },
-        },
-      } as any,
-    });
-    this.indicatorCharts = this.buildPaneCharts(
-      computed.panes, chartBars, { min: viewMin, max: viewMax }, xScale, zoomOptions({ min: fullMin, max: fullMax }),
-      fixedAxisAfterFit, dateForIndex,
-    );
-    // Dev-only test handle: expose the chart instances for the Playwright
-    // verification scripts (window.Chart is module-scoped in this app).
-    // ngDevMode is stripped in production builds — no production pollution.
-    if (typeof ngDevMode !== 'undefined' && ngDevMode) {
-      (window as any).__charts = { price: this.priceChart, volume: this.volumeChart, indicators: this.indicatorCharts };
-    }
+    this.builders = [];
+    this.loaded = null;
   }
 
   /** Resolve + calculate every state indicator; bad entries are skipped, not fatal. */
-  private computeIndicators(bars: OHLCV[]): {
-    overlays: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[];
-    panes: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[];
-  } {
-    const overlays: any[] = [];
-    const panes: any[] = [];
+  private computeIndicators(bars: OHLCV[]): { overlays: Computed[]; panes: Computed[] } {
+    const overlays: Computed[] = [];
+    const panes: Computed[] = [];
     for (const entry of this.chartState.snapshot().indicators) {
       try {
         const resolved = resolveEntry(entry);
@@ -634,151 +378,275 @@ export class ChartViewerComponent implements OnInit, OnDestroy {
     return { overlays, panes };
   }
 
-  /** Theme colour from a CSS custom property (6.2 token rule), with fallback. */
-  private cssVar(name: string, fallback: string): string {
-    try {
-      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      return v || fallback;
-    } catch {
-      return fallback;
-    }
+  /** Max points on screen: ~1 per 4px of canvas, clamped. */
+  private maxPoints(): number {
+    const w = this.chartCanvas?.nativeElement?.clientWidth || 1200;
+    return Math.min(500, Math.max(120, Math.floor(w / 4)));
   }
 
-  private static readonly DASHES: Record<OutputSpec['defaultLineStyle'], number[]> = {
-    solid: [], dash: [6, 4], dot: [2, 3], dash_dot: [6, 3, 2, 3],
-  };
-
-  private lineDataset(label: string, values: (number | null)[], color: string, width: number, dash: number[]) {
+  private lineDataset(label: string, yAxisID: string, color: string, width: number, dash: number[]) {
     return {
-      type: 'line' as const,
-      label,
-      data: values.map((y, x) => ({ x, y })),
-      borderColor: color,
-      backgroundColor: color,
-      borderWidth: width,
-      borderDash: dash,
-      pointRadius: 0,
-      pointHoverRadius: 3,
-      tension: 0,
-      spanGaps: false,
+      type: 'line' as const, label, yAxisID, data: [] as any[],
+      borderColor: color, backgroundColor: color, borderWidth: width, borderDash: dash,
+      pointRadius: 0, pointHoverRadius: 3, tension: 0, spanGaps: false,
+      parsing: false, normalized: true,
     };
   }
 
-  private buildOverlayDatasets(overlays: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[]) {
-    return overlays.flatMap(({ resolved, outputs }, i) => {
-      const color = this.cssVar(`--c-indicator-${(i % 4) + 1}`, ['#4c9aff', '#f59e0b', '#a78bfa', '#22c55e'][i % 4]);
-      return Object.values(outputs).slice(0, 1).map((vals) => this.lineDataset(resolved.label, vals, color, 1.5, []));
+  /** Value of a per-bar series sampled at the LAST bar of each bucket. */
+  private lineBuilder(values: (number | null)[]): DataBuilder {
+    return (pts) => pts.map((p) => {
+      const v = values[Math.min(p.i + p.n - 1, values.length - 1)];
+      return { x: p.x, y: typeof v === 'number' ? v : null };
     });
   }
 
-  /** Publish the pane list to the template and render it NOW so the canvases exist. */
-  private syncOscPanes(panes: { resolved: ResolvedIndicator }[]): void {
-    this.oscPanes = panes.map((p, i) => ({ key: `${i}-${p.resolved.entry.type}`, label: p.resolved.label, resolved: p.resolved }));
-    this.cdr.detectChanges();
-  }
+  private createChart(data: OHLCV[], preserveView?: { min: number; max: number }): void {
+    // Belt-and-braces guard: never crash on a missing canvas reference.
+    const el = this.chartCanvas?.nativeElement;
+    if (!el) {
+      console.warn('createChart: canvas not ready; skipping chart creation');
+      return;
+    }
+    this.destroyChart();
 
-  private buildPaneCharts(
-    panes: { resolved: ResolvedIndicator; outputs: Record<string, (number | null)[]> }[],
-    _bars: OHLCV[],
-    view: { min: number; max: number },
-    xScale: any,
-    zoom: any,
-    axisAfterFit: (scale: any) => void,
-    dateForIndex: (i: number) => string,
-  ): Chart[] {
-    const canvases = this.paneCanvases?.toArray() ?? [];
-    const charts: Chart[] = [];
-    panes.forEach((p, i) => {
-      const el = canvases[i]?.nativeElement;
-      if (!el) return;
-      const def = this.indicatorCalc.definition(p.resolved.definitionId);
-      const datasets = def.outputs
-        .filter((o) => p.outputs[o.key])
-        .map((o) => this.lineDataset(o.label, p.outputs[o.key], o.defaultColor, o.defaultWidth,
-          ChartViewerComponent.DASHES[o.defaultLineStyle]));
-      const y: any = { type: 'linear', position: 'right', afterFit: axisAfterFit, grid: { drawOnChartArea: false } };
-      if (def.defaultYRange) { y.min = def.defaultYRange[0]; y.max = def.defaultYRange[1]; }
-      charts.push(new Chart(el, {
-        type: 'line',
-        data: { datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: false,
-          interaction: { mode: 'index', intersect: false },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              enabled: true, mode: 'index', intersect: false,
-              callbacks: {
-                title: (items: any[]) => dateForIndex(Number(items?.[0]?.parsed?.x ?? 0)),
-                label: (item: any) => {
-                  const v = item?.raw?.y;
-                  return `${item.dataset.label} ${typeof v === 'number' ? v.toFixed(2) : '-'}`;
-                },
+    // The range preset only FRAMES the view (4.3); all bars stay reachable by pan/zoom.
+    const rangeSlice = filterByRange(data, this.currentRange as any, this.currentInterval);
+    if (!rangeSlice.length) {
+      this.error = 'No data in range';
+      return;
+    }
+    // Weekly aggregation applies to the whole file so pan-left shows weekly bars.
+    const bars = this.currentInterval === '1w' ? aggregateWeeklyWFri(data) : data;
+    this.bars = bars;
+
+    // X = bar INDEX on a LINEAR scale (root-caused in 4.3: category scales break
+    // under the zoom plugin's numeric min/max; indices also drop weekend gaps).
+    const dateForIndex = (i: number) => {
+      const b = bars[Math.min(Math.max(0, Math.round(i)), bars.length - 1)];
+      return b ? this.formatBarDate(b.timestamp) : '';
+    };
+
+    // View = the preset window as an index range (MATCH BY TIMESTAMP: the weekly
+    // path re-aggregates into new bar objects, so reference lookups fail).
+    const sliceStartTs = rangeSlice[0].timestamp;
+    const sliceEndTs = rangeSlice[rangeSlice.length - 1].timestamp;
+    let sliceStart = bars.findIndex((b) => b.timestamp >= sliceStartTs);
+    if (sliceStart < 0) sliceStart = 0;
+    let sliceEnd = sliceStart;
+    for (let i = sliceStart; i < bars.length; i++) {
+      if (bars[i].timestamp <= sliceEndTs) sliceEnd = i; else break;
+    }
+    const viewMin = preserveView ? preserveView.min : Math.max(0, sliceStart - 1);
+    const viewMax = preserveView ? preserveView.max : Math.min(bars.length - 1, sliceEnd + 1);
+    const fullMax = bars.length - 1;
+
+    const { overlays, panes } = this.computeIndicators(bars);
+
+    // ---- datasets + their data builders (order = builders order) -------------
+    const up = cssVar('--c-up', '#26a69a');
+    const down = cssVar('--c-down', '#ef5350');
+    const datasets: any[] = [];
+    this.builders = [];
+    const add = (ds: any, b: DataBuilder) => { datasets.push(ds); this.builders.push(b); };
+
+    add({ type: 'candlestick', label: 'Price', yAxisID: 'y', data: [] },
+      (pts) => pts.map((p) => ({ x: p.x, o: p.o, h: p.h, l: p.l, c: p.c, t: p.t })));
+    overlays.forEach(({ resolved, outputs }, i) => {
+      const color = cssVar(`--c-indicator-${(i % 4) + 1}`, ['#4c9aff', '#f59e0b', '#a78bfa', '#22c55e'][i % 4]);
+      const first = Object.values(outputs)[0];
+      if (first) add(this.lineDataset(resolved.label, 'y', color, 1.5, []), this.lineBuilder(first));
+    });
+    add({
+      type: 'bar', label: 'Volume', yAxisID: 'yVol', data: [], parsing: false, normalized: true,
+      barPercentage: 1, categoryPercentage: 0.9,
+      backgroundColor: (ctx: any) => (ctx.raw?.up ? up : down),
+    }, (pts) => pts.map((p) => ({ x: p.x, y: p.v, up: p.up, t: p.t })));
+
+    const paneScales: Record<string, any> = {};
+    panes.forEach(({ resolved, outputs }, i) => {
+      const id = `yInd${i}`;
+      const def = this.indicatorCalc.definition(resolved.definitionId);
+      for (const o of def.outputs) {
+        if (!outputs[o.key]) continue;
+        add(this.lineDataset(o.label, id, o.defaultColor, o.defaultWidth, DASHES[o.defaultLineStyle]),
+          this.lineBuilder(outputs[o.key]));
+      }
+      paneScales[id] = {
+        type: 'linear', position: 'right', stack: 'panel', stackWeight: PANE_WEIGHT,
+        afterFit: (s: any) => { s.width = Y_WIDTH; },
+        grid: { color: cssVar('--c-grid', 'rgba(0,0,0,0.06)') },
+        ticks: { includeBounds: false },
+        paneLabel: resolved.label,
+        ...(def.defaultYRange
+          ? {
+              min: def.defaultYRange[0], max: def.defaultYRange[1], fixedRange: true,
+              // fixed-range panes (RSI 0-100): label 20/50/80 — bound labels would
+              // collide with the neighbouring pane's axis at the boundary
+              afterBuildTicks: (scale: any) => {
+                const r = scale.max - scale.min;
+                scale.ticks = [0.2, 0.5, 0.8].map((f) => ({ value: scale.min + r * f }));
               },
-            },
-            zoom,
-            crosshair: true,
-          },
-          scales: { x: { ...xScale, min: view.min, max: view.max, display: false }, y },
-        } as any,
-      }));
+            }
+          : {}),
+      };
     });
-    return charts;
+
+    // ---- scales: one x, stacked y's ------------------------------------------
+    const grid = { color: cssVar('--c-grid', 'rgba(0,0,0,0.06)') };
+    const scales: Record<string, any> = {
+      x: {
+        type: 'linear', position: 'bottom', min: viewMin, max: viewMax, grid,
+        ticks: {
+          maxRotation: 0, autoSkip: true, maxTicksLimit: 8,
+          // First arg is the VALUE = the bar index on this linear scale
+          // (the 2nd arg is the tick index — mapping it showed 1986 dates, 4.3).
+          callback: (value: any) => dateForIndex(Number(value)),
+        },
+      },
+      y: {
+        type: 'linear', position: 'right', stack: 'panel', stackWeight: PRICE_WEIGHT,
+        afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
+        ticks: { includeBounds: false },
+        paneLabel: `${this.currentSymbol.toUpperCase()} · ${this.currentInterval.toUpperCase()}`,
+      },
+      yVol: {
+        type: 'linear', position: 'right', stack: 'panel', stackWeight: VOLUME_WEIGHT,
+        beginAtZero: true, min: 0, afterFit: (s: any) => { s.width = Y_WIDTH; }, grid,
+        ticks: { maxTicksLimit: 3, includeBounds: false, callback: (v: any) => compactVolume(Number(v)) },
+        paneLabel: 'Volume',
+      },
+      ...paneScales,
+    };
+
+    this.chart = new Chart(el, {
+      type: 'candlestick',
+      data: { datasets } as any,
+      plugins: [{
+        id: 'lodWindow',
+        beforeUpdate: (c: Chart) => this.syncView(c),
+        // y-fit must run once the scales exist but before they're laid out
+        // (beforeUpdate is too early: the resolved scale options are stale then)
+        beforeLayout: (c: Chart) => this.fitYAxes(c),
+      }],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false, // animations are the main source of jank on pan/zoom
+        interaction: { mode: 'index', axis: 'x', intersect: false },
+        plugins: {
+          legend: { display: false }, // TradingView hides the legend; 10.2 adds rows
+          tooltip: {
+            enabled: true, mode: 'index', axis: 'x', intersect: false,
+            // guide lines (overbought/stretched/...) are noise in the readout
+            filter: (item: any) => !(item.dataset?.borderDash?.length),
+            callbacks: {
+              title: (items: any[]) => dateForIndex(Number(items?.[0]?.parsed?.x ?? 0)),
+              label: tooltipLabel,
+            },
+          },
+          // 3.2: wheel/pinch/drag on x only, clamped to the data extent (min ~10 bars).
+          zoom: {
+            zoom: {
+              wheel: { enabled: true, speed: 0.1 }, pinch: { enabled: true }, mode: 'x',
+            },
+            pan: {
+              enabled: true, mode: 'x',
+            },
+            limits: { x: { min: 0, max: fullMax, minRange: 10 } },
+          },
+          crosshair: true,
+        },
+        scales,
+      } as any,
+    });
+
+    // Dev-only test handle for the Playwright verification scripts.
+    if (typeof ngDevMode !== 'undefined' && ngDevMode) {
+      (window as any).__charts = { chart: this.chart };
+    }
   }
 
-  /** Minimum visible x-range: ~10 bars (Python range_controller port) — prevents
-   *  zooming in past ~10 candles so the chart stays readable. */
-  private minVisibleRange(extent: { min: number; max: number }): number {
-    // 10 bars' width; the caller passes the padded extent — derive bar width
-    // from the raw extent stored on the component.
-    return this.currentBarWidth || (extent.max - extent.min) / 10;
+  /**
+   * Runs from the chart's own `beforeUpdate` hook, i.e. INSIDE every update
+   * cycle (initial render, zoom/pan, resize): (re)load the data window for the
+   * requested x-range when needed and refit the y-axes to the VISIBLE bars.
+   * Doing it here — instead of a second update afterwards — means one render
+   * per frame while panning. The window is only rebuilt when the bucket size
+   * changes or the view leaves the loaded window; a pure pan inside it only
+   * refits the y-axes.
+   */
+  private syncView(chart: Chart): void {
+    // NB: no `chart === this.chart` check — the very first update runs inside the
+    // Chart constructor, before `this.chart` is assigned.
+    if (!this.bars.length || !this.builders.length) return;
+    const xo = (chart.options.scales as any)['x'];
+    const min = typeof xo?.min === 'number' ? xo.min : 0;
+    const max = typeof xo?.max === 'number' ? xo.max : this.bars.length - 1;
+    const bucket = chooseBucket(max - min, this.maxPoints());
+    const L = this.loaded;
+    const outside = !L || L.bucket !== bucket || (min < L.from && L.from > 0) || (max > L.to && L.to < this.bars.length - 1);
+    if (outside) {
+      const w = loadWindow(min, max, this.bars.length);
+      const pts = bucketWindow(this.bars, w.from, w.to, bucket);
+      chart.data.datasets.forEach((ds: any, i: number) => { ds.data = this.builders[i](pts); });
+      this.loaded = { from: w.from, to: w.to, bucket };
+    }
   }
 
-  /** Bar width in ms (raw data extent / count) — set at chart creation. */
-  private currentBarWidth = 0;
-
-  /** 3.2: apply the source pane's current x-range to the other pane. DEFERRED
-   *  via queueMicrotask (re-entrant updates mid-cycle throw). Loop guard
-   *  prevents the pan/zoom echo (both panes fire callbacks on interaction).
-   *  LINEAR x-scale: numeric min/max — plugin-native, no label conversion. */
-  private syncXRange(sourceChart: Chart): void {
-    queueMicrotask(() => {
-      const scale = sourceChart.scales['x'] as any;
-      if (scale?.min == null || scale?.max == null) return;
-      for (const target of this.allCharts()) {
-        if (target === sourceChart) continue;
-        const tScale = target.scales['x'] as any;
-        // loop guard: already in sync → nothing to do (breaks the echo)
-        if (tScale?.min === scale.min && tScale?.max === scale.max) continue;
-        (target.options.scales as any).x = {
-          ...(target.options.scales as any).x,
-          min: scale.min,
-          max: scale.max,
-        };
-        try {
-          target.update('none'); // no animation — instant sync
-        } catch (e) {
-          console.error('syncXRange update threw:', (e as Error).message?.slice(0, 120));
+  /** Fit every y-scale to the data inside the x-range (fixed-range panes keep theirs). */
+  private fitYAxes(chart: any): void {
+    if (!this.builders.length) return;
+    const xo = chart.options.scales.x;
+    const min = typeof xo?.min === 'number' ? xo.min : 0;
+    const max = typeof xo?.max === 'number' ? xo.max : this.bars.length - 1;
+    const bucket = this.loaded?.bucket ?? 1;
+    const lo = min - bucket;
+    const hi = max + bucket;
+    const ext: Record<string, { min: number; max: number }> = {};
+    for (const ds of chart.data.datasets) {
+      const id = ds.yAxisID as string;
+      const e = (ext[id] ??= { min: Infinity, max: -Infinity });
+      for (const p of ds.data) {
+        if (p.x < lo || p.x > hi) continue;
+        if (ds.type === 'candlestick') {
+          if (p.l < e.min) e.min = p.l;
+          if (p.h > e.max) e.max = p.h;
+        } else if (typeof p.y === 'number') {
+          if (p.y < e.min) e.min = p.y;
+          if (p.y > e.max) e.max = p.y;
         }
       }
-    });
+    }
+    for (const [id, e] of Object.entries(ext)) {
+      const cfg = chart.options.scales[id];
+      if (!cfg || cfg.fixedRange || !isFinite(e.min) || !isFinite(e.max)) continue;
+      const r = id === 'yVol' ? { min: 0, max: e.max > 0 ? e.max * 1.1 : 1 } : fitRange(e.min, e.max, 0.06);
+      // write the config (persists across updates) AND the live scale: Chart.js
+      // caches the user bounds at init (_userMin/_userMax), before our hook runs,
+      // so without this the fit would apply one update late.
+      cfg.min = r.min;
+      cfg.max = r.max;
+      const live = chart.scales[id];
+      if (live) {
+        live.options.min = r.min;
+        live.options.max = r.max;
+        live._userMin = r.min;
+        live._userMax = r.max;
+      }
+    }
   }
 
-  /** Reset-zoom button (3.2): restores the full data extent on BOTH panes. */
+  /** Reset-zoom button (3.2): back to the preset's framing. */
   resetZoom(): void {
     try {
-      for (const c of this.allCharts()) c.resetZoom();
+      this.chart?.resetZoom();
     } catch (e) {
       console.error('resetZoom THREW:', (e as Error).message?.slice(0, 120));
-    }
-    for (const c of this.allCharts()) {
-      if ((c as any).options?.scales?.x) c.update('none');
     }
   }
 
   ngOnDestroy(): void {
-    this.destroyCharts();
+    this.destroyChart();
   }
 }

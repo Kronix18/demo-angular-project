@@ -1,4 +1,4 @@
-<div class="app-container">
+<div class="app-container" [class.fullscreen]="fullscreen()">
   <!-- Navigation Bar -->
   <nav class="navbar">
     <div class="navbar-content">
@@ -40,7 +40,7 @@
   </main>
 
   <!-- Footer -->
-  <footer class="footer">
+  <footer class="footer" *ngIf="!fullscreen()">
     <p>&copy; 2024 Stock Screener. Basic stock analysis tools without technical indicators or watchlists.</p>
   </footer>
 </div>

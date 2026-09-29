@@ -63,6 +63,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 | 5.1 | phase-5-indicators/5.1-indicator-calculations.md | DONE (unit-verified; golden values vs Python, 14 specs) | `core/indicators/*` + `IndicatorCalculationService`; UI render is 5.2 |
 | 5.2 | phase-5-indicators/5.2-indicator-panel.md | DONE (browser-verified 12/12, `scripts/verify-5-2.cjs`) | overlay + oscillator panes, panel add/remove, state-driven |
 | 5.3 | phase-5-indicators/5.3-indicator-management.md | NOT STARTED | |
+| 5.4 | phase-5-indicators/5.4-chart-layout-redesign.md | DONE (browser-verified 25/25, `scripts/verify-layout.cjs`) | one-panel chart, LOD windowing, full-viewport layout, compact navbar (Kevin, 2026-09-29) |
 | 6.1 | phase-6-integration/6.1-routing-navigation.md | NOT STARTED | charts route exists; navbar link missing |
 | 6.2 | phase-6-integration/6.2-design-token-compliance.md | NOT STARTED | constraint currently violated |
 | 6.3 | phase-6-integration/6.3-error-loading-states.md | NOT STARTED | |

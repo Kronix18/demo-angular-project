@@ -12,3 +12,17 @@
   --c-indicator-3: #a78bfa;
   --c-indicator-4: #22c55e;
 }
+
+/* Chart panel tokens (layout redesign) */
+:root {
+  --c-up: #26a69a;
+  --c-down: #ef5350;
+  --c-grid: rgba(0, 0, 0, 0.06);
+  --c-pane-border: #d1d5db;
+  --c-crosshair: #758696;
+  --c-text-muted: #6b7280;
+}
+
+html, body {
+  margin: 0;
+}

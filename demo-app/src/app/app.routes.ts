@@ -28,7 +28,7 @@ export const routes: Routes = [
   {
     path: 'charts/:symbol',
     loadComponent: () => import('./charts/chart-viewer/chart-viewer.component').then(m => m.ChartViewerComponent),
-    data: { title: 'Chart Viewer' }
+    data: { title: 'Chart Viewer', fullscreen: true }
   },
   {
     path: 'profile',
