@@ -1556,6 +1556,69 @@ describe('ChartViewerComponent — chart.js registration & canvas timing (task 2
     });
   });
 
+  describe('layouts + indicator templates (11.17)', () => {
+    const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
+    let store: any;
+    beforeEach(async () => {
+      localStorage.clear();
+      const { DrawingStore } = await import('../drawings/drawing-store.service');
+      store = TestBed.inject(DrawingStore);
+    });
+    const ready = async () => {
+      sessionStorage.clear(); localStorage.clear();
+      const st = TestBed.inject(ChartStateService); st.reset();
+      store.setHidden(false); store.clear('msft');
+      await loaded();
+      return st;
+    };
+
+    it('Save layout stores chart state + drawings; Load brings them back after a reset', async () => {
+      const st = await ready();
+      st.addIndicator({ type: 'sma', period: 2 });
+      st.setChartType('line');
+      store.add('msft', { id: 'a', type: 'hline', a: { t: 1, p: 100 } });
+      (q('[data-layouts]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const name = q('[data-layout-name]') as HTMLInputElement;
+      name.value = 'Mine'; name.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      (q('[data-layout-save]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(q('[data-layouts]')!.textContent).toContain('Mine');
+      st.reset();
+      store.clear('msft');
+      await fixture.whenStable();
+      expect(st.snapshot().indicators).toEqual([]);
+      (q('[data-layouts]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (q('[data-layout-load]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(st.snapshot().indicators.map((i) => i.type)).toEqual(['sma']);
+      expect(st.snapshot().chartType).toBe('line');
+      expect(store.list('msft').map((d: any) => d.id)).toEqual(['a']);
+      expect(q('app-layouts-dialog')).toBeNull();
+    });
+
+    it('applying an indicator template replaces the indicators', async () => {
+      const st = await ready();
+      st.addIndicator({ type: 'rsi', period: 14 });
+      (q('[data-indicators]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const n = q('[data-tpl-name]') as HTMLInputElement;
+      n.value = 'T'; n.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      (q('[data-tpl-save]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      st.clearIndicators();
+      st.addIndicator({ type: 'sma', period: 9 });
+      fixture.detectChanges();
+      (q('[data-tpl-apply]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      expect(st.snapshot().indicators.map((i) => i.type)).toEqual(['rsi']);
+    });
+  });
+
   describe('type-to-search symbol dialog', () => {
     const q = (sel: string) => fixture.nativeElement.querySelector(sel) as HTMLElement | null;
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) =>

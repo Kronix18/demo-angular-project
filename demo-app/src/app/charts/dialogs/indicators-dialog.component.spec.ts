@@ -58,4 +58,39 @@ describe('IndicatorsDialogComponent (indicator picker)', () => {
     (el().querySelector('input[type="search"]') as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(added).toEqual(['atr']);
   });
+
+  describe('templates (11.17)', () => {
+    const q = <T extends HTMLElement>(sel: string) => el().querySelector(sel) as T;
+    beforeEach(() => {
+      localStorage.clear();
+      fixture = TestBed.createComponent(IndicatorsDialogComponent);
+      fixture.componentRef.setInput('current', [{ type: 'sma', period: 20 }, { type: 'rsi', period: 14 }]);
+      fixture.detectChanges();
+    });
+    const name = (v: string) => { const i = q<HTMLInputElement>('[data-tpl-name]'); i.value = v; i.dispatchEvent(new Event('input')); fixture.detectChanges(); };
+
+    it('saves the indicators on the chart as a named template, lists it, applies it and deletes it', () => {
+      expect(q<HTMLButtonElement>('[data-tpl-save]').disabled).toBe(true);
+      name('My set');
+      q<HTMLButtonElement>('[data-tpl-save]').click();
+      fixture.detectChanges();
+      expect(el().querySelectorAll('[data-tpl-row]').length).toBe(1);
+      expect(q('[data-tpl-row]').textContent).toContain('My set');
+      expect(q('[data-tpl-row]').textContent).toContain('2 indicators');
+      const applied: unknown[] = [];
+      fixture.componentInstance.applyTemplate.subscribe((e) => applied.push(e));
+      q<HTMLButtonElement>('[data-tpl-apply]').click();
+      expect(applied).toEqual([[{ type: 'sma', period: 20 }, { type: 'rsi', period: 14 }]]);
+      q<HTMLButtonElement>('[data-tpl-delete]').click();
+      fixture.detectChanges();
+      expect(el().querySelectorAll('[data-tpl-row]').length).toBe(0);
+    });
+
+    it('nothing to save when the chart has no indicators', () => {
+      fixture.componentRef.setInput('current', []);
+      fixture.detectChanges();
+      name('x');
+      expect(q<HTMLButtonElement>('[data-tpl-save]').disabled).toBe(true);
+    });
+  });
 });
