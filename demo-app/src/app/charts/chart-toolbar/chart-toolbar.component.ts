@@ -1,3 +1,4 @@
+import { DataInfoComponent } from '../../shared/data-info/data-info.component';
 import { ChangeDetectorRef, Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -14,7 +15,7 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
 @Component({
   selector: 'app-chart-toolbar',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, DataInfoComponent],
   template: `
     <div class="toolbar">
       <div class="toolbar-group">
@@ -62,6 +63,8 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
       <div class="toolbar-group">
         <button type="button" (click)="submitSymbol()">Update Chart</button>
       </div>
+
+      <div class="toolbar-group data-info-slot"><app-data-info /></div>
     </div>
   `,
   styles: [
@@ -75,6 +78,8 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
         gap: 0.25rem 0.75rem;
         align-items: center;
       }
+
+      .data-info-slot { margin-left: auto; }
 
       .toolbar-group {
         display: flex;

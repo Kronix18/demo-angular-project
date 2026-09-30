@@ -106,8 +106,8 @@ No backend dataset needed: everything is built and verified against contract fix
 | 12.8 | phase-12-api-foundation/12.8-metaservice-api-meta-with-dataset-signals.md | DONE | MetaService (`/api/meta`) with dataset signals — needs: `meta` |
 | 12.9 | phase-12-api-foundation/12.9-symbolcapabilities-api-chart-symbol-meta.md | DONE | SymbolCapabilities (`/api/chart/{symbol}/meta`) — needs: `prices` |
 | 12.10 | phase-12-api-foundation/12.10-appifdataset-appiffeature-structural-directives.md | DONE | `*appIfDataset` / `*appIfFeature` structural directives — needs: none |
-| 12.12 | phase-12-api-foundation/12.12-freshness-indicator.md | NOT STARTED | Freshness indicator — needs: `meta` |
-| 12.11 | phase-12-api-foundation/12.11-data-info-popover-as-of-model-versions.md | NOT STARTED | "Data info" popover (as_of, model versions) — needs: `meta` |
+| 12.12 | phase-12-api-foundation/12.12-freshness-indicator.md | DONE | Freshness indicator — needs: `meta` |
+| 12.11 | phase-12-api-foundation/12.11-data-info-popover-as-of-model-versions.md | DONE | "Data info" popover (as_of, model versions) — needs: `meta` |
 
 ### Phase 13 — Prices from the backend
 Replaces the static `*.us.txt` files with `/api/chart/...` when the backend can serve them, keeping the file path as fallback.

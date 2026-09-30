@@ -268,3 +268,10 @@ h2 {
     padding: 8px;
   }
 }
+
+.screener-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}

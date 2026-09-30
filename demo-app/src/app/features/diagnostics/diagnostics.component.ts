@@ -38,7 +38,7 @@ const FEATURES = ['technicals_server', 'ratings', 'rs_line', 'canslim', 'pattern
       </ul>
     </section>
   `,
-  styles: [`.diag { max-width: 720px; margin: 1.5rem auto; padding: 0 1rem; color: var(--c-text); } .on { color: var(--c-success, var(--c-text)); } .off { color: var(--c-text-muted, var(--c-text)); }`],
+  styles: [`.diag { max-width: 720px; margin: 1.5rem auto; padding: 0 1rem; color: var(--c-text); } .on { color: var(--c-success); } .off { color: var(--c-text-muted); }`],
 })
 export class DiagnosticsComponent {
   protected readonly meta = inject(MetaService);

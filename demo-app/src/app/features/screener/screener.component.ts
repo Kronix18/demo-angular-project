@@ -1,3 +1,4 @@
+import { DataInfoComponent } from '../../shared/data-info/data-info.component';
 import { IconComponent } from '../../shared/icons/icon.component';
 import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -11,7 +12,7 @@ import { ScreenerService } from '../../core/services/screener.service';
 @Component({
   selector: 'app-screener',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, IconComponent],
+  imports: [CommonModule, FormsModule, RouterLink, IconComponent, DataInfoComponent],
   templateUrl: './screener.component.html',
   styleUrl: './screener.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
