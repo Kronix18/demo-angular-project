@@ -5,7 +5,7 @@ import ent from '../../../../docs/api/fixtures/entitlements-pro.json';
 import { ApiErrorService } from './errors';
 import { EntitlementsService } from './entitlements.service';
 
-const URL = 'http://192.168.1.111:3000/api/user/entitlements';
+const URL = 'http://localhost:3000/api/user/entitlements';
 
 describe('EntitlementsService (12.10 minimal store; task 20.2 extends it)', () => {
   let svc: EntitlementsService;

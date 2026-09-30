@@ -5,7 +5,7 @@ import { AuthService } from '../auth/auth.service';
 import { authInterceptor } from './auth-interceptor';
 import { TokenStore } from './token-store';
 
-const BASE = 'http://192.168.1.111:3000';
+const BASE = 'http://localhost:3000';
 
 describe('authInterceptor + TokenStore (task 12.4, docs/api/09-user-tiers.md §1)', () => {
   let http: HttpClient;

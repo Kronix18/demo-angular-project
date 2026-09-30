@@ -6,7 +6,7 @@ import { ApiService } from './api.service';
 describe('ApiService (coverage gate 7.1)', () => {
   let api: ApiService;
   let http: HttpTestingController;
-  const BASE = 'http://192.168.1.111:3000';
+  const BASE = 'http://localhost:3000';
 
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);

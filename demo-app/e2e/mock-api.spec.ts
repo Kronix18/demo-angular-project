@@ -5,7 +5,7 @@ import { mockApi } from './mock-api';
 test.describe('mockApi helper (12.2)', () => {
   const get = (page: import('@playwright/test').Page, path: string) =>
     page.evaluate(async (p) => {
-      const r = await fetch(`http://192.168.1.111:3000${p}`);
+      const r = await fetch(`http://localhost:3000${p}`);
       return { status: r.status, body: await r.json().catch(() => null) };
     }, path);
 

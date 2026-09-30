@@ -3,7 +3,7 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { RETRY_JITTER, retryInterceptor } from './retry-interceptor';
 
-const U = 'http://192.168.1.111:3000/api/quotes';
+const U = 'http://localhost:3000/api/quotes';
 
 describe('retryInterceptor (task 12.6)', () => {
   let http: HttpClient;

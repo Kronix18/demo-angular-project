@@ -7,7 +7,7 @@ import { EntitlementsService } from '../../core/api/entitlements.service';
 import { MetaService } from '../../core/api/meta.service';
 import { DiagnosticsComponent } from './diagnostics.component';
 
-const base = 'http://192.168.1.111:3000';
+const base = 'http://localhost:3000';
 
 describe('DiagnosticsComponent (task 12.10 demo of the gating directives; data status page)', () => {
   it('lists each known dataset as on/off from /api/meta and features as available/locked', () => {

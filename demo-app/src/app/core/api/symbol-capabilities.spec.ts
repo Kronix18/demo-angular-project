@@ -5,7 +5,7 @@ import chartMeta from '../../../../docs/api/fixtures/chart-meta-msft.json';
 import { ApiErrorService } from './errors';
 import { SymbolCapabilities } from './symbol-capabilities';
 
-const url = (s: string) => `http://192.168.1.111:3000/api/chart/${s}/meta`;
+const url = (s: string) => `http://localhost:3000/api/chart/${s}/meta`;
 
 describe('SymbolCapabilities (task 12.9, docs/api/02-prices.md)', () => {
   let svc: SymbolCapabilities;

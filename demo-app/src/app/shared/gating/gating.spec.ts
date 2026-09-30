@@ -26,7 +26,7 @@ class Host { sym = signal('MSFT'); }
 
 describe('*appIfDataset / *appIfFeature (task 12.10)', () => {
   let ctl: HttpTestingController;
-  const base = 'http://192.168.1.111:3000';
+  const base = 'http://localhost:3000';
 
   function setup() {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });

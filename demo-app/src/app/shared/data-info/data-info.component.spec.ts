@@ -13,7 +13,7 @@ describe('DataInfoComponent (tasks 12.11 + 12.12)', () => {
     const f = TestBed.createComponent(DataInfoComponent);
     if (metaBody) {
       TestBed.inject(MetaService).load();
-      TestBed.inject(HttpTestingController).expectOne('http://192.168.1.111:3000/api/meta').flush(metaBody);
+      TestBed.inject(HttpTestingController).expectOne('http://localhost:3000/api/meta').flush(metaBody);
     }
     f.detectChanges();
     return f;

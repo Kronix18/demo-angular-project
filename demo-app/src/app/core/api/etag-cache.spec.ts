@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ETagCache, etagCacheInterceptor } from './etag-cache';
 import { TokenStore } from './token-store';
 
-const BASE = 'http://192.168.1.111:3000';
+const BASE = 'http://localhost:3000';
 
 describe('etagCacheInterceptor (task 12.5, docs/api/README.md §6)', () => {
   let http: HttpClient;

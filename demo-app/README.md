@@ -25,6 +25,20 @@ The Playwright runner uses its own Chromium. If that isn't installed, point it a
   Anything else (e.g. `/charts/aapl`) shows an error card listing these.
 - Screener / stock / profile pages talk to a backend that does not ship with this repo (see `API-BACKEND-SPEC.md`).
 
+## Connecting to your backend (localhost:3000)
+
+The app calls `http://localhost:3000` by default (`src/app/core/api-url.ts`); to use another URL add
+`<meta name="api-url" content="https://api.example.com">` to `src/index.html` (per deployment, no rebuild logic needed).
+
+1. Start your backend on port 3000, then `npm start` (Angular on http://localhost:4200).
+2. `npm run backend:check` (or `npm run backend:check -- http://host:port`) verifies reachability, **CORS for the Angular origin**
+   (it must allow the request headers `Authorization`, `If-None-Match`, `Content-Type` and expose `ETag`, `Retry-After`) and the `/api/meta` shape.
+3. Open http://localhost:4200/diagnostics: it lists which datasets the backend has switched on (from `GET /api/meta`) and what the plan unlocks.
+   Anything the backend doesn't serve yet degrades silently to the built-in demo data; no endpoint is required to exist.
+4. Optional end-to-end check against your real server: `LOCAL_BACKEND=1 npx playwright test e2e/local-backend.spec.ts`.
+
+The contract the backend should serve is in `docs/api/`; the plan is `docs/DATA-PLAN.md`.
+
 ## Chart viewer at a glance
 
 - `/charts/:symbol` fills the whole viewport (compact navbar, no footer, no page scroll).

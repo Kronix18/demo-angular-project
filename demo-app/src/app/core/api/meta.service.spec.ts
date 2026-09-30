@@ -6,7 +6,7 @@ import { ApiErrorService } from './errors';
 import { ETagCache } from './etag-cache';
 import { MetaService } from './meta.service';
 
-const URL = 'http://192.168.1.111:3000/api/meta';
+const URL = 'http://localhost:3000/api/meta';
 
 describe('MetaService (task 12.8, docs/api/README.md §10)', () => {
   let svc: MetaService;
