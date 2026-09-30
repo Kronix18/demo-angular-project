@@ -5,7 +5,8 @@ import { ApiService } from './services/api.service';
 describe('API_URL', () => {
   afterEach(() => document.querySelectorAll('meta[name="api-url"]').forEach((m) => m.remove()));
 
-  it('defaults to the dev server', () => {
+  it('defaults to the local backend on localhost:3000', () => {
+    expect(DEFAULT_API_URL).toBe('http://localhost:3000');
     expect(TestBed.inject(API_URL)).toBe(DEFAULT_API_URL);
   });
 
