@@ -86,6 +86,7 @@ previously embedded in TASKS.md (which had duplicate task numbers, false
 ## Data & backend integration plan (Phases 12–23) — added 2026-09-29
 
 Plan: `docs/DATA-PLAN.md`. Contract the backend implements: `docs/api/README.md` (+ files 00–10).
+**Pick-up point and working rules for these phases: `docs/HANDOFF.md` (read first). Phase 12 and task 13.1 are DONE; next is 13.2.** Use `scripts/task-done.py` to mark tasks; never regenerate the task files.
 Rules specific to these phases:
 - **No backend code is written here.** Every task is built and browser-verified against the contract fixtures/mock (task 12.2); the real backend is a later switch, then the same task's verification is re-run against it.
 - Each task states the **backend dataset** it needs; a dataset that is off in `GET /api/meta` means the feature is hidden or shows "coming soon" (never an error).

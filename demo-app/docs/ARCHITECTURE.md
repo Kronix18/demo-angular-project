@@ -103,3 +103,11 @@ real Python calculators (`scripts/gen_indicator_fixtures.py`), matched within 1e
 `mockApi(page, { datasets, tier, errors, overrides, onRequest })`, which fulfils `/api/**` from them in Playwright so
 front-end tasks are verified without a backend (toggle datasets, tier, inject 402/429/503). Unit checks of the fixtures'
 conventions live in `src/app/core/api/fixtures.spec.ts`. The same fixtures become the backend's contract tests (task 23.2).
+
+## API layer (Phase 12, `src/app/core/api/`)
+Everything that talks to the (future) backend goes through `provideHttpClient(withInterceptors([...]))` in `app.config.ts`:
+`errorInterceptor` (typed `ApiError`, single toast, `SILENT_ERRORS` for optional calls) → `entitlementInterceptor` (402 → `UpgradeService`)
+→ `retryInterceptor` (GET 429/503/network) → `etagCacheInterceptor` (`ETagCache`, 304) → `authInterceptor` (Bearer, shared refresh via `TokenRefresher`/`TokenStore`).
+Discovery state lives in `MetaService` (`GET /api/meta`), `SymbolCapabilities` (`GET /api/chart/{symbol}/meta`) and `EntitlementsService`;
+UI gating via `*appIfDataset` / `*appIfFeature` (`shared/gating`); typed clients such as `OhlcvApiClient` sit next to them.
+Types mirror `docs/api/`; fixtures in `docs/api/fixtures` feed both unit specs and the Playwright `mockApi`. Current state and next steps: `docs/HANDOFF.md`.

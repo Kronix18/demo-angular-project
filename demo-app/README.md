@@ -37,7 +37,7 @@ The app calls `http://localhost:3000` by default (`src/app/core/api-url.ts`); to
    Anything the backend doesn't serve yet degrades silently to the built-in demo data; no endpoint is required to exist.
 4. Optional end-to-end check against your real server: `LOCAL_BACKEND=1 npx playwright test e2e/local-backend.spec.ts`.
 
-The contract the backend should serve is in `docs/api/`; the plan is `docs/DATA-PLAN.md`.
+The contract the backend should serve is in `docs/api/`; the plan is `docs/DATA-PLAN.md`; **current status and how to continue: `docs/HANDOFF.md`**.
 
 ## Chart viewer at a glance
 

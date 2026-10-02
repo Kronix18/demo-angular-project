@@ -207,6 +207,9 @@ Milestones M0–M11 and their per-project deliverables are in `integration/READM
 ## 13. Benchmark decision (interim)
 Stooq offers no S&P 500; the owner chose **`TSX` (S&P/TSX Composite) as the interim replacement**, with `NDQ` for the market engine. RS *ratings* (stock vs stock) are unaffected; only the RS line and the market state use it. Exposed as `meta.benchmarks` with `is_interim: true`; switching to `SPX` later needs no front-end change (task 13.12). Trade-off: a Canadian index is a weaker proxy for US market direction, so market-state output is shown with an "interim benchmark" note.
 
+## Execution status (2026-10-02)
+Phase 12 (API foundation, 12 tasks) and task 13.1 are implemented, tested and pushed; everything else is NOT STARTED. Exact state, deviations, open questions and the next step (13.2) are in [`HANDOFF.md`](HANDOFF.md). The app now defaults to a backend on `http://localhost:3000`.
+
 ## 14. Risks
 
 - **Contract drift** between this repo and the backend: mitigated by fixtures (12.2) and the parity/contract specs; when the backend publishes OpenAPI, generate types from it and diff against `docs/api`.
