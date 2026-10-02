@@ -114,7 +114,7 @@ Replaces the static `*.us.txt` files with `/api/chart/...` when the backend can 
 
 | # | File | Status | Backend dataset needed / summary |
 |---|---|---|---|
-| 13.1 | phase-13-prices-from-backend/13.1-ohlcvapiclient-params-columnar-decode.md | NOT STARTED | OhlcvApiClient (params, columnar decode) — needs: `prices` |
+| 13.1 | phase-13-prices-from-backend/13.1-ohlcvapiclient-params-columnar-decode.md | DONE | OhlcvApiClient (params, columnar decode) — needs: `prices` |
 | 13.2 | phase-13-prices-from-backend/13.2-backend-first-data-source-with-static-fallback.md | NOT STARTED | Backend-first data source with static fallback — needs: `prices` |
 | 13.3 | phase-13-prices-from-backend/13.3-split-adjusted-label-no-toggle.md | NOT STARTED | Split-adjusted label (no toggle) — needs: `prices` |
 | 13.11 | phase-13-prices-from-backend/13.11-volume-basis-label.md | NOT STARTED | Volume basis label — needs: `prices` |
