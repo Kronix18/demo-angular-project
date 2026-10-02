@@ -1,0 +1,49 @@
+{
+  "api_version": 2,
+  "data_as_of": {
+    "prices": "2026-09-22",
+    "technicals": "2026-09-22",
+    "rs": "2026-09-22",
+    "eps": "2026-09-15",
+    "smr": "2026-09-15",
+    "filings": "2026-09-22"
+  },
+  "benchmarks": {
+    "default": "TSX",
+    "market_indices": [
+      "NDQ",
+      "TSX"
+    ],
+    "is_interim": true
+  },
+  "display_names": {
+    "smr_rating": "Quality (Sales·Margins·ROE)",
+    "canslim_score": "O'Neil-style growth score",
+    "eps_rating": "EPS Rating",
+    "rs_rating": "RS Rating",
+    "composite_rating": "Composite Rating"
+  },
+  "next_refresh_after": null,
+  "model_versions": {
+    "technicals": "TECHNICAL_DAILY_V1",
+    "rs": [
+      "RS_3M_V1",
+      "RS_6M_V1",
+      "RS_12M_V1",
+      "RS_ER3_V1"
+    ],
+    "eps": "EPS_V5_3",
+    "smr": "SMR_V4"
+  },
+  "datasets": [
+    "security_master",
+    "prices",
+    "splits",
+    "technicals",
+    "rs_ratings",
+    "eps_rating",
+    "smr_rating",
+    "filings",
+    "screener"
+  ]
+}

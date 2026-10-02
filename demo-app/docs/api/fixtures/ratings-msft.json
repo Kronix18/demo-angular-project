@@ -1,0 +1,32 @@
+{
+  "security_id": 4821,
+  "effective_dates": {
+    "rs": "2026-09-22",
+    "eps": "2026-09-15",
+    "smr": "2026-09-15",
+    "composite": null
+  },
+  "rs_rating": 94,
+  "rs_3m_rating": 91,
+  "rs_6m_rating": 93,
+  "rs_12m_rating": 95,
+  "rs_exp_3m": 88,
+  "eps_rating": 97,
+  "eps_basis": "adjusted",
+  "smr_rating": "A",
+  "accdist_rating": null,
+  "sponsorship_rating": null,
+  "composite_rating": null,
+  "group_rs_rating": null,
+  "earnings_stability": null,
+  "unrated": {
+    "eps": null,
+    "smr": null,
+    "composite": "not_available"
+  },
+  "model_version": {
+    "rs_12m": "RS_12M_V1",
+    "eps": "EPS_V5_3",
+    "smr": "SMR_V4"
+  }
+}

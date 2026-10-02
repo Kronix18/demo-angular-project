@@ -20,6 +20,8 @@ import {
   OhlcElement,
 } from 'chartjs-chart-financial';
 
+import { TvBarController, TvBarElement } from './chart-types/tv-bar';
+
 Chart.register(
   ...registerables,
   zoomPlugin,
@@ -27,4 +29,6 @@ Chart.register(
   CandlestickElement,
   OhlcController,
   OhlcElement,
+  TvBarController,
+  TvBarElement,
 );

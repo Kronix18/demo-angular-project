@@ -1,22 +1,88 @@
 import { Injectable } from '@angular/core';
+import { IndicatorEntry } from '../indicators/indicator-catalog';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-/** Chart state shape (4.1). Indicators list: {type, period} entries — wired in 5.x. */
+/** Chart state shape (4.1). Indicators: {type, period, hidden?} entries (hidden = eye toggle, 10.2). */
+import { CHART_TYPES, ChartType } from '../models/chart-type';
+import { ViewSettings, defaultView, sanitizeView } from '../models/view-settings';
+import { PriceSettings, VolumeSettings, sanitizePrice, sanitizeVolume } from '../models/symbol-settings';
+export { CHART_TYPES };
+export type { ChartType };
+
 export interface ChartState {
   symbol: string;
   interval: string;
   range: string;
-  indicators: Array<{ type: string; period: number }>;
+  indicators: IndicatorEntry[];
+  /** price series rendering (10.5) */
+  chartType: ChartType;
+  /** logarithmic price (and volume) scale (11.4) */
+  logScale: boolean;
+  /** crosshair magnet: snap the horizontal line to the hovered bar's close (10.5) */
+  magnet: boolean;
+  /** price axis as % change from the first visible bar, and flipped (11.8) */
+  percentScale: boolean;
+  invertScale: boolean;
+  /** symbols overlaid on the price pane, normalised to the price (11.16) */
+  compare: string[];
+  /** grid / crosshair / last price / status line options (11.11) */
+  view: ViewSettings;
+  /** symbol + volume settings from the legend (11.6) */
+  price: PriceSettings;
+  volume: VolumeSettings;
 }
 
 const STORAGE_KEY = 'chart-state';
+
+function cleanCompare(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim().toLowerCase().replace(/\.us$/, '');
+  return /^[a-z0-9.\-]{1,10}$/.test(s) ? s : null;
+}
+const DASHES = ['solid', 'dash', 'dot', 'dash_dot'];
+
+/** Validates one persisted indicator entry; anything malformed is dropped, never trusted. */
+export function sanitizeIndicator(i: any): IndicatorEntry | null {
+  if (!i || typeof i.type !== 'string' || typeof i.period !== 'number' || !Number.isFinite(i.period)) return null;
+  const out: IndicatorEntry = { type: i.type, period: i.period };
+  if (i.hidden === true) out.hidden = true;
+  if (i.params && typeof i.params === 'object' && !Array.isArray(i.params)) {
+    const params: Record<string, number | string | boolean> = {};
+    for (const [k, v] of Object.entries(i.params)) if (['number', 'string', 'boolean'].includes(typeof v)) params[k] = v as never;
+    out.params = params;
+  }
+  if (i.styles && typeof i.styles === 'object' && !Array.isArray(i.styles)) {
+    const styles: NonNullable<IndicatorEntry['styles']> = {};
+    for (const [k, v] of Object.entries<any>(i.styles)) {
+      if (!v || typeof v !== 'object') continue;
+      const st: NonNullable<IndicatorEntry['styles']>[string] = {};
+      if (typeof v.color === 'string') st.color = v.color;
+      if (typeof v.width === 'number') st.width = v.width;
+      if (DASHES.includes(v.dash)) st.dash = v.dash;
+      if (typeof v.visible === 'boolean') st.visible = v.visible;
+      styles[k] = st;
+    }
+    out.styles = styles;
+  }
+  if (Array.isArray(i.intervals)) out.intervals = i.intervals.filter((x: unknown) => typeof x === 'string');
+  return out;
+}
 
 const DEFAULTS: ChartState = {
   symbol: 'msft',
   interval: '1d',
   range: '6M', // matches the RANGE_PRESETS constant case (4.3 buttons)
   indicators: [],
+  chartType: 'candles',
+  magnet: false,
+  logScale: false,
+  percentScale: false,
+  invertScale: false,
+  price: {},
+  volume: {},
+  view: defaultView(),
+  compare: [],
 };
 
 /**
@@ -58,15 +124,86 @@ export class ChartStateService {
     this.update({ range });
   }
 
-  /** Indicator CRUD (5.2/5.3 use this): add (dedup by type+period), remove by index. */
-  addIndicator(entry: { type: string; period: number }): boolean {
-    const exists = this.subject.value.indicators.some(
-      (i) => i.type === entry.type && i.period === entry.period
-    );
-    if (exists) return false;
+  /** Adds an indicator (the same one may be added repeatedly, like TradingView). */
+  addIndicator(entry: IndicatorEntry): boolean {
     this.update({ indicators: [...this.subject.value.indicators, entry] });
     return true;
   }
+
+  /** Settings dialog: merge a patch into one indicator; editing `length` keeps `period` in sync. */
+  updateIndicator(index: number, patch: Partial<IndicatorEntry>): void {
+    const list = this.subject.value.indicators;
+    if (index < 0 || index >= list.length) return;
+    const merged: IndicatorEntry = { ...list[index], ...patch };
+    const length = merged.params?.['length'];
+    if (typeof length === 'number' && Number.isFinite(length)) merged.period = length;
+    this.update({ indicators: list.map((e, i) => (i === index ? merged : e)) });
+  }
+
+  setChartType(chartType: ChartType): void {
+    if (CHART_TYPES.includes(chartType)) this.update({ chartType });
+  }
+
+  /** Replaces the symbol settings (invalid values are dropped). */
+  setPriceSettings(price: PriceSettings): void { this.update({ price: sanitizePrice(price) }); }
+  setVolumeSettings(volume: VolumeSettings): void { this.update({ volume: sanitizeVolume(volume) }); }
+
+  togglePriceHidden(): void {
+    const { hidden, ...rest } = this.subject.value.price;
+    this.update({ price: hidden ? rest : { ...rest, hidden: true } });
+  }
+
+  toggleVolumeHidden(): void {
+    const { hidden, ...rest } = this.subject.value.volume;
+    this.update({ volume: hidden ? rest : { ...rest, hidden: true } });
+  }
+
+  toggleLogScale(): void {
+    this.update({ logScale: !this.subject.value.logScale });
+  }
+
+  setViewSettings(view: ViewSettings): void { this.update({ view: sanitizeView(view) }); }
+
+  togglePercentScale(): void { this.update({ percentScale: !this.subject.value.percentScale }); }
+  toggleInvertScale(): void { this.update({ invertScale: !this.subject.value.invertScale }); }
+
+  toggleMagnet(): void {
+    this.update({ magnet: !this.subject.value.magnet });
+  }
+
+  /** Eye toggle (10.2): flips visibility, keeps the indicator and its pane. */
+  toggleHidden(index: number): void {
+    const list = this.subject.value.indicators;
+    if (index < 0 || index >= list.length) return;
+    const next = list.map((e, i) => {
+      if (i !== index) return e;
+      const { hidden, ...rest } = e;
+      return hidden ? rest : { ...rest, hidden: true };
+    });
+    this.update({ indicators: next });
+  }
+
+  addCompare(symbol: string): void {
+    const s = cleanCompare(symbol);
+    const cur = this.subject.value.compare;
+    if (s && !cur.includes(s) && cur.length < 5) this.update({ compare: [...cur, s] });
+  }
+
+  removeCompare(symbol: string): void { this.update({ compare: this.subject.value.compare.filter((s) => s !== symbol) }); }
+
+  /** Replaces the whole state (loading a saved layout); anything invalid falls back to the defaults. */
+  restore(raw: unknown): void {
+    const next = sanitizeState(raw);
+    this.subject.next(next);
+    this.persist(next);
+  }
+
+  /** Replaces the indicators (applying a template). */
+  setIndicators(list: IndicatorEntry[]): void {
+    this.update({ indicators: list.map(sanitizeIndicator).filter((i): i is IndicatorEntry => i !== null) });
+  }
+
+  clearIndicators(): void { this.update({ indicators: [] }); }
 
   removeIndicator(index: number): void {
     const next = this.subject.value.indicators.filter((_, i) => i !== index);
@@ -76,7 +213,7 @@ export class ChartStateService {
   /** Restore defaults and clear the persisted state. */
   reset(): void {
     sessionStorage.removeItem(STORAGE_KEY);
-    this.subject.next({ ...DEFAULTS, indicators: [] });
+    this.subject.next({ ...DEFAULTS, indicators: [], price: {}, volume: {}, view: defaultView(), compare: [] });
   }
 
   private update(partial: Partial<ChartState>): void {
@@ -97,16 +234,31 @@ export class ChartStateService {
   private readPersisted(): ChartState {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...DEFAULTS, indicators: [] };
-      const parsed = JSON.parse(raw);
-      return {
-        symbol: typeof parsed.symbol === 'string' ? parsed.symbol : DEFAULTS.symbol,
-        interval: typeof parsed.interval === 'string' ? parsed.interval : DEFAULTS.interval,
-        range: typeof parsed.range === 'string' ? parsed.range : DEFAULTS.range,
-        indicators: Array.isArray(parsed.indicators) ? parsed.indicators : [],
-      };
+      return raw ? sanitizeState(JSON.parse(raw)) : sanitizeState(null);
     } catch {
-      return { ...DEFAULTS, indicators: [] };
+      return sanitizeState(null);
     }
   }
+}
+
+/** Builds a valid chart state from anything (persisted data, a saved layout): unknown or invalid parts fall back to the defaults. */
+export function sanitizeState(parsed: any): ChartState {
+  const p = parsed && typeof parsed === 'object' ? parsed : {};
+  return {
+    symbol: typeof p.symbol === 'string' ? p.symbol : DEFAULTS.symbol,
+    interval: typeof p.interval === 'string' ? p.interval : DEFAULTS.interval,
+    range: typeof p.range === 'string' ? p.range : DEFAULTS.range,
+    chartType: CHART_TYPES.includes(p.chartType) ? p.chartType : DEFAULTS.chartType,
+    magnet: p.magnet === true,
+    logScale: p.logScale === true,
+    percentScale: p.percentScale === true,
+    invertScale: p.invertScale === true,
+    view: sanitizeView(p.view),
+    compare: Array.isArray(p.compare) ? [...new Set<string>(p.compare.map(cleanCompare).filter((s: string | null): s is string => !!s))].slice(0, 5) : [],
+    price: sanitizePrice(p.price),
+    volume: sanitizeVolume(p.volume),
+    indicators: Array.isArray(p.indicators)
+      ? p.indicators.map(sanitizeIndicator).filter((i: IndicatorEntry | null): i is IndicatorEntry => i !== null)
+      : [],
+  };
 }

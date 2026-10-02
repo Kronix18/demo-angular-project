@@ -118,4 +118,13 @@ describe('ChartToolbarComponent — store wiring (task 4.2)', () => {
     // live use: writing via the store works (proven by the other tests)
     expect(typeof (component as any).store).toBe('object');
   });
+
+  it('follows store changes made elsewhere (route seed, error-card symbol pick, reset)', () => {
+    store.setSymbol('nvda');
+    store.setInterval('1w');
+    store.setRange('1Y');
+    expect(component.symbol).toBe('nvda');
+    expect(component.interval).toBe('1w');
+    expect(component.range).toBe('1Y');
+  });
 });

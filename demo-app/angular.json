@@ -32,6 +32,9 @@
             ],
             "styles": [
               "src/styles.scss"
+            ],
+            "allowedCommonJsDependencies": [
+              "hammerjs"
             ]
           },
           "configurations": {
@@ -69,7 +72,7 @@
             }
           },
           "defaultConfiguration": "development",
-          "options":{
+          "options": {
             "allowedHosts": [
               "localhost",
               "screener.poredos.eu"

@@ -1,0 +1,102 @@
+{
+  "data": {
+    "timestamp": [
+      1758067200000,
+      1758153600000,
+      1758240000000,
+      1758326400000,
+      1758412800000,
+      1758499200000,
+      1758585600000,
+      1758672000000
+    ],
+    "sma_10": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "ema_21": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "sma_50": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "sma_200": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "atr_14": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      4.2
+    ],
+    "atr_pct": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      0.98
+    ],
+    "avg_volume_50": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "relative_volume_50": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      1.05
+    ]
+  },
+  "meta": {
+    "as_of": "2026-09-22",
+    "calculated_at": "2026-09-23T02:14:05Z",
+    "price_basis": "split_adjusted",
+    "model_version": {
+      "technicals": "TECHNICAL_DAILY_V1"
+    }
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "data": [
+    {
+      "key": "sector_key",
+      "label": "Sector",
+      "display_name": "Sector",
+      "group": "classification",
+      "type": "enum",
+      "options_ref": "/api/universe/facets#sectors",
+      "operators": [
+        "in",
+        "not_in"
+      ],
+      "sortable": true,
+      "default_column": false,
+      "min_tier": "free",
+      "dataset": "security_master",
+      "available": true
+    },
+    {
+      "key": "price",
+      "label": "Price",
+      "display_name": "Price",
+      "group": "price_volume",
+      "type": "usd",
+      "operators": [
+        "gte",
+        "lte",
+        "between"
+      ],
+      "sortable": true,
+      "default_column": true,
+      "min_tier": "free",
+      "dataset": "prices",
+      "available": true
+    },
+    {
+      "key": "pct_from_52w_high",
+      "label": "% from 52w high",
+      "display_name": "% from 52w high",
+      "group": "technicals",
+      "type": "pct",
+      "operators": [
+        "gte",
+        "lte",
+        "between"
+      ],
+      "sortable": true,
+      "default_column": false,
+      "min_tier": "free",
+      "dataset": "technicals",
+      "available": true
+    },
+    {
+      "key": "rs_rating",
+      "label": "RS Rating",
+      "display_name": "RS Rating",
+      "group": "ratings",
+      "type": "int",
+      "min": 1,
+      "max": 99,
+      "operators": [
+        "gte",
+        "lte",
+        "between",
+        "eq"
+      ],
+      "sortable": true,
+      "default_column": true,
+      "min_tier": "free",
+      "dataset": "rs_ratings",
+      "available": true
+    },
+    {
+      "key": "eps_rating",
+      "label": "EPS Rating",
+      "display_name": "EPS Rating",
+      "group": "ratings",
+      "type": "int",
+      "min": 1,
+      "max": 99,
+      "operators": [
+        "gte",
+        "lte",
+        "between",
+        "eq"
+      ],
+      "sortable": true,
+      "default_column": true,
+      "min_tier": "plus",
+      "dataset": "eps_rating",
+      "available": true
+    },
+    {
+      "key": "smr_rating",
+      "label": "SMR",
+      "display_name": "Quality (Sales·Margins·ROE)",
+      "group": "ratings",
+      "type": "grade",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "operators": [
+        "in",
+        "gte_grade",
+        "lte_grade"
+      ],
+      "sortable": true,
+      "default_column": false,
+      "min_tier": "plus",
+      "dataset": "smr_rating",
+      "available": true
+    },
+    {
+      "key": "composite_rating",
+      "label": "Composite Rating",
+      "display_name": "Composite Rating",
+      "group": "ratings",
+      "type": "int",
+      "min": 1,
+      "max": 99,
+      "operators": [
+        "gte",
+        "lte",
+        "between"
+      ],
+      "sortable": true,
+      "default_column": false,
+      "min_tier": "pro",
+      "dataset": "composite",
+      "available": false
+    }
+  ],
+  "meta": {
+    "groups": [
+      "classification",
+      "price_volume",
+      "technicals",
+      "fundamentals",
+      "ratings"
+    ],
+    "available_datasets": [
+      "security_master",
+      "prices",
+      "technicals",
+      "rs_ratings",
+      "eps_rating",
+      "smr_rating"
+    ]
+  }
+}

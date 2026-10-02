@@ -1,0 +1,10 @@
+{
+  "user_id": "1",
+  "username": "admin",
+  "name": "Demo Admin",
+  "email": "admin@demo.angular-project.local",
+  "role": "admin",
+  "email_status": "verified",
+  "created_at": "2026-01-01T00:00:00Z",
+  "last_login": "2026-09-29T08:00:00Z"
+}

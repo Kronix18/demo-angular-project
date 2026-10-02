@@ -1,17 +1,24 @@
-<div class="app-container">
+<div class="app-container" [class.fullscreen]="fullscreen()">
   <!-- Navigation Bar -->
   <nav class="navbar">
     <div class="navbar-content">
       <h1 class="logo" routerLink="/home">Stock Screener</h1>
 
       <div class="nav-links">
-        <a routerLink="/home" class="nav-link">Home</a>
-        <a routerLink="/screener" class="nav-link">Screener</a>
-        <a routerLink="/charts/msft" class="nav-link">Charts</a>
-        <a routerLink="/pricing" class="nav-link">Pricing</a>
+        <a routerLink="/home" routerLinkActive="active" class="nav-link">Home</a>
+        <a routerLink="/screener" routerLinkActive="active" class="nav-link">Screener</a>
+        <a [routerLink]="['/charts', chartsSymbol()]" routerLinkActive="active" class="nav-link">Charts</a>
+        <a routerLink="/pricing" routerLinkActive="active" class="nav-link">Pricing</a>
       </div>
 
       <div class="nav-actions">
+        <button
+          type="button"
+          class="theme-toggle"
+          (click)="theme.cycle()"
+          [attr.aria-label]="'Theme: ' + theme.mode() + ' (click to change)'"
+          [title]="'Theme: ' + theme.mode()"
+        ><app-icon [name]="themeIcon[theme.mode()]" [size]="18" /></button>
         <a
           *ngIf="isAuthenticated"
           routerLink="/profile"
@@ -40,7 +47,8 @@
   </main>
 
   <!-- Footer -->
-  <footer class="footer">
+  <footer class="footer" *ngIf="!fullscreen()">
     <p>&copy; 2024 Stock Screener. Basic stock analysis tools without technical indicators or watchlists.</p>
   </footer>
+  <app-api-toast />
 </div>

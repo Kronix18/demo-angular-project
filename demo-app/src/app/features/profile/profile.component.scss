@@ -1,3 +1,16 @@
+%accent-fill {
+  background: var(--grad);
+  color: var(--on-ac);
+}
+
+%accent-btn {
+  @extend %accent-fill;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
 .profile-container {
   max-width: 960px;
   margin: 0 auto;
@@ -5,29 +18,29 @@
 }
 
 .loading-state,
-.error-state {
-  background: #0b1220;
-  border: 1px solid #1f2a3d;
+.error-state,
+.profile-card {
+  background: var(--pn);
+  border: 1px solid var(--pn-ln);
   border-radius: 16px;
+  box-shadow: 0 16px 40px var(--c-shadow-a35);
+}
+
+.loading-state,
+.error-state {
   padding: 3rem;
   text-align: center;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 
   p {
-    color: #9fb1cc;
+    color: var(--pn-t4);
     font-size: 1.1rem;
     margin: 1rem 0;
   }
 
   button {
-    background: linear-gradient(135deg, #4c8dff, #6ee7ff);
-    color: #0b1220;
-    border: none;
+    @extend %accent-btn;
     padding: 0.65rem 1.5rem;
     border-radius: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: transform 0.1s ease;
 
     &:hover {
       transform: translateY(-2px);
@@ -39,8 +52,8 @@
   width: 48px;
   height: 48px;
   margin: 0 auto;
-  border: 4px solid #1f2a3d;
-  border-top-color: #4c8dff;
+  border: 4px solid var(--pn-ln);
+  border-top-color: var(--ac);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -50,11 +63,7 @@
 }
 
 .profile-card {
-  background: #0b1220;
-  border: 1px solid #1f2a3d;
-  border-radius: 16px;
   padding: 1.75rem;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
 .profile-header {
@@ -68,8 +77,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4c8dff, #6ee7ff);
-  color: #0b1220;
+  @extend %accent-fill;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -78,18 +86,18 @@
 
 .identity h2 {
   margin: 0;
-  color: #e6edf7;
+  color: var(--pn-t1);
 }
 
 .identity .email {
   margin: 0.15rem 0;
-  color: #9fb1cc;
+  color: var(--pn-t4);
   font-size: 0.95rem;
 }
 
 .identity .username {
   margin: 0.15rem 0;
-  color: #7a8fa8;
+  color: var(--pn-t5);
   font-size: 0.9rem;
   font-family: monospace;
 }
@@ -100,17 +108,17 @@
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
-  background: rgba(110, 231, 255, 0.16);
-  color: #6ee7ff;
+  background: var(--ac2-a16);
+  color: var(--ac2);
   font-weight: 600;
   font-size: 0.85rem;
-  border: 1px solid rgba(110, 231, 255, 0.35);
+  border: 1px solid var(--ac2-a35);
 }
 
 .badge.secondary {
-  background: rgba(76, 141, 255, 0.14);
-  color: #b4cdff;
-  border-color: rgba(76, 141, 255, 0.35);
+  background: var(--ac-a14);
+  color: var(--pn-l2);
+  border-color: var(--ac-a35);
 }
 
 .subscription-card {
@@ -120,7 +128,7 @@
     align-items: center;
     margin-bottom: 1rem;
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid #1b2435;
+    border-bottom: 1px solid var(--pn-ln2);
   }
 
   .tier-badge {
@@ -133,45 +141,41 @@
   }
 
   .badge-free {
-    background: rgba(150, 150, 150, 0.2);
-    color: #aaa;
-    border: 1px solid rgba(150, 150, 150, 0.3);
+    background: var(--nu-a20);
+    color: var(--c-text-5);
+    border: 1px solid var(--nu-a30);
   }
 
   .badge-plus {
-    background: rgba(76, 141, 255, 0.2);
-    color: #6ea8ff;
-    border: 1px solid rgba(76, 141, 255, 0.4);
+    background: var(--ac-a20);
+    color: var(--pn-l);
+    border: 1px solid var(--ac-a40);
   }
 
   .badge-pro {
-    background: rgba(110, 231, 255, 0.2);
-    color: #6ee7ff;
-    border: 1px solid rgba(110, 231, 255, 0.4);
+    background: var(--ac2-a20);
+    color: var(--ac2);
+    border: 1px solid var(--ac2-a40);
   }
 
   .badge-ultimate {
-    background: linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.2));
-    color: #ec4899;
-    border: 1px solid rgba(236, 72, 153, 0.4);
+    background: var(--grad-ultimate);
+    color: var(--tr-pink);
+    border: 1px solid var(--tr-pink-a40);
   }
 
   .badge-admin {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 165, 0, 0.2));
-    color: #ffa500;
-    border: 1px solid rgba(255, 165, 0, 0.4);
+    background: var(--grad-admin);
+    color: var(--tr-orange);
+    border: 1px solid var(--tr-orange-a40);
   }
 
   .upgrade-btn {
+    @extend %accent-btn;
     padding: 0.4rem 0.9rem;
-    background: linear-gradient(135deg, #4c8dff, #6ee7ff);
-    color: #0b1220;
-    border: none;
     border-radius: 6px;
     font-weight: 600;
     font-size: 0.85rem;
-    cursor: pointer;
-    transition: transform 0.1s ease;
 
     &:hover {
       transform: translateY(-1px);
@@ -186,15 +190,15 @@
 }
 
 .card {
-  background: #0f1829;
-  border: 1px solid #1f2a3d;
+  background: var(--pn-2);
+  border: 1px solid var(--pn-ln);
   border-radius: 12px;
   padding: 1rem 1.1rem;
 }
 
 .card h3 {
   margin: 0 0 0.75rem;
-  color: #d7e3f5;
+  color: var(--pn-t2);
 }
 
 .item {
@@ -202,8 +206,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #1b2435;
-  color: #b8c7dd;
+  border-bottom: 1px solid var(--pn-ln2);
+  color: var(--pn-t3);
   font-size: 0.95rem;
 }
 
@@ -220,41 +224,37 @@
 }
 
 .actions button {
-  background: linear-gradient(135deg, #4c8dff, #6ee7ff);
-  color: #0b1220;
-  border: none;
+  @extend %accent-btn;
   padding: 0.65rem 1rem;
   border-radius: 10px;
-  font-weight: 700;
-  cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
 .actions button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(76, 141, 255, 0.28);
+  box-shadow: 0 10px 20px var(--ac-a28);
 }
 
 .actions .ghost {
   padding: 0.65rem 1rem;
   border-radius: 10px;
-  border: 1px solid #1f2a3d;
-  color: #b8c7dd;
+  border: 1px solid var(--pn-ln);
+  color: var(--pn-t3);
   text-decoration: none;
-  background: #0f1829;
+  background: var(--pn-2);
 }
 
 .empty-state {
   text-align: center;
-  background: #0f1829;
-  border: 1px solid #1f2a3d;
+  background: var(--pn-2);
+  border: 1px solid var(--pn-ln);
   border-radius: 12px;
   padding: 1.5rem;
-  color: #b8c7dd;
+  color: var(--pn-t3);
 }
 
 .empty-state a {
-  color: #6ee7ff;
+  color: var(--ac2);
 }
 
 @media (max-width: 640px) {

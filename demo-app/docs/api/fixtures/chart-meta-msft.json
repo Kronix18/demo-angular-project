@@ -1,0 +1,24 @@
+{
+  "security_id": 4821,
+  "first_bar": "1986-03-13",
+  "last_bar": "2026-09-22",
+  "bar_count": 10200,
+  "intervals": [
+    "1d",
+    "1w",
+    "1mo"
+  ],
+  "price_basis": "split_adjusted",
+  "volume_basis": "as_reported",
+  "split_count": 9,
+  "source": "stooq",
+  "price_scale": 2,
+  "currency": "USD",
+  "delisted": false,
+  "datasets": {
+    "technicals": true,
+    "rs_line": true,
+    "patterns": false,
+    "fundamental_markers": false
+  }
+}

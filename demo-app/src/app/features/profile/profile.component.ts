@@ -51,14 +51,7 @@ export class ProfileComponent implements OnInit {
         console.log('Profile data received:', profile);
         this.userProfile.set(profile);
         
-        // Update auth service with fresh user data
-        this.authService.getCurrentUser().set({
-          id: profile.user_id,
-          name: profile.name,
-          email: profile.email,
-          is_admin: profile.role === 'admin'
-        });
-        
+        // (the demo AuthService derives the user from its session; syncing real user data arrives with tasks 9.1 / 20.1)
         this.isLoading.set(false);
         this.cdr.markForCheck();
       },

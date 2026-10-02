@@ -10,7 +10,7 @@ import { AuthService } from '../../../core/auth/auth.service';
   styles: [
     `
       .login-error {
-        color: var(--auth-error-color, #dc3545);
+        color: var(--auth-error-color);
         font-size: 14px;
         font-weight: 600;
         margin: 12px 0 0 0;

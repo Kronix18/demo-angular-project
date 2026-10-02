@@ -1,4 +1,6 @@
-import { Component } from '@angular/core';
+import { DataInfoComponent } from '../../shared/data-info/data-info.component';
+import { ChangeDetectorRef, Component, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { AVAILABLE_SYMBOLS } from '../../core/services/chart-data.service';
 import { ChartStateService } from '../../core/services/chart-state.service';
@@ -13,7 +15,7 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
 @Component({
   selector: 'app-chart-toolbar',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, DataInfoComponent],
   template: `
     <div class="toolbar">
       <div class="toolbar-group">
@@ -61,87 +63,92 @@ import { RANGE_PRESETS } from '../../core/services/data-aggregation';
       <div class="toolbar-group">
         <button type="button" (click)="submitSymbol()">Update Chart</button>
       </div>
+
+      <div class="toolbar-group data-info-slot"><app-data-info /></div>
     </div>
   `,
   styles: [
     `
+      /* Compact single-row toolbar (chart page is full-viewport): inline
+         controls, labels kept for a11y but visually hidden. */
+      :host { display: block; }
       .toolbar {
         display: flex;
-        gap: 1rem;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
         align-items: center;
-        padding: 1rem;
-        background-color: var(--c-surface, #ffffff);
-        border-radius: var(--border-radius, 8px);
-        box-shadow: var(--shadow-elevation-low, 0 1px 4px rgba(0, 0, 0, 0.12));
       }
+
+      .data-info-slot { margin-left: auto; }
 
       .toolbar-group {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        align-items: center;
         gap: 0.25rem;
       }
 
-      /* 4.3: range preset buttons — TradingView-style bottom-bar row */
-      .range-group {
-        flex-direction: row;
-        gap: 0.25rem;
-        align-items: flex-end;
+      label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
       }
+
+      /* 4.3: range preset buttons — TradingView-style row */
+      .range-group { gap: 0.125rem; }
       .range-btn {
-        padding: 0.375rem 0.625rem;
+        padding: 0.1875rem 0.5rem;
         border: 1px solid transparent;
-        border-radius: var(--border-radius-sm, 4px);
+        border-radius: var(--border-radius-sm);
         background: transparent;
-        color: var(--c-text, #1f2937);
+        color: var(--c-text);
         cursor: pointer;
         font-size: 0.8125rem;
         font-weight: 500;
       }
       .range-btn:hover {
-        background: rgba(37, 99, 235, 0.08);
-        color: var(--c-primary, #2563eb);
+        background: var(--c-primary-tint);
+        color: var(--c-primary);
       }
       .range-btn.active {
-        background: var(--c-primary, #2563eb);
-        color: #fff;
-      }
-
-      label {
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: var(--c-text, #1f2937);
+        background: var(--c-primary);
+        color: var(--c-on-primary);
       }
 
       input,
       select {
-        padding: 0.5rem;
-        border: 1px solid var(--c-border, #d1d5db);
-        border-radius: var(--border-radius-sm, 4px);
-        background-color: var(--c-surface, #ffffff);
-        color: var(--c-text, #1f2937);
-        font-size: 0.875rem;
+        padding: 0.1875rem 0.5rem;
+        border: 1px solid var(--c-border);
+        border-radius: var(--border-radius-sm);
+        background-color: var(--c-surface);
+        color: var(--c-text);
+        font-size: 0.8125rem;
       }
+      input#symbol { width: 6.5rem; }
 
       input:focus,
       select:focus {
         outline: none;
-        border-color: var(--c-primary, #2563eb);
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+        border-color: var(--c-primary);
+        box-shadow: 0 0 0 2px var(--c-focus-ring);
       }
 
-      button {
-        padding: 0.5rem 1rem;
-        background-color: var(--c-primary, #2563eb);
-        color: #fff;
+      button:not(.range-btn) {
+        padding: 0.1875rem 0.75rem;
+        background-color: var(--c-primary);
+        color: var(--c-on-primary);
         border: none;
-        border-radius: var(--border-radius-sm, 4px);
+        border-radius: var(--border-radius-sm);
         cursor: pointer;
-        font-size: 0.875rem;
+        font-size: 0.8125rem;
         font-weight: 500;
       }
 
-      button:hover {
-        background-color: var(--c-primary-dark, #1d4ed8);
+      button:not(.range-btn):hover {
+        background-color: var(--c-primary-dark);
       }
     `,
   ],
@@ -157,6 +164,8 @@ export class ChartToolbarComponent {
   // Only symbols with demo data (0.3 spec) — drives the datalist.
   symbols = [...AVAILABLE_SYMBOLS];
 
+  private cdr = inject(ChangeDetectorRef);
+
   constructor(private store: ChartStateService) {
     // Initialize form values FROM the store (rehydration: refresh keeps the
     // user's symbol/interval — single source of truth).
@@ -164,6 +173,14 @@ export class ChartToolbarComponent {
     this.symbol = snap.symbol;
     this.interval = snap.interval;
     this.range = snap.range;
+    // ...and keep following it: the route param, the error card's symbol picker
+    // and reset() all write the store after this component was constructed.
+    this.store.state$.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((s) => {
+      this.symbol = s.symbol;
+      this.interval = s.interval;
+      this.range = s.range;
+      this.cdr.markForCheck(); // zoneless: store writes from elsewhere must schedule a render
+    });
   }
 
   /** Enter key / Update button: write the store ONCE with the current input value. */

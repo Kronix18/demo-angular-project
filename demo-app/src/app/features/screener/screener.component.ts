@@ -1,3 +1,5 @@
+import { DataInfoComponent } from '../../shared/data-info/data-info.component';
+import { IconComponent } from '../../shared/icons/icon.component';
 import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -10,7 +12,7 @@ import { ScreenerService } from '../../core/services/screener.service';
 @Component({
   selector: 'app-screener',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, IconComponent, DataInfoComponent],
   templateUrl: './screener.component.html',
   styleUrl: './screener.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -208,7 +210,7 @@ export class ScreenerComponent implements OnInit, OnDestroy {
    * Get sort icon for column header
    */
   getSortIcon(column: string): string {
-    if (this.sortColumn !== column) return '↕';
-    return this.sortDirection === 'asc' ? '↑' : '↓';
+    if (this.sortColumn !== column) return 'sortboth';
+    return this.sortDirection === 'asc' ? 'sortup' : 'sortdown';
   }
 }

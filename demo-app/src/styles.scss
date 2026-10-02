@@ -1,6 +1,2 @@
-/* You can add global styles to this file. You can also import other style files */
-
-:root {
-  --auth-error-color: #dc3545;
-  --navbar-brand-color: #667eea;
-}
+/* Global styles. ALL colour/shape tokens live in the theme file. */
+@use './styles/theme';

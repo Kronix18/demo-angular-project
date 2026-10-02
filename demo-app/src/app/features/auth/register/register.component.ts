@@ -1,3 +1,4 @@
+import { IconComponent } from '../../../shared/icons/icon.component';
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,7 +8,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, IconComponent],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss'
 })

@@ -28,7 +28,7 @@ export const routes: Routes = [
   {
     path: 'charts/:symbol',
     loadComponent: () => import('./charts/chart-viewer/chart-viewer.component').then(m => m.ChartViewerComponent),
-    data: { title: 'Chart Viewer' }
+    data: { title: 'Chart Viewer', fullscreen: true }
   },
   {
     path: 'profile',
@@ -41,6 +41,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/stock/stock.component').then(m => m.StockComponent),
     data: { title: 'Stock Details' },
     canActivate: [authGuard]
+  },
+  {
+    path: 'diagnostics',
+    loadComponent: () => import('./features/diagnostics/diagnostics.component').then(m => m.DiagnosticsComponent),
+    data: { title: 'Data status' }
   },
   {
     path: 'auth',

@@ -1,0 +1,71 @@
+# 00 — Data status: what exists, what is planned
+
+Source: the two backend-project documents `SECURITY_MASTER.md` (state of the DB) and `IMPLEMENTATION_PLAN.md`
+(roadmap, almost every checkbox still `[ ]`). Status legend used in every file of this folder:
+
+| Tag | Meaning |
+|---|---|
+| **DB** | Data is in the database today (per the backend docs `SECURITY_MASTER`, `PRICE_DATA`, `DAILY_INGESTION_GUIDE`, `EPS_STATUS`, `SMR_STATUS`). Endpoint still has to be exposed. |
+| **CODE** | A pure calculation module exists (no persisted table confirmed). Needs a persisted table + job + endpoint. |
+| **PLAN** | Only in the roadmap. Nothing built. |
+| **UNKNOWN** | Cannot tell from the documents; needs an answer from the backend project (see `../DATA-PLAN.md` §9). |
+
+## 1. Implemented (DB)
+
+| Domain | What exists | Notes for the front end |
+|---|---|---|
+| Security master | `security_master`: 13 317 securities. `id` is the stable anchor (**`security_id` ≠ ticker**). | Join everything on `id`. |
+| Classification | `sector`, `industry`, `industry_group`, `sic`, `sic_name`, `sector_key`, `industry_key`; ETF/fund fields; `classification_source/status/updated_at`. SIC → Fama-French plus fallbacks; target 100–200 industry groups. | `classification_status` may be `UNRESOLVED`. |
+| Enrichment V2 | `ipo_date`, `delisting_date`, `shares_outstanding`, `float_shares`, `market_cap` (**whole USD**), `shares_as_of`, `is_adr`, `is_spac`, `is_etf`. | `market_cap` is a snapshot, not a daily series. |
+| Universe flags | 13 317 → 5 342 rating-eligible → 3 508 pass the gate (price / dollar-volume gates still skipped, but `avg_dollar_volume_50` now exists in `technical_daily`, so they can be added). | |
+| **Daily prices** | **`stock_history`**: `(security_id, date)` PK, `open/high/low/close` stored as `VARCHAR(20)`, `volume NUMERIC`, from 1997-01-02, ~95 % of Stooq tickers mapped. **Provider (Stooq) prices as ingested, not mutated**; split-adjusted views are derived on demand. Incremental daily import (`sync_stooq_daily.py`), idempotent, **currently a manual Stooq download** (bot-walled). Current through the last finalised session (guide verified 2026-09-04). | Prices are strings in the DB → the API must cast to numbers. No `adj_close`, no dividend-adjusted series **by design** (total-return is rejected for pattern geometry). |
+| Index prices | Expected (Stooq indices are in the same bulk file family; the index rows in `data_dh5.txt` include indices/forex). Owner supplied the Stooq index list (60 tickers, see `02-prices.md` §Index catalogue): it contains `^NDQ` (Nasdaq Composite), `^NDX`, `^TSX` and the world indices, but **no `^SPX` (S&P 500), `^DJI`, `^RUT`, `^NYA`** — decision: `TSX` replaces the S&P 500 for now (RS-line benchmark, market engine with `NDQ`); Stooq lists index volume. Table name TBD. | Codes are Stooq tickers without `^`: `NDQ`, `NDX`, `TSX`, … (`SPX` only if added later) |
+| Intraday | `stock_history_intraday` (5 and 60 min) exists but holds only indices / forex / metals today, **no US stocks**. | No intraday charts. |
+| **Splits / dividends** | `splits(security_id, ex_date, factor)` (4.0 = 4:1, 0.5 = 1:2 reverse), `dividends(security_id, ex_date, amount, currency)`, mirrored into `corporate_actions` (types `ticker_change`, `name_change`, `merger`, `delisting`, `split`, `dividend`). `split_review_queue` + `stock_history_audit` hold detected-but-unapproved splits. 592 verified splits loaded for the EPS work. | Populated at least for EPS; coverage for the whole universe to confirm. **Volume is NOT split-adjusted** (frozen policy). |
+| **`technical_daily`** | Persisted, ~28 M rows, model `TECHNICAL_DAILY_V1`, incremental after each price import. Columns: `sma_10, ema_21, sma_50, sma_200, high_52w, low_52w, ath_high, pct_from_52w_high, pct_from_52w_low, new_52w_high, new_ath, pct_from_sma_50, pct_from_sma_200, true_range, atr_14, atr_pct, avg_volume_20, avg_volume_50, avg_dollar_volume_50, relative_volume_50, up_volume_50, down_volume_50, up_down_volume_ratio_50`. | Not stored: SMA 100, ATR 20/30, avg volume 10, weekly MAs, MA slopes, days-above counters. Chart needs of these stay client-side. |
+| **RS ratings** | `rs_rating_history`, updated daily by `update_ratings.py`: `RS_3M_V1`, `RS_6M_V1`, `RS_12M_V1` (canonical "original"), `RS_ER3_V1` (3-month exponential). Whole eligible universe per date; < 5 sessions of history → 1. | No 9-month window. No RS *line* (needs index prices). |
+| **EPS rating** | `EPS_V5_3` in prod on **19 stored dates** (2023-07 … 2026-09-15), not daily. Adjusted EPS is the primary input (YF_ADJ / AV_ADJ), GAAP fallback. Rank correlation vs IBD ≈ 0.75, 91 % coverage of IBD's list on 2026-06-17. Backfill of foreign filers running until ~2026-10-20. | It is a **model estimate**, not IBD's number. REITs weak (ρ 0.40). |
+| **SMR rating** | `smr_rating_history`, `SMR_V4` (bank scoring) on the same 19 dates; letters A–E by quintile from sales growth, after-tax and pretax margin, ROE. ρ ≈ 0.80 vs IBD, ~80 % coverage of IBD-graded names. Data source `external_quarter_financials` (yfinance quarters, 488 foreign issuers) + SEC-derived `PROFITABILITY_V1` inputs. | Not in any cron. Unrated when the latest quarter is > 250 days old. |
+| Identity history | `security_symbol_history`, `security_name_history` created but **empty**. | Ticker-as-of resolution not available. |
+| SEC filing index | `sec_filing`: 197 970 rows (10-Q, 10-K, 20-F, 6-K, 40-F, 8-K; since 2009-04-15). | Index only. |
+| **SEC fundamentals** (`FUNDAMENTALS.md`) | `sec_financial_fact` (raw XBRL, 11.3 M rows, immutable), `fundamental_concept_map`, `fundamental_period`, `fundamental_metric` (**FUNDAMENTALS_V2**, 9 709 314 rows, keyed by `accession_number`), `fundamental_quarter_period` + `fundamental_quarter_metric` (**QUARTERS_V2**: direct quarters win, derived Q2/Q3/Q4 = YTD differences; versioned by `disclosed_at`, `source_rank` DIRECT 0 / DERIVED 100), point-in-time resolver (`resolve_issuer_quarters`), YoY growth + acceleration computed at query time (not stored), annual EPS (`ANNUAL_EPS_V1`), `FUNDAMENTAL_UNIVERSE_V1` = 5 230 issuer CIKs, flag `security_master.is_fundamental_rating_eligible`. Coverage 2026-08-30: annual EPS history 93.6 %, 3Y chain 83.7 %, numeric 3Y CAGR 37.8 %, 5Y CAGR 30.9 %, latest annual ≤ 450 d old 88.4 %. | These are the tables the fundamentals endpoints (`04`) read. Growth is derived per request from two point-in-time quarter resolutions. |
+
+## 2. Not yet built (PLAN)
+
+| Domain (plan §) | Tables named in plan §50 | Front-end value |
+|---|---|---|
+| Weekly bars (§2, §50.2) | `weekly_prices` | weekly interval |
+| Index prices — **expected to exist / be loaded from Stooq (S&P 500, Nasdaq Composite; optional NYSE, Russell 2000, Dow)**; not documented as a table yet | `index_prices` | benchmark, RS line, market state |
+| Served fundamentals API and derived metrics (ROE/margins/CAGR snapshot) (§20) | read the tables above; `fundamental_metrics` snapshot may be a view | earnings block, C/A scores, chart markers |
+| Accumulation/Distribution, Sponsorship, Group RS, Earnings Stability, **Composite** (§13, §15–§18) | `accdist_/sponsorship_/industry_/composite_rating_history`, `earnings_stability_history` | badges, screener columns |
+| Industry groups ranking (§16) | `industry_rating_history` | group RS, leaders, heat-map |
+| Institutional 13F (§9, §17) | `form13f_*`, `institutional_metrics` | sponsorship |
+| CAN SLIM (§42) | `canslim_*` | gauge with reasons |
+| Patterns / trade engine (§22–§41) | `detected_bases`, `base_pivots`, `breakouts`, `sell_signals` | overlays |
+| Market regime (§10) | `market_state_history`, `follow_through_days`, `distribution_days`, … | market banner |
+| News / events (§47) | `news_articles`, `company_events` | N score, markers |
+| Backtest (§48) | `backtest.*` | later |
+| Application schema | users, watchlists, saved screens, alerts, layouts | user features (see `09`) |
+
+## 3. Facts the API design now relies on
+
+1. **Everything the API serves is split-adjusted** (owner decision, 2026-09-29: if it is not yet, it will be; the contract acts as if it is). Prices, `technical_daily`, RS, patterns all use the split-adjusted series; responses carry `meta.price_basis = "split_adjusted"`. There is no raw-price mode and no dividend-adjusted (total-return) series in the API, even when a vendor supplies one (Yahoo `adjclose`). Volume basis is declared in `meta.volume_basis` (`"as_reported"` today, `"split_adjusted"` if the vendor supplies adjusted volume). `adjust=all` (total return) is **not offered**. **Volume is returned as stored** (no split division) unless the caller asks `adjust_volume=true`.
+2. **Ratings exist only on 19 stored dates today; the plan is a recompute daily or at least at each earnings ingestion.** The contract is written for both: it never assumes daily, it reports the `effective_date` used. `/ratings` therefore answers "latest stored date not after `as_of`" and reports the actual `effective_date`; history is sparse (see `03`). RS ratings are daily.
+3. **Ratings are model estimates** of the IBD-style concept (versioned: `EPS_V5_3`, `SMR_V4`, `RS_*_V1`). The UI labels them "model rating", shows `model_version`, and never claims they equal IBD's.
+4. Coverage is partial by design: only the rated universe (~3 000–3 500 names per date), foreign 20-F filers mostly unrated. Every rating field can be `null` with an `unrated_reason` (`no_quarterly_data`, `stale_quarter`, `not_eligible`, `too_new`, `no_cik`).
+5. **Data sources are moving to Yahoo Finance / Business Quant / Alpha Vantage** (they also provide adjusted figures) for prices and fundamentals. The contract is source-agnostic: every series/row may carry `source`, and `meta.source` names the provider; switching vendor must not change shapes.
+6. **Data freshness is human-driven today** (manual Stooq download → import → technicals → RS). `data_as_of` may lag several days; `next_refresh_after` may be `null`. The front end must show the date, never imply "live".
+7. IBD changed its own method on 2026-04-27 (SMR / EPS). Backend models track IBD's behaviour at each date; front end just shows `model_version`.
+
+## 4. What the front end does until each dataset exists
+
+| Dataset off | Front-end behaviour |
+|---|---|
+| prices | keep reading static `*.us.txt` exports (current). |
+| technicals | compute in the browser (current `IndicatorCalculationService` port). |
+| RS / EPS / SMR ratings | badges hidden until `datasets` lists `ratings`; partial ratings show only the fields that are non-null. |
+| composite, A/D, sponsorship, group RS, CAN SLIM, patterns | features hidden (no client fallback — they need the universe). |
+| fundamentals | earnings block hidden; chart markers hidden. |
+| screener | current v1 `screener/run` on the demo table. |
+
+Details: `10-capabilities-and-fallbacks.md`.

@@ -1,15 +1,14 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { API_URL } from '../api-url';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError, of } from 'rxjs';
-import { catchError, retry, timeout, retryWhen, delayWhen, take } from 'rxjs/operators';
-import { timer } from 'rxjs';
+import { catchError, timeout } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  private apiUrl = 'http://192.168.1.111:3000';
-  private readonly maxRetries = 3;
+  private apiUrl = inject(API_URL);
   private readonly timeoutMs = 10000;
 
   constructor(private http: HttpClient) {}
@@ -17,22 +16,9 @@ export class ApiService {
   get<T>(endpoint: string): Observable<T> {
     const url = `${this.apiUrl}/${endpoint}`;
     console.log('ApiService GET request to:', url);
-    const headers = { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` };
-    return this.http.get<T>(url, { headers }).pipe(
+    // Authorization is attached by authInterceptor (task 12.4).
+    return this.http.get<T>(url).pipe(
       timeout(this.timeoutMs),
-      retryWhen(errors =>
-        errors.pipe(
-          delayWhen((error, index) => {
-            if (index >= this.maxRetries) {
-              return throwError(() => error);
-            }
-            const delayMs = Math.pow(2, index) * 1000;
-            console.warn(`Retry attempt ${index + 1} after ${delayMs}ms`, error);
-            return timer(delayMs);
-          }),
-          take(this.maxRetries)
-        )
-      ),
       catchError(error => this.handleError(error, url))
     );
   }
@@ -40,7 +26,6 @@ export class ApiService {
   post<T>(endpoint: string, data: any, customTimeoutMs?: number): Observable<T> {
     const url = `${this.apiUrl}/${endpoint}`;
     console.log('ApiService POST request to:', url);
-    console.log('Request body:', JSON.stringify(data, null, 2));
 
     const toMs = customTimeoutMs ?? this.timeoutMs;
     console.log(`Request timeout: ${toMs}ms`);
