@@ -48,7 +48,22 @@ export function collectErrors(page: Page, ignore: RegExp = /$^/): string[] {
   return errors;
 }
 
-export { expect, test } from '@playwright/test';
+import { test as base } from '@playwright/test';
+import { mockApi } from './mock-api';
+
+/**
+ * `test` with the contract mock backend installed on every page by default: the app probes http://localhost:3000
+ * (/api/meta etc.), and without a server the browser logs ERR_CONNECTION_REFUSED as console errors, which the
+ * "console must be clean" checks would flag. Specs that need other behaviour call `mockApi(page, {...})` again
+ * (later routes win) or run with LOCAL_BACKEND=1 to hit a real server.
+ */
+export const test = base.extend({
+  page: async ({ page }, use) => {
+    if (!process.env['LOCAL_BACKEND']) await mockApi(page);
+    await use(page);
+  },
+});
+export { expect } from '@playwright/test';
 
 /** Picks a drawing tool: measure / zoom / cursor and a group's current tool are on the sidebar, everything else via its group's flyout. */
 export async function pickTool(page: Page, id: string): Promise<void> {

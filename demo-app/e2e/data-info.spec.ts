@@ -47,7 +47,7 @@ test.describe('data info popover + freshness (12.11, 12.12)', () => {
     await p2.addInitScript(() => { sessionStorage.setItem('isLoggedIn', 'true'); });
     await mockApi(p2, { errors: { '/api/meta': { status: 500 } } });
     await p2.goto('/screener');
-    await expect(p2.locator('h1')).toBeVisible();
+    await expect(p2.locator('.screener-title h1')).toBeVisible();
     await expect(p2.locator('[data-info-btn]')).toHaveCount(0);
   });
 });

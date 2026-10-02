@@ -9,6 +9,7 @@ import { entitlementInterceptor } from './core/api/upgrade';
 import { MetaService } from './core/api/meta.service';
 import { SymbolCapabilities } from './core/api/symbol-capabilities';
 import { EntitlementsService } from './core/api/entitlements.service';
+import { OhlcvApiClient } from './core/api/ohlcv-api.client';
 import { ChartDataService } from './core/services/chart-data.service';
 
 import { routes } from './app.routes';
@@ -18,7 +19,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
     provideHttpClient(withInterceptors([errorInterceptor, entitlementInterceptor, retryInterceptor, etagCacheInterceptor, authInterceptor])),
-    provideAppInitializer(() => { inject(MetaService).load(); inject(SymbolCapabilities); inject(EntitlementsService).load(); }), // not awaited: never blocks first render; SymbolCapabilities instantiated so its e2e hook exists
+    provideAppInitializer(() => { inject(MetaService).load(); inject(SymbolCapabilities); inject(EntitlementsService).load(); inject(OhlcvApiClient); }), // not awaited: never blocks first render; SymbolCapabilities instantiated so its e2e hook exists
     ChartDataService
   ]
 };

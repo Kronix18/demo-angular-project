@@ -56,6 +56,7 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<void>
     [/^\/api\/screener\/run$/, load('screener-run.json')],
     [/^\/api\/user\/entitlements$/, ent],
     [/^\/api\/plans$/, load('plans.json')],
+    [/^\/api\/user\/profile$/, load('user-profile.json')],
   ];
   const flakyCount: Record<string, number> = {};
   await page.route(/\/api\//, async (route) => {
